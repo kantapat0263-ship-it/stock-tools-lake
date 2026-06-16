@@ -130,6 +130,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
       <button data-v="dash" class="active"><span class="ic">📊</span> Dashboard</button>
       <button data-v="tools"><span class="ic">🧰</span> ทะเบียนเครื่องมือ</button>
       <button data-v="borrow"><span class="ic">🔄</span> เบิก / คืน</button>
+      <button data-v="scan"><span class="ic">📷</span> สแกน (มือถือ)</button>
       <button data-v="repair"><span class="ic">📤</span> ส่งซ่อม</button>
       <button data-v="receive"><span class="ic">📥</span> รับคืนจากซ่อม</button>
       <button data-v="history"><span class="ic">📜</span> ประวัติ</button>
@@ -168,6 +169,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 /* ============ state ============ */
 const SB_URL='https://iadnauodmoydxaajtory.supabase.co';
@@ -198,7 +200,7 @@ function count(st){return S.tools.filter(t=>t.status===st&&inView(t)).length;}
 /* ============ toast ============ */
 let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tmo);tmo=setTimeout(()=>t.classList.remove('on'),2200);}
 /* ---- data layer (Supabase) ---- */
-function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||''};}
+function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||'')};}
 function rowToSlip(s){return {id:s.id,slip_no:s.slip_no,no:String(s.slip_no).padStart(3,'0'),sent:(s.sent_date||''),vendor:s.vendor||'',project:s.project||'',sender:s.sender||'',status:s.status||'ส่งแล้ว',received:(s.received_date||''),receiver:s.receiver||'',note:s.note||'',count:'0',company:s.company};}
 function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||''};}
 async function loadAll(){
@@ -242,7 +244,9 @@ async function init(){
   applyTheme(ME.company);
   await loadAll();
   if(!S.tools.length && ME.role!=='admin'){toast('บัญชีนี้ยังไม่ถูกตั้งสิทธิ์ — แจ้งแอดมินตั้งบริษัท/admin ให้');}
-  go('dash');
+  const _tp=new URLSearchParams(location.search).get('t');
+  if(_tp){ go('scan'); const _tt=S.tools.find(x=>x.id===_tp); if(_tt)showScanTool(_tt); }
+  else go('dash');
 }
 function showLogin(){$('#loginScrim').style.display='flex';document.querySelector('.app').style.display='none';}
 async function doLogin(){const e=$('#li_email').value.trim(),p=$('#li_pass').value;$('#li_msg').textContent='กำลังเข้าสู่ระบบ…';
@@ -258,13 +262,14 @@ async function doSignup(){const e=$('#li_email').value.trim(),p=$('#li_pass').va
 async function logout(){await sb.auth.signOut();location.reload();}
 
 /* ============ router ============ */
-const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],labels:['ป้าย QR','สร้าง QR ไม่ซ้ำของแต่ละเครื่อง → พิมพ์เป็นป้าย'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
+const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],scan:['สแกน','สแกน QR → ยืนยันรับ / ส่งคืน / แจ้งชำรุด (ใช้บนมือถือที่หน้างาน)'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],labels:['ป้าย QR','สร้าง QR ไม่ซ้ำของแต่ละเครื่อง → พิมพ์เป็นป้าย'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
 function go(v){
   if(v==='guide'){window.open('guide.html','_blank');return;}
+  if(CUR==='scan'&&v!=='scan'&&window._scanner)stopScanner();
   CUR=v;
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
   $('#ttl').textContent=TITLES[v][0];$('#tsub').textContent=TITLES[v][1];
-  ({dash:renderDash,tools:renderTools,borrow:renderBorrow,repair:renderRepair,receive:renderReceive,history:renderHistory,report:renderReport,labels:renderLabels,trash:renderTrash,audit:renderAudit,users:renderUsers}[v])();
+  ({dash:renderDash,tools:renderTools,borrow:renderBorrow,scan:renderScan,repair:renderRepair,receive:renderReceive,history:renderHistory,report:renderReport,labels:renderLabels,trash:renderTrash,audit:renderAudit,users:renderUsers}[v])();
   window.scrollTo(0,0);
 }
 $('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b)go(b.dataset.v);});
@@ -307,7 +312,13 @@ function renderDash(){
       <table><thead><tr><th>รหัส</th><th>ชื่อ</th><th>ยืมโดย</th><th>อยู่ที่</th></tr></thead><tbody>${_lent.map(x=>`<tr><td><b>${esc(x.t.code)}</b></td><td>${esc(x.t.name).slice(0,30)}</td><td>${coBadge(x.by)}</td><td>${esc(x.t.loc)||'-'}</td></tr>`).join('')}</tbody></table>`:''}
     ${_bor.length?`<p class="muted" style="margin:8px 0 0">📤 คุณกำลังยืมเครื่องของบริษัทอื่นอยู่ ${_bor.length} รายการ</p>`:''}
   </div>`:'';
+  const _late=S.tools.filter(t=>t.receiptPending&&t.dispatchedAt&&inView(t)&&(Date.now()-new Date(t.dispatchedAt))>2*86400000);
+  const pendAlert=_late.length?`<div class="panel" style="border-left:4px solid #dc2626;background:#fef2f2">
+    <h3 style="margin:0 0 6px">⚠️ ค้างยืนยันรับ เกิน 2 วัน (${_late.length}) — อาจตกหล่นระหว่างทาง</h3>
+    <table><thead><tr><th>รหัส</th><th>บ.</th><th>ส่งไป</th><th>ส่งเมื่อ</th></tr></thead><tbody>${_late.slice(0,8).map(t=>`<tr><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.pendingDest)||'-'}</td><td class="muted">${esc(String(t.dispatchedAt).slice(0,10))}</td></tr>`).join('')}</tbody></table>
+  </div>`:'';
   $('#view').innerHTML=`
+    ${pendAlert}
     ${notif}
     <div class="cards">${cards}</div>
     <div class="life">${strip}</div>
@@ -641,9 +652,9 @@ async function doBorrow(){
   if(out&&(!who||!proj)){toast('กรุณากรอก ผู้เบิก + โครงการ/ไซต์ ให้ครบ');return;}
   const sel=[...selBor].map(ix=>S.tools[ix]);
   for(const t of sel){
-    if(out){await sb.from('tools').update({status:'ถูกยืม',location:(proj||'')+(who?' / '+who:''),updated_at:new Date().toISOString()}).eq('id',t.id);
+    if(out){await sb.from('tools').update({status:'ถูกยืม',location:(proj||'')+(who?' / '+who:''),receipt_pending:true,pending_dest:proj,dispatched_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',t.id);
       await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'เบิก',project:proj,actor:who});}
-    else{await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',t.id);
+    else{await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:new Date().toISOString()}).eq('id',t.id);
       await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'คืน'});}
   }
   if(out){await ensureLookup('people',who);await ensureLookup('projects',proj);}
@@ -655,7 +666,7 @@ async function doMove(){
   if(!proj){toast('กรุณากรอก ไซต์ใหม่');return;}
   const sel=[...selBor].map(ix=>S.tools[ix]);
   for(const t of sel){
-    await sb.from('tools').update({location:proj+(who?' / '+who:''),updated_at:new Date().toISOString()}).eq('id',t.id);
+    await sb.from('tools').update({location:proj+(who?' / '+who:''),receipt_pending:true,pending_dest:proj,dispatched_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',t.id);
     await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'ย้ายไซต์',project:proj,actor:who});
   }
   await ensureLookup('projects',proj); if(who)await ensureLookup('people',who);
@@ -800,6 +811,119 @@ function renderReport(){
       </div>
       <p class="muted" style="margin-top:10px;font-size:13px">ดาวน์โหลดตาม "ตัวกรองบริษัท" ที่เลือกอยู่มุมบนขวา · ไฟล์ UTF-8 รองรับภาษาไทยใน Excel</p>
     </div>`;
+}
+
+/* ============ SCAN (มือถือ — เฟส 2: ยืนยันรับ / ส่งคืน / แจ้งชำรุด) ============ */
+let scanTool=null;
+function stopScanner(){ if(window._scanner){try{window._scanner.stop().then(()=>{try{window._scanner.clear();}catch(e){}}).catch(()=>{});}catch(e){} window._scanner=null;} }
+async function startScanner(){
+  if(!window.Html5Qrcode){toast('ไลบรารีสแกนยังโหลดไม่เสร็จ ลองรีเฟรช');return;}
+  stopScanner();
+  try{
+    const h=new Html5Qrcode('qrreader'); window._scanner=h;
+    await h.start({facingMode:'environment'},{fps:10,qrbox:{width:220,height:220}},txt=>{resolveScan(txt);},()=>{});
+    $('#scanStart').style.display='none'; $('#scanStop').style.display='';
+  }catch(e){ window._scanner=null; toast('เปิดกล้องไม่ได้: '+(e.message||e)+' — พิมพ์รหัส/NO แทนได้'); }
+}
+function scanNext(){ $('#scanResult').innerHTML=''; const q=$('#scanq'); if(q){q.value='';} startScanner(); }
+function renderScan(){
+  stopScanner();
+  $('#view').innerHTML=`<div class="panel" style="max-width:520px;margin:0 auto">
+    <h3>📷 สแกนเครื่องมือ <span class="muted" style="font-weight:400">— ส่อง QR หรือพิมพ์รหัส/NO</span></h3>
+    <div id="qrreader" style="width:100%;max-width:340px;margin:0 auto;border-radius:10px;overflow:hidden;background:#0f172a;min-height:60px"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn primary" id="scanStart">▶️ เปิดกล้อง</button>
+      <button class="btn" id="scanStop" style="display:none">⏸️ ปิดกล้อง</button>
+    </div>
+    <div class="field" style="margin-top:10px"><label>หรือพิมพ์รหัส / NO แล้วกด Enter (เผื่อกล้อง/ป้ายมีปัญหา)</label><input class="search" id="scanq" placeholder="เช่น ตู้เชื่อม 02 หรือ 02"></div>
+    <p class="muted" style="font-size:12px">บนมือถือครั้งแรกจะขออนุญาตใช้กล้อง — กดอนุญาต · ใช้ได้ดีบนมือถือ</p>
+    <div id="scanResult" style="margin-top:6px"></div>
+  </div>`;
+  $('#scanStart').onclick=startScanner;
+  $('#scanStop').onclick=()=>{stopScanner();$('#scanStop').style.display='none';$('#scanStart').style.display='';};
+  $('#scanq').addEventListener('keydown',e=>{if(e.key==='Enter'){resolveScan($('#scanq').value.trim());}});
+}
+function resolveScan(text){
+  if(!text)return; const q=String(text).trim(); let id=null;
+  const m=q.match(/[?&]t=([0-9a-fA-F-]{6,})/); if(m)id=m[1];
+  let t=id?S.tools.find(x=>x.id===id):null;
+  if(!t){ const lq=q.toLowerCase();
+    const cands=S.tools.filter(x=>(x.code+' '+x.name+' '+x.no).toLowerCase().includes(lq)||(x.no||'').toLowerCase()===lq);
+    if(cands.length===1)t=cands[0]; else if(cands.length>1){stopScanner();showScanCandidates(cands);return;} }
+  if(!t){ $('#scanResult').innerHTML='<div class="panel empty">ไม่พบเครื่อง — ลองพิมพ์รหัส/NO ใหม่</div>'; return; }
+  stopScanner(); $('#scanStart').style.display=''; $('#scanStop').style.display='none';
+  showScanTool(t);
+}
+function showScanCandidates(cands){
+  $('#scanResult').innerHTML=`<div class="panel"><h3>พบหลายตัว — เลือก</h3>${cands.slice(0,8).map(t=>`<div onclick="showScanToolById('${t.id}')" style="cursor:pointer;padding:9px;border:0.5px solid var(--line);border-radius:8px;margin-bottom:6px"><b>${esc(t.code)}</b> ${coBadge(t.company)} · ${esc(t.name).slice(0,32)}</div>`).join('')}</div>`;
+}
+function showScanToolById(id){const t=S.tools.find(x=>x.id===id);if(t)showScanTool(t);}
+function showScanTool(t){
+  scanTool=t;
+  const pending=t.receiptPending, dest=t.pendingDest||'', toOffice=pending&&dest==='ออฟฟิต';
+  let statusLine='', actions='';
+  if(t.status==='ว่าง'){
+    statusLine=`<span style="background:#dcfce7;color:#15803d;padding:3px 10px;border-radius:8px;font-size:13px">🟢 ว่าง · ที่ออฟฟิต</span>`;
+    actions=`<button class="btn primary" onclick="scanBorrowPrompt()">📤 เบิก (ส่งออกไซต์)</button>`;
+  }else if(t.status==='ถูกยืม'&&pending&&!toOffice){
+    statusLine=`<span style="background:#fef3c7;color:#b45309;padding:3px 10px;border-radius:8px;font-size:13px">🚚 ส่งไป ${esc(dest)} · รอยืนยันรับ</span>`;
+    actions=`<button class="btn green" onclick="scanConfirmReceive()">✅ ยืนยันรับเครื่องนี้</button>`;
+  }else if(t.status==='ถูกยืม'&&pending&&toOffice){
+    statusLine=`<span style="background:#fef3c7;color:#b45309;padding:3px 10px;border-radius:8px;font-size:13px">🚚 ส่งกลับออฟฟิต · รอยืนยันรับ</span>`;
+    actions=`<button class="btn green" onclick="scanConfirmReceive()">✅ ยืนยันรับที่ออฟฟิต</button>`;
+  }else if(t.status==='ถูกยืม'&&!pending){
+    statusLine=`<span style="background:#dbeafe;color:#1d4ed8;padding:3px 10px;border-radius:8px;font-size:13px">📍 อยู่ ${esc(t.loc)||'-'} · ยืนยันแล้ว</span>`;
+    actions=`<button class="btn primary" onclick="scanSendBack()">↩️ ส่งคืน (กลับออฟฟิต)</button>`;
+  }else if(t.status==='ส่งซ่อม'){
+    statusLine=`<span style="background:#e2e8f0;color:#475569;padding:3px 10px;border-radius:8px;font-size:13px">⚙️ อยู่ร้านซ่อม</span>`;
+    actions=`<span class="muted" style="font-size:13px">รับคืนจากซ่อมทำที่หน้าคอม</span>`;
+  }else{
+    statusLine=`<span style="background:#e2e8f0;color:#475569;padding:3px 10px;border-radius:8px;font-size:13px">${esc(t.status)}</span>`;
+  }
+  $('#scanResult').innerHTML=`<div class="panel" style="border-left:4px solid var(--blue)">
+    <div style="display:flex;align-items:center;gap:8px"><b style="font-size:18px">${esc(t.code)}</b> ${coBadge(t.company)}</div>
+    <div class="muted">${esc(t.name)}</div>
+    <div style="margin:12px 0">${statusLine}</div>
+    <div style="display:flex;flex-direction:column;gap:8px">${actions}
+      <button class="btn" style="background:#fee2e2;color:#b91c1c" onclick="scanReportBroken()">⚠️ แจ้งชำรุด</button>
+      <button class="btn ghost" onclick="scanNext()">📷 สแกนตัวอื่น</button>
+    </div>
+  </div>`;
+}
+async function scanWrite(t,upd,mv,msg){
+  await sb.from('tools').update(Object.assign({updated_at:new Date().toISOString()},upd)).eq('id',t.id);
+  await sb.from('movements').insert(Object.assign({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:today()},mv));
+  toast(msg); await loadAll(); scanDone(t,msg);
+}
+async function scanConfirmReceive(){ const t=scanTool; if(!t)return;
+  const toOffice=t.pendingDest==='ออฟฟิต';
+  const upd=toOffice?{status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null}
+                    :{receipt_pending:false,pending_dest:null,dispatched_at:null};
+  await scanWrite(t,upd,{type:toOffice?'คืน':'ยืนยันรับ',project:toOffice?'ออฟฟิต':(t.pendingDest||'')},toOffice?'✅ รับเข้าออฟฟิตแล้ว':'✅ ยืนยันรับที่ไซต์แล้ว');
+}
+async function scanSendBack(){ const t=scanTool; if(!t)return;
+  await scanWrite(t,{receipt_pending:true,pending_dest:'ออฟฟิต',dispatched_at:new Date().toISOString()},{type:'ส่งคืน',project:'ออฟฟิต'},'↩️ ส่งคืน '+t.code+' — รอออฟฟิตยืนยันรับ');
+}
+async function scanReportBroken(){ const t=scanTool; if(!t)return;
+  if(!confirm('แจ้งว่า '+t.code+' ชำรุด?'))return;
+  await scanWrite(t,{status:'ชำรุด',receipt_pending:false,pending_dest:null,dispatched_at:null},{type:'แจ้งชำรุด',reason:'แจ้งจากสแกนหน้างาน'},'⚠️ แจ้งชำรุด '+t.code+' แล้ว');
+}
+async function scanBorrowPrompt(){ const t=scanTool; if(!t)return;
+  const site=(prompt('เบิก '+t.code+' ส่งไปไซต์ไหน?')||'').trim(); if(!site)return;
+  const who=(prompt('ผู้รับปลายทาง (ถ้ามี)')||'').trim();
+  await sb.from('tools').update({status:'ถูกยืม',location:site+(who?' / '+who:''),receipt_pending:true,pending_dest:site,dispatched_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',t.id);
+  await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:today(),type:'เบิก',project:site,actor:who});
+  await ensureLookup('projects',site); if(who)await ensureLookup('people',who);
+  toast('📤 เบิก '+t.code+' → '+site); await loadAll(); scanDone(t,'ส่งออกไซต์ '+site+' — รอยืนยันรับ');
+}
+function scanDone(t,msg){ scanTool=null;
+  $('#scanResult').innerHTML=`<div class="panel" style="text-align:center;border-left:4px solid #16a34a">
+    <div style="font-size:40px">✅</div>
+    <div style="font-size:16px;font-weight:600">${esc(msg)}</div>
+    <div class="muted">${esc(t.code)} · ${esc(t.name).slice(0,30)}</div>
+    <div class="muted" style="font-size:12px;margin-top:6px">บันทึกโดย ${esc((ME&&ME.email)||'')} · ${esc(today())}</div>
+    <button class="btn primary" style="margin-top:12px" onclick="scanNext()">📷 สแกนตัวต่อไป</button>
+  </div>`;
 }
 
 /* ============ QR LABELS (ป้าย QR — เฟส 1) ============ */
