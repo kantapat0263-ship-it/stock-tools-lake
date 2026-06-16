@@ -44,6 +44,28 @@ body{margin:0;font-family:'Noto Sans Thai',system-ui,sans-serif;background:var(-
 .user{display:flex;align-items:center;gap:9px}
 .user .av{width:38px;height:38px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
 .view{padding:24px 26px}
+.menubtn{display:none;background:none;border:0;font-size:24px;line-height:1;cursor:pointer;color:var(--ink);padding:2px 8px 2px 0}
+.navback{display:none}
+@media (max-width:768px){
+  .side{position:fixed;left:0;top:0;width:230px;height:100vh;z-index:60;transform:translateX(-100%);transition:transform .25s ease}
+  .app.navopen .side{transform:translateX(0);box-shadow:0 0 50px rgba(0,0,0,.5)}
+  .app.navopen .navback{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:55}
+  .menubtn{display:block}
+  .topbar{padding:11px 12px;gap:8px}
+  .topbar h2{font-size:16px}
+  .topbar .sub{display:none}
+  .user .uinfo{display:none}
+  .user .av{width:32px;height:32px;font-size:13px}
+  .coswitch button{padding:6px 9px;font-size:12.5px}
+  .view{padding:14px 11px}
+  .cards{grid-template-columns:repeat(2,1fr);gap:10px}
+  .card{padding:13px 14px}
+  .card .big{font-size:23px}
+  .grid3{grid-template-columns:1fr !important}
+  .life{overflow-x:auto}
+  .flexrow{flex-direction:column;gap:8px}
+  table{font-size:12.5px}
+}
 /* ---------- cards ---------- */
 .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:18px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
@@ -143,12 +165,14 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
     </nav>
     <div class="sidefoot">PAC SYSTEM<br><span style="color:#4ade80">● เชื่อม Supabase ออนไลน์</span><br><a href="#" id="reset" style="color:#7891b5">↩ ออกจากระบบ</a></div>
   </aside>
+  <div class="navback" onclick="closeNav()"></div>
   <div class="main">
     <div class="topbar">
+      <button class="menubtn" onclick="toggleNav()" aria-label="เมนู">☰</button>
       <div><h2 id="ttl">ภาพรวม</h2><div class="sub" id="tsub">ยินดีต้อนรับ 👋</div></div>
       <div class="spacer"></div>
       <div class="coswitch" id="coswitch"><button class="on" data-co="" onclick="setView('')">🏢 ทั้งหมด</button><button data-co="PAC" onclick="setView('PAC')">PAC</button><button data-co="LOTUS" onclick="setView('LOTUS')">LOTUS</button></div>
-      <div class="user"><div class="av">P</div><div><b style="font-size:13px" id="uemail">—</b><div class="sub" id="urole">—</div></div></div>
+      <div class="user"><div class="av">P</div><div class="uinfo"><b style="font-size:13px" id="uemail">—</b><div class="sub" id="urole">—</div></div></div>
     </div>
     <div class="view" id="view"></div>
   </div>
@@ -272,7 +296,9 @@ function go(v){
   ({dash:renderDash,tools:renderTools,borrow:renderBorrow,scan:renderScan,repair:renderRepair,receive:renderReceive,history:renderHistory,report:renderReport,labels:renderLabels,trash:renderTrash,audit:renderAudit,users:renderUsers}[v])();
   window.scrollTo(0,0);
 }
-$('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b)go(b.dataset.v);});
+$('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b){go(b.dataset.v);closeNav();}});
+function toggleNav(){document.querySelector('.app').classList.toggle('navopen');}
+function closeNav(){document.querySelector('.app').classList.remove('navopen');}
 $('#reset').onclick=e=>{e.preventDefault();if(confirm('ออกจากระบบ?'))logout();};
 
 /* ============ DASHBOARD ============ */
