@@ -134,6 +134,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
       <button data-v="receive"><span class="ic">📥</span> รับคืนจากซ่อม</button>
       <button data-v="history"><span class="ic">📜</span> ประวัติ</button>
       <button data-v="report"><span class="ic">📈</span> รายงาน</button>
+      <button data-v="labels"><span class="ic">🏷️</span> ป้าย QR</button>
       <button data-v="trash"><span class="ic">🗑️</span> ถังขยะ</button>
       <button data-v="guide"><span class="ic">📖</span> คู่มือ</button>
       <button data-v="audit" id="navAudit" style="display:none"><span class="ic">📝</span> ประวัติแก้ไข</button>
@@ -166,6 +167,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script>
 /* ============ state ============ */
 const SB_URL='https://iadnauodmoydxaajtory.supabase.co';
@@ -256,13 +258,13 @@ async function doSignup(){const e=$('#li_email').value.trim(),p=$('#li_pass').va
 async function logout(){await sb.auth.signOut();location.reload();}
 
 /* ============ router ============ */
-const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
+const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],labels:['ป้าย QR','สร้าง QR ไม่ซ้ำของแต่ละเครื่อง → พิมพ์เป็นป้าย'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
 function go(v){
   if(v==='guide'){window.open('guide.html','_blank');return;}
   CUR=v;
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
   $('#ttl').textContent=TITLES[v][0];$('#tsub').textContent=TITLES[v][1];
-  ({dash:renderDash,tools:renderTools,borrow:renderBorrow,repair:renderRepair,receive:renderReceive,history:renderHistory,report:renderReport,trash:renderTrash,audit:renderAudit,users:renderUsers}[v])();
+  ({dash:renderDash,tools:renderTools,borrow:renderBorrow,repair:renderRepair,receive:renderReceive,history:renderHistory,report:renderReport,labels:renderLabels,trash:renderTrash,audit:renderAudit,users:renderUsers}[v])();
   window.scrollTo(0,0);
 }
 $('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b)go(b.dataset.v);});
@@ -798,6 +800,71 @@ function renderReport(){
       </div>
       <p class="muted" style="margin-top:10px;font-size:13px">ดาวน์โหลดตาม "ตัวกรองบริษัท" ที่เลือกอยู่มุมบนขวา · ไฟล์ UTF-8 รองรับภาษาไทยใน Excel</p>
     </div>`;
+}
+
+/* ============ QR LABELS (ป้าย QR — เฟส 1) ============ */
+const QR_BASE='https://stock-tools-lake.vercel.app/?t=';
+let selLabel=new Set(), lblFiltered=[];
+function qrDataURL(text){return new Promise((res,rej)=>{
+  if(!window.qrcode){return rej(new Error('ไลบรารี QR ยังโหลดไม่เสร็จ ลองรีเฟรช'));}
+  let gif; try{const qr=qrcode(0,'H');qr.addData(text);qr.make();gif=qr.createDataURL(8,16);}catch(e){return rej(e);}
+  const img=new Image();
+  img.onload=()=>{const s=320,c=document.createElement('canvas');c.width=c.height=s;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,s,s);ctx.imageSmoothingEnabled=false;ctx.drawImage(img,0,0,s,s);res(c.toDataURL('image/png'));};
+  img.onerror=()=>rej(new Error('โหลดรูป QR ไม่ได้'));
+  img.src=gif;
+});}
+async function downloadQR(id,code){ try{ const u=await qrDataURL(QR_BASE+id); const a=document.createElement('a'); a.href=u; a.download='QR_'+String(code||id).replace(/[^\w\-ก-๙]+/g,'_')+'.png'; document.body.appendChild(a); a.click(); a.remove(); toast('ดาวน์โหลด QR แล้ว'); }catch(e){ toast('สร้าง QR ไม่ได้: '+e.message);} }
+function togLabel(id,on){on?selLabel.add(id):selLabel.delete(id);$('#lcount').textContent='เลือก '+selLabel.size;}
+function renderLabels(){
+  selLabel=new Set();
+  $('#view').innerHTML=`<div class="panel">
+    <h3>🏷️ ป้าย QR เครื่องมือ <span class="muted" style="font-weight:400">— QR ไม่ซ้ำของแต่ละตัว · เลือกแล้วพิมพ์เป็นแผ่นป้าย หรือกด ⬇️ ดาวน์โหลดทีละตัว</span></h3>
+    <div class="toolbar"><input class="search" id="lq" placeholder="🔎 ค้นหา ชื่อ / หมวด / NO / รหัส">
+      <button class="btn" id="lall" style="margin-left:8px">เลือกทั้งหมดที่เห็น</button>
+      <button class="btn" id="lnone">ล้าง</button></div>
+    <div class="selbar" style="position:sticky;top:10px;z-index:5;background:var(--card);box-shadow:0 6px 16px rgba(0,0,0,.10);border-radius:10px;padding:10px 14px;margin:10px 0">
+      <b id="lcount">เลือก 0</b><div class="spacer"></div>
+      <button class="btn primary" id="lprint">🖨️ พิมพ์ / บันทึก PDF (ที่เลือก)</button>
+    </div>
+    <div id="ltbl"></div>
+  </div>`;
+  const draw=()=>{const q=$('#lq').value.trim().toLowerCase();
+    lblFiltered=S.tools.filter(t=>inView(t)&&(!q||(t.code+' '+t.name+' '+t.no+' '+t.cat).toLowerCase().includes(q)));
+    $('#ltbl').innerHTML=`<table><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th></th></tr></thead><tbody>${
+      lblFiltered.map(t=>`<tr><td><input type="checkbox" ${selLabel.has(t.id)?'checked':''} onchange="togLabel('${t.id}',this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,40)}</td><td>${esc(t.no)}</td><td class="right"><button class="btn" style="padding:4px 10px" onclick="downloadQR('${t.id}','${esc(t.code)}')">⬇️ QR</button></td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่พบ</td></tr>'
+    }</tbody></table>`;
+    $('#lcount').textContent='เลือก '+selLabel.size;};
+  $('#lq').oninput=draw;
+  $('#lall').onclick=()=>{lblFiltered.forEach(t=>selLabel.add(t.id));draw();};
+  $('#lnone').onclick=()=>{selLabel=new Set();draw();};
+  $('#lprint').onclick=printLabels;
+  draw();
+}
+async function printLabels(){
+  const tools=S.tools.filter(t=>selLabel.has(t.id));
+  if(!tools.length){toast('ยังไม่ได้เลือกเครื่อง');return;}
+  if(!window.qrcode){toast('ไลบรารี QR ยังโหลดไม่เสร็จ ลองรีเฟรช');return;}
+  toast('กำลังสร้าง QR '+tools.length+' ดวง…');
+  let cells='';
+  for(const t of tools){
+    let u=''; try{u=await qrDataURL(QR_BASE+t.id);}catch(e){}
+    cells+=`<div class="lbl"><img src="${u}"><div class="c">${esc(t.code)}</div><div class="n">${esc(t.name)}</div><div class="co">${esc(t.company)}</div></div>`;
+  }
+  const w=window.open('','_blank');
+  w.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ป้าย QR (${tools.length} ดวง)</title>
+    <style>*{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:"Noto Sans Thai",Tahoma,sans-serif;padding:8mm;color:#111}
+      h1{font-size:14px;margin-bottom:6mm;color:#555}
+      .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5mm}
+      .lbl{border:1px dashed #bbb;border-radius:6px;padding:6px 4px;text-align:center;page-break-inside:avoid}
+      .lbl img{width:34mm;height:34mm;display:block;margin:0 auto}
+      .lbl .c{font-weight:700;font-size:13px;margin-top:3px}
+      .lbl .n{font-size:9.5px;color:#444;line-height:1.15;max-height:23px;overflow:hidden}
+      .lbl .co{font-size:9px;color:#888}
+      @media print{body{padding:5mm}h1{display:none}.lbl{border-color:#ccc}}
+    </style></head><body><h1>ป้าย QR เครื่องมือ — ${tools.length} ดวง (พิมพ์/บันทึก PDF)</h1><div class="grid">${cells}</div>
+    <scr`+`ipt>window.onload=function(){setTimeout(function(){window.print();},400);}</scr`+`ipt></body></html>`);
+  w.document.close();
 }
 
 /* ============ TRASH (ถังขยะ — กู้คืน) ============ */
