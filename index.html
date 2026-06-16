@@ -130,6 +130,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
       <button data-v="history"><span class="ic">📜</span> ประวัติ</button>
       <button data-v="report"><span class="ic">📈</span> รายงาน</button>
       <button data-v="trash"><span class="ic">🗑️</span> ถังขยะ</button>
+      <button data-v="guide"><span class="ic">📖</span> คู่มือ</button>
       <button data-v="audit" id="navAudit" style="display:none"><span class="ic">📝</span> ประวัติแก้ไข</button>
       <button data-v="users" id="navUsers" style="display:none"><span class="ic">👥</span> จัดการผู้ใช้</button>
     </nav>
@@ -252,6 +253,7 @@ async function logout(){await sb.auth.signOut();location.reload();}
 /* ============ router ============ */
 const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
 function go(v){
+  if(v==='guide'){window.open('guide.html','_blank');return;}
   CUR=v;
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
   $('#ttl').textContent=TITLES[v][0];$('#tsub').textContent=TITLES[v][1];
