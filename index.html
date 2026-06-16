@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PAC — ระบบจัดการเครื่องมือ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#0f2744; --navy2:#16365c; --navydark:#0a1c33; --blue:#2563eb; --blue-d:#1d4ed8;
+  --bg:#f1f5f9; --card:#fff; --line:#e2e8f0; --ink:#0f172a; --muted:#64748b;
+  --green:#16a34a; --amber:#d97706; --red:#dc2626; --gray:#64748b;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Noto Sans Thai',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+.app{display:flex;min-height:100vh}
+/* ---------- sidebar ---------- */
+.side{width:230px;background:linear-gradient(180deg,var(--navy),var(--navydark));color:#cbd5e1;flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.brand{padding:20px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.08)}
+.brand .logo{width:38px;height:38px;border-radius:9px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:17px}
+.brand b{color:#fff;font-size:17px;display:block;line-height:1.1}
+.brand small{color:#7891b5;font-size:10px;letter-spacing:.5px}
+.nav{padding:12px 10px;flex:1;overflow:auto}
+.nav button{width:100%;text-align:left;background:none;border:0;color:#cbd5e1;padding:11px 14px;border-radius:9px;cursor:pointer;font:inherit;display:flex;align-items:center;gap:11px;margin-bottom:3px}
+.nav button:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav button.active{background:var(--blue);color:#fff;font-weight:600;box-shadow:0 4px 12px rgba(37,99,235,.35)}
+.nav .ic{width:20px;text-align:center}
+.sidefoot{padding:14px 18px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:#7891b5}
+/* ---------- main ---------- */
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{background:#fff;border-bottom:1px solid var(--line);padding:14px 26px;display:flex;align-items:center;gap:18px;position:sticky;top:0;z-index:5}
+.topbar h2{margin:0;font-size:19px}
+.topbar .sub{color:var(--muted);font-size:12px}
+.spacer{flex:1}
+.coswitch{display:flex;background:var(--bg);border-radius:9px;padding:3px;gap:2px;border:1px solid var(--line)}
+.coswitch button{border:0;background:none;padding:7px 16px;border-radius:7px;cursor:pointer;font:inherit;color:var(--muted);font-weight:600}
+.coswitch button.on{background:var(--blue);color:#fff}
+.user{display:flex;align-items:center;gap:9px}
+.user .av{width:38px;height:38px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+.view{padding:24px 26px}
+/* ---------- cards ---------- */
+.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.card .lab{color:var(--muted);font-size:12px;display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.card .big{font-size:30px;font-weight:800;line-height:1}
+.card .pct{font-size:12px;color:var(--muted);margin-top:6px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:16px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+.panel h3{margin:0 0 14px;font-size:15px;display:flex;align-items:center;justify-content:space-between}
+.panel h3 a{font-size:12px;color:var(--blue);text-decoration:none;cursor:pointer}
+/* lifecycle strip */
+.life{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:var(--navy);border-radius:14px;padding:18px 20px;color:#fff;margin-bottom:18px}
+.life .st{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:64px}
+.life .st .b{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;background:rgba(255,255,255,.1)}
+.life .st small{font-size:11px;color:#cbd5e1}
+.life .ar{color:#5b7aa6;font-size:18px}
+/* tables */
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);font-size:13px}
+th{color:var(--muted);font-weight:600;font-size:12px;background:#f8fafc}
+tbody tr:hover{background:#f8fafc}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
+.chip .dot{width:8px;height:8px}
+/* controls */
+.toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+input,select,textarea{font:inherit;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
+input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
+.search{flex:1;min-width:200px}
+.btn{border:0;border-radius:9px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer;background:#eef2f7;color:var(--ink);display:inline-flex;align-items:center;gap:7px}
+.btn:hover{filter:brightness(.97)}
+.btn.primary{background:var(--blue);color:#fff}
+.btn.green{background:var(--green);color:#fff}
+.btn.ghost{background:none;border:1px solid var(--line)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.muted{color:var(--muted)}
+.right{text-align:right}
+.center{text-align:center}
+/* modal / drawer */
+.scrim{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:40}
+.scrim.on{display:flex}
+.modal{background:#fff;border-radius:16px;max-width:560px;width:92%;max-height:88vh;overflow:auto;padding:22px}
+.modal h3{margin:0 0 4px}
+.field{margin:12px 0}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%}
+.flexrow{display:flex;gap:10px}
+.flexrow>*{flex:1}
+.selbar{position:sticky;bottom:0;background:#fff;border-top:2px solid var(--blue);padding:14px 18px;display:flex;align-items:center;gap:14px;border-radius:0 0 14px 14px;margin:0 -18px -18px}
+.tabs{display:flex;gap:6px;margin-bottom:16px}
+.tabs button{border:1px solid var(--line);background:#fff;padding:9px 18px;border-radius:9px;cursor:pointer;font:inherit;font-weight:600;color:var(--muted)}
+.tabs button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:13px 22px;border-radius:11px;z-index:60;opacity:0;transition:.25s;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.toast.on{opacity:1}
+.tl{list-style:none;padding:0;margin:0}
+.tl li{display:flex;gap:14px;padding:10px 0;border-bottom:1px dashed var(--line)}
+.tl .ti{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#eef2f7}
+.empty{text-align:center;color:var(--muted);padding:40px}
+/* ---------- print ---------- */
+#printArea{display:none}
+@media print{
+  body{background:#fff}
+  .app{display:none}
+  #printArea{display:block;font-family:Tahoma,'Noto Sans Thai',sans-serif;color:#000;padding:0}
+  @page{size:A4 portrait;margin:12mm}
+}
+.doc{width:100%;color:#000;font-family:Tahoma,'Noto Sans Thai',sans-serif}
+.doc h1{text-align:center;font-size:18px;margin:0 0 2px}
+.doc .dsub{text-align:center;font-size:12px;margin-bottom:10px}
+.doc .dhead{display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px}
+.doc table{width:100%;border-collapse:collapse;font-size:12px}
+.doc th,.doc td{border:1px solid #000;padding:4px 6px}
+.doc th{text-align:center;background:#fff}
+.doc .sign{display:flex;justify-content:space-around;margin-top:34px;font-size:13px;text-align:center}
+.doc .sign div{flex:1}
+</style>
+</head>
+<body>
+<div class="app" style="display:none">
+  <aside class="side">
+    <div class="brand"><div class="logo">LG</div><div><b>LOTUS GROUP</b><small>STOCK เครื่องมือ</small></div></div>
+    <nav class="nav" id="nav">
+      <button data-v="dash" class="active"><span class="ic">📊</span> Dashboard</button>
+      <button data-v="tools"><span class="ic">🧰</span> ทะเบียนเครื่องมือ</button>
+      <button data-v="borrow"><span class="ic">🔄</span> เบิก / คืน</button>
+      <button data-v="repair"><span class="ic">📤</span> ส่งซ่อม</button>
+      <button data-v="receive"><span class="ic">📥</span> รับคืนจากซ่อม</button>
+      <button data-v="history"><span class="ic">📜</span> ประวัติ</button>
+      <button data-v="report"><span class="ic">📈</span> รายงาน</button>
+      <button data-v="trash"><span class="ic">🗑️</span> ถังขยะ</button>
+      <button data-v="audit" id="navAudit" style="display:none"><span class="ic">📝</span> ประวัติแก้ไข</button>
+      <button data-v="users" id="navUsers" style="display:none"><span class="ic">👥</span> จัดการผู้ใช้</button>
+    </nav>
+    <div class="sidefoot">PAC SYSTEM<br><span style="color:#4ade80">● เชื่อม Supabase ออนไลน์</span><br><a href="#" id="reset" style="color:#7891b5">↩ ออกจากระบบ</a></div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <div><h2 id="ttl">ภาพรวม</h2><div class="sub" id="tsub">ยินดีต้อนรับ 👋</div></div>
+      <div class="spacer"></div>
+      <div class="coswitch" id="coswitch"><button class="on" data-co="" onclick="setView('')">🏢 ทั้งหมด</button><button data-co="PAC" onclick="setView('PAC')">PAC</button><button data-co="LOTUS" onclick="setView('LOTUS')">LOTUS</button></div>
+      <div class="user"><div class="av">P</div><div><b style="font-size:13px" id="uemail">—</b><div class="sub" id="urole">—</div></div></div>
+    </div>
+    <div class="view" id="view"></div>
+  </div>
+</div>
+<div class="scrim" id="scrim"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+<div id="printArea"></div>
+<div id="loginScrim" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#0f2744,#16365c);align-items:center;justify-content:center;z-index:100">
+  <div style="background:#fff;border-radius:16px;padding:30px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.35)">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><div style="width:42px;height:42px;border-radius:10px;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px">LG</div><div><b style="font-size:18px">LOTUS GROUP STOCK</b><div style="font-size:11px;color:#64748b">ระบบจัดการเครื่องมือ (PAC + LOTUS)</div></div></div>
+    <div class="field"><label>อีเมล</label><input id="li_email" type="email" autocomplete="username" style="width:100%"></div>
+    <div class="field"><label>รหัสผ่าน</label><input id="li_pass" type="password" autocomplete="current-password" style="width:100%" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div id="li_msg" style="color:#dc2626;font-size:12px;min-height:16px;margin:4px 0"></div>
+    <button class="btn primary" style="width:100%;justify-content:center" onclick="doLogin()">เข้าสู่ระบบ</button>
+    <button class="btn ghost" style="width:100%;justify-content:center;margin-top:8px" onclick="doSignup()">สมัครบัญชีใหม่</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ============ state ============ */
+const SB_URL='https://iadnauodmoydxaajtory.supabase.co';
+const SB_KEY='sb_publishable_P7s42m8Z66_0fT0VjCxXrg_wXsc0ONi';
+let COMPANY='PAC';
+let FILTER='';
+function inView(t){return !FILTER||t.company===FILTER;}
+function coBadge(co){return `<span class="chip" style="background:${co==='LOTUS'?'#ede9fe':'#e0f2fe'};color:${co==='LOTUS'?'#7c3aed':'#0369a1'};font-size:11px;padding:2px 8px">${esc(co||'-')}</span>`;}
+function setView(co){FILTER=co; if(co&&ME&&ME.role==='admin')COMPANY=co; document.querySelectorAll('#coswitch button').forEach(b=>b.classList.toggle('on',(b.dataset.co||'')===co)); go(CUR);}
+function applyTheme(co){const r=document.documentElement.style;
+  if(co==='LOTUS'){r.setProperty('--navy','#3f4a22');r.setProperty('--navy2','#55652f');r.setProperty('--navydark','#2a3217');r.setProperty('--blue','#5c7a29');r.setProperty('--blue-d','#465f1f');}
+  else{r.setProperty('--navy','#0f2744');r.setProperty('--navy2','#16365c');r.setProperty('--navydark','#0a1c33');r.setProperty('--blue','#2563eb');r.setProperty('--blue-d','#1d4ed8');}}
+function canEditCo(co){return !!(ME&&(ME.role==='admin'||ME.company===co));}
+async function logAudit(action,company,code,detail){try{await sb.from('audit_log').insert({company,user_email:(ME&&ME.email)||'',action,tool_code:code,detail:detail||''});}catch(e){}}
+const sb = window.supabase.createClient(SB_URL, SB_KEY);
+let S = {tools:[],slips:[],movements:[],lookups:{categories:[],projects:[],people:[],vendors:[]},nextSlip:1};
+let CUR='dash', ME=null;
+function today(){const d=new Date();return d.toISOString().slice(0,10);}
+const $=s=>document.querySelector(s);
+const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ============ status helpers ============ */
+const STC={'ว่าง':'#16a34a','ถูกยืม':'#2563eb','ส่งซ่อม':'#64748b','รอส่งซ่อม':'#d97706','ชำรุด':'#dc2626'};
+function chip(st){const c=STC[st]||'#94a3b8';const bg={'#16a34a':'#dcfce7','#2563eb':'#dbeafe','#64748b':'#f1f5f9','#d97706':'#fef3c7','#dc2626':'#fee2e2'}[c]||'#f1f5f9';
+  return `<span class="chip" style="background:${bg};color:${c}"><span class="dot" style="background:${c}"></span>${esc(st||'-')}</span>`;}
+function count(st){return S.tools.filter(t=>t.status===st&&inView(t)).length;}
+
+/* ============ toast ============ */
+let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tmo);tmo=setTimeout(()=>t.classList.remove('on'),2200);}
+/* ---- data layer (Supabase) ---- */
+function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||''};}
+function rowToSlip(s){return {id:s.id,slip_no:s.slip_no,no:String(s.slip_no).padStart(3,'0'),sent:(s.sent_date||''),vendor:s.vendor||'',project:s.project||'',sender:s.sender||'',status:s.status||'ส่งแล้ว',received:(s.received_date||''),receiver:s.receiver||'',note:s.note||'',count:'0',company:s.company};}
+function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||''};}
+async function loadAll(){
+  const [t,s,mv,c,p,pe,v,au,tr]=await Promise.all([
+    sb.from('tools').select('*').eq('deleted',false),
+    sb.from('repair_slips').select('*').order('slip_no'),
+    sb.from('movements').select('*').order('occurred_on'),
+    sb.from('categories').select('name'),sb.from('projects').select('name'),
+    sb.from('people').select('name'),sb.from('vendors').select('name'),
+    sb.from('audit_log').select('*').order('occurred_at',{ascending:false}).limit(1000),
+    sb.from('tools').select('*').eq('deleted',true)]);
+  if(t.error){toast('โหลดข้อมูลไม่ได้: '+t.error.message);}
+  const byId={};
+  S.tools=(t.data||[]).map(rowToTool); S.tools.forEach((x,i)=>{x.i=i;byId[x.id]=x;});
+  S.slips=(s.data||[]).map(rowToSlip);
+  S.movements=(mv.data||[]).map(m=>rowToMov(m,byId));
+  const rc={},slc={};
+  S.movements.forEach(m=>{if(m.type==='ส่งซ่อม'){if(m.tool_id)rc[m.tool_id]=(rc[m.tool_id]||0)+1;if(m.slip)slc[m.slip]=(slc[m.slip]||0)+1;}});
+  S.tools.forEach(x=>x.repairs=String(rc[x.id]||0));
+  S.slips.forEach(x=>x.count=String(slc[x.no]||0));
+  const nm=d=>(d.data||[]).map(r=>r.name).sort();
+  S.lookups={categories:nm(c),projects:nm(p),people:nm(pe),vendors:nm(v)};
+  S.audit=(au.data||[]);
+  S.trash=(tr.data||[]).map(rowToTool);
+  S.nextSlipByCo={};['PAC','LOTUS'].forEach(co=>S.nextSlipByCo[co]=(S.slips.filter(x=>x.company===co).reduce((m,x)=>Math.max(m,x.slip_no||0),0))+1);
+}
+async function ensureLookup(tbl,name,co){name=(name||'').trim();if(!name)return;if((S.lookups[tbl]||[]).includes(name))return;try{await sb.from(tbl).insert({company:co||COMPANY,name});}catch(e){}}
+async function reload(view){await loadAll();go(view||CUR);}
+/* ---- auth ---- */
+async function init(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){showLogin();return;}
+  const u=session.user;
+  const {data:pr}=await sb.from('profiles').select('*').eq('id',u.id).maybeSingle();
+  ME={id:u.id,email:u.email,role:pr?pr.role:'staff',company:pr?pr.company:null};
+  $('#loginScrim').style.display='none';
+  document.querySelector('.app').style.display='flex';
+  $('#uemail').textContent=ME.email; $('#urole').textContent=(ME.role==='admin'?'ผู้ดูแลระบบ':'พนักงาน '+(ME.company||''));
+  if(ME.role==='admin'){$('#navUsers').style.display='';$('#navAudit').style.display='';}
+  if(ME.role!=='admin'&&ME.company)COMPANY=ME.company;
+  applyTheme(ME.company);
+  await loadAll();
+  if(!S.tools.length && ME.role!=='admin'){toast('บัญชีนี้ยังไม่ถูกตั้งสิทธิ์ — แจ้งแอดมินตั้งบริษัท/admin ให้');}
+  go('dash');
+}
+function showLogin(){$('#loginScrim').style.display='flex';document.querySelector('.app').style.display='none';}
+async function doLogin(){const e=$('#li_email').value.trim(),p=$('#li_pass').value;$('#li_msg').textContent='กำลังเข้าสู่ระบบ…';
+  const {error}=await sb.auth.signInWithPassword({email:e,password:p});
+  if(error){$('#li_msg').textContent='เข้าสู่ระบบไม่ได้: '+error.message;return;} init();}
+async function doSignup(){const e=$('#li_email').value.trim(),p=$('#li_pass').value;
+  if(!e||p.length<6){$('#li_msg').textContent='ใส่อีเมล + รหัสผ่าน (อย่างน้อย 6 ตัว)';return;}
+  $('#li_msg').textContent='กำลังสมัคร…';
+  const {data,error}=await sb.auth.signUp({email:e,password:p});
+  if(error){$('#li_msg').textContent='สมัครไม่ได้: '+error.message;return;}
+  if(data.session){$('#li_msg').textContent='สมัครสำเร็จ! กำลังเข้าสู่ระบบ…';setTimeout(init,600);}
+  else{$('#li_msg').style.color='#16a34a';$('#li_msg').textContent='สมัครแล้ว — โปรดยืนยันอีเมลก่อน หรือกด เข้าสู่ระบบ';}}
+async function logout(){await sb.auth.signOut();location.reload();}
+
+/* ============ router ============ */
+const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
+function go(v){
+  CUR=v;
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
+  $('#ttl').textContent=TITLES[v][0];$('#tsub').textContent=TITLES[v][1];
+  ({dash:renderDash,tools:renderTools,borrow:renderBorrow,repair:renderRepair,receive:renderReceive,history:renderHistory,report:renderReport,trash:renderTrash,audit:renderAudit,users:renderUsers}[v])();
+  window.scrollTo(0,0);
+}
+$('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b)go(b.dataset.v);});
+$('#reset').onclick=e=>{e.preventDefault();if(confirm('ออกจากระบบ?'))logout();};
+
+/* ============ DASHBOARD ============ */
+function renderDash(){
+  const total=S.tools.length, freeN=count('ว่าง'), borrowN=count('ถูกยืม'), repairN=count('ส่งซ่อม');
+  const pendingSlips=S.slips.filter(s=>s.status!=='รับคืนครบ');
+  const pct=n=>total?Math.round(n/total*100):0;
+  const cards=[
+    ['🧰','เครื่องมือทั้งหมด',total,'#0f172a',''],
+    ['🟢','ว่าง',freeN,'#16a34a',pct(freeN)+'%'],
+    ['🔵','ถูกยืม',borrowN,'#2563eb',pct(borrowN)+'%'],
+    ['⚙️','ส่งซ่อม',repairN,'#64748b',pct(repairN)+'%'],
+    ['📄','ใบค้างรับคืน',pendingSlips.length,'#dc2626','']
+  ].map(c=>`<div class="card"><div class="lab"><span>${c[0]}</span>${c[1]}</div><div class="big" style="color:${c[3]}">${c[2]}</div><div class="pct">${c[4]}</div></div>`).join('');
+
+  const life=[['🟢','ว่าง'],['🔵','ถูกยืม'],['🟠','รอซ่อม'],['⚙️','ส่งซ่อม'],['📥','รับคืน'],['✅','พร้อมเบิก']];
+  const strip=life.map((s,idx)=>`<div class="st"><div class="b">${s[0]}</div><small>${s[1]}</small></div>${idx<life.length-1?'<span class="ar">→</span>':''}`).join('');
+
+  // donut
+  const segs=[['ว่าง',freeN],['ถูกยืม',borrowN],['ส่งซ่อม',repairN],['รอส่งซ่อม',count('รอส่งซ่อม')],['ชำรุด',count('ชำรุด')]];
+  const donut=mkDonut(segs,total);
+
+  // pending repair table
+  const ptbl=pendingSlips.slice(0,6).map(s=>`<tr><td><b>${esc(s.no)}</b></td><td>${esc(s.vendor)||'-'}</td><td>${esc(s.sent)}</td><td>${esc(s.status)}</td><td class="center">${esc(s.count)}</td></tr>`).join('')||'<tr><td colspan=5 class="empty">ไม่มี</td></tr>';
+
+  // borrowed list
+  const btbl=S.tools.filter(t=>t.status==='ถูกยืม').slice(0,6).map(t=>`<tr><td><b>${esc(t.no)}</b></td><td>${esc(t.name).slice(0,34)}</td><td>${esc(t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=3 class="empty">ไม่มี</td></tr>';
+
+  // recent activity
+  const recent=[...S.movements.filter(inViewMov)].slice(-8).reverse().map(m=>`<li><div class="ti">${({'เบิก':'📤','คืน':'📥','ส่งซ่อม':'⚙️','รับคืนจากซ่อม':'✅','แจ้งชำรุด':'⚠️','ย้ายไซต์':'🔀'}[m.type]||'•')}</div><div><b>${esc(m.type)}</b> ${esc(m.code||m.note||'')}<div class="sub muted">${esc(m.date)} ${m.actor?'· '+esc(m.actor):''} ${m.project?'· '+esc(m.project):''}</div></div></li>`).join('');
+
+  const _xb=crossBorrows().filter(x=>!FILTER||x.t.company===FILTER||x.by===FILTER);
+  const _lent=(ME&&ME.company)?_xb.filter(x=>x.t.company===ME.company):_xb;
+  const _bor=(ME&&ME.company)?_xb.filter(x=>x.by===ME.company&&x.t.company!==ME.company):[];
+  const notif=(_lent.length||_bor.length)?`<div class="panel" style="border-left:4px solid #f59e0b;background:#fffbeb">
+    ${_lent.length?`<h3 style="margin:0 0 6px">🔔 เครื่องของ ${esc(FILTER||(ME&&ME.company)||'(ทุกบริษัท)')} ถูกอีกบริษัทยืมอยู่ (${_lent.length})</h3>
+      <table><thead><tr><th>รหัส</th><th>ชื่อ</th><th>ยืมโดย</th><th>อยู่ที่</th></tr></thead><tbody>${_lent.map(x=>`<tr><td><b>${esc(x.t.code)}</b></td><td>${esc(x.t.name).slice(0,30)}</td><td>${coBadge(x.by)}</td><td>${esc(x.t.loc)||'-'}</td></tr>`).join('')}</tbody></table>`:''}
+    ${_bor.length?`<p class="muted" style="margin:8px 0 0">📤 คุณกำลังยืมเครื่องของบริษัทอื่นอยู่ ${_bor.length} รายการ</p>`:''}
+  </div>`:'';
+  $('#view').innerHTML=`
+    ${notif}
+    <div class="cards">${cards}</div>
+    <div class="life">${strip}</div>
+    <div class="grid3">
+      <div class="panel"><h3>การกระจายตามสถานะ</h3>${donut}</div>
+      <div class="panel"><h3>เครื่องส่งซ่อมค้างอยู่ <a onclick="go('receive')">ไปรับคืน →</a></h3>
+        <table><thead><tr><th>ใบ</th><th>ช่าง</th><th>ส่งเมื่อ</th><th>สถานะ</th><th class="center">จำนวน</th></tr></thead><tbody>${ptbl}</tbody></table></div>
+      <div class="panel"><h3>กิจกรรมล่าสุด</h3><ul class="tl">${recent}</ul></div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h3>เครื่องที่ถูกยืมอยู่ <a onclick="go('borrow')">ไปเบิก-คืน →</a></h3>
+        <table><thead><tr><th>NO</th><th>ชื่อ</th><th>อยู่ที่</th></tr></thead><tbody>${btbl}</tbody></table></div>
+      <div class="panel"><h3>ทางลัด</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn primary" onclick="go('repair')">📤 ส่งซ่อม</button>
+          <button class="btn green" onclick="go('borrow')">🔄 เบิก-ยืม</button>
+          <button class="btn" onclick="go('receive')">📥 รับคืนจากซ่อม</button>
+          <button class="btn" onclick="go('tools')">🧰 ทะเบียน</button>
+        </div>
+        <p class="muted" style="margin-top:16px;font-size:13px">เลขใบส่งซ่อมถัดไป: <b>${String(S.nextSlip).padStart(3,'0')}</b></p>
+      </div>
+    </div>`;
+}
+function mkDonut(segs,total){
+  let acc=0;const R=70,C=2*Math.PI*R;const colors=segs.map(s=>STC[s[0]]||'#94a3b8');
+  const circles=segs.map((s,i)=>{const frac=total?s[1]/total:0;const dash=frac*C;const el=`<circle r="${R}" cx="90" cy="90" fill="none" stroke="${colors[i]}" stroke-width="26" stroke-dasharray="${dash} ${C-dash}" stroke-dashoffset="${-acc*C}" transform="rotate(-90 90 90)"/>`;acc+=frac;return el;}).join('');
+  const leg=segs.map((s,i)=>`<div style="display:flex;align-items:center;gap:8px;margin:5px 0;font-size:13px"><span class="dot" style="background:${colors[i]}"></span>${esc(s[0])} <b style="margin-left:auto">${s[1]}</b></div>`).join('');
+  return `<div style="display:flex;align-items:center;gap:18px"><svg width="180" height="180" viewBox="0 0 180 180">${circles}<text x="90" y="86" text-anchor="middle" font-size="26" font-weight="800">${total}</text><text x="90" y="106" text-anchor="middle" font-size="12" fill="#64748b">รายการ</text></svg><div style="flex:1">${leg}</div></div>`;
+}
+
+/* ============ TOOLS (ทะเบียน) ============ */
+function renderTools(){
+  const cats=S.lookups.categories;
+  $('#view').innerHTML=`
+   <div class="panel">
+    <div class="toolbar">
+      <input class="search" id="tq" placeholder="🔎 ค้นหา: ชื่อ / NO / S/N / รหัส…">
+      <select id="fcat"><option value="">ทุกหมวด</option>${cats.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
+      <select id="fst"><option value="">ทุกสถานะ</option>${Object.keys(STC).map(s=>`<option>${s}</option>`).join('')}</select>
+      <button class="btn primary" onclick="addTool()">➕ เพิ่มเครื่องใหม่</button>
+      <span class="muted" id="tcount"></span>
+    </div>
+    <div id="ttbl"></div>
+   </div>`;
+  const draw=()=>{
+    const q=$('#tq').value.trim().toLowerCase(),fc=$('#fcat').value,fs=$('#fst').value;
+    const rows=S.tools.filter(t=>{
+      if(!inView(t))return false;
+      if(fc&&t.cat!==fc)return false; if(fs&&t.status!==fs)return false;
+      if(q){const h=(t.code+' '+t.name+' '+t.no+' '+t.sn).toLowerCase();if(!h.includes(q))return false;}
+      return true;});
+    $('#tcount').textContent=`${rows.length} เครื่อง`;
+    $('#ttbl').innerHTML=`<table><thead><tr><th>รหัส</th><th>บริษัท</th><th>ชื่อ/รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th><th>อยู่ที่/ผู้ถือ</th></tr></thead><tbody>${
+      rows.slice(0,300).map(t=>`<tr style="cursor:pointer" onclick="toolDetail(${t.i})"><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td><td>${esc(t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=8 class="empty">ไม่พบ</td></tr>'
+    }</tbody></table>${rows.length>300?'<p class="muted center">แสดง 300 แรก — ใช้ค้นหาเพื่อกรอง</p>':''}`;
+  };
+  $('#tq').oninput=draw;$('#fcat').onchange=draw;$('#fst').onchange=draw;draw();
+}
+function toolFormFields(t){t=t||{};return `
+    <div class="field"><label>บริษัทเจ้าของ *</label><select id="ed_company" ${ME&&ME.role!=='admin'?'disabled':''}>${(ME&&ME.role==='admin'?['PAC','LOTUS']:[ME?ME.company:'PAC']).filter(Boolean).map(c=>`<option value="${c}" ${(t.company||COMPANY)===c?'selected':''}>${c==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)'}</option>`).join('')}</select></div>
+    <div class="flexrow">
+      <div class="field"><label>หมวด *</label><input id="ed_cat" list="dl_cat" value="${esc(t.cat)}"></div>
+      <div class="field"><label>NO (เลขบนเครื่อง) *</label><input id="ed_no" value="${esc(t.no)}"></div>
+    </div>
+    <div class="field"><label>ชื่อ / รุ่น *</label><input id="ed_name" value="${esc(t.name)}"></div>
+    <div class="flexrow">
+      <div class="field"><label>ยี่ห้อ</label><input id="ed_brand" value="${esc(t.brand)}"></div>
+      <div class="field"><label>S/N <span class="muted">(ใส่ทีหลังได้)</span></label><input id="ed_sn" value="${esc(t.sn)}"></div>
+    </div>
+    <div class="flexrow">
+      <div class="field"><label>สถานะ</label><select id="ed_st">${Object.keys(STC).map(s=>`<option ${s===(t.status||'ว่าง')?'selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="field"><label>อยู่ที่ / ผู้ถือ</label><input id="ed_loc" value="${esc(t.loc)}"></div>
+    </div>
+    <div class="flexrow">
+      <div class="field"><label>วันที่ซื้อ</label><input id="ed_pdate" type="date" value="${esc(t.purchaseDate)}"></div>
+      <div class="field"><label>ราคา (บาท)</label><input id="ed_price" type="number" step="0.01" value="${esc(t.price)}"></div>
+      <div class="field"><label>ประกัน</label><input id="ed_warranty" value="${esc(t.warranty)}" placeholder="เช่น ถึง 2027 / 1 ปี"></div>
+    </div>
+    <div class="field"><label>หมายเหตุ</label><input id="ed_note" value="${esc(t.note)}"></div>
+    <datalist id="dl_cat">${S.lookups.categories.map(c=>`<option>${esc(c)}</option>`).join('')}</datalist>`;}
+function readToolForm(t){t.cat=$('#ed_cat').value.trim();t.no=$('#ed_no').value.trim();t.name=$('#ed_name').value.trim();t.brand=$('#ed_brand').value.trim();t.sn=$('#ed_sn').value.trim();t.status=$('#ed_st').value;t.loc=$('#ed_loc').value.trim();t.note=$('#ed_note').value.trim();t.code=(t.cat+' '+t.no).trim();t.updated=today();return t;}
+function toolDetail(i){
+  const t=S.tools[i];
+  const editable=canEditCo(t.company);
+  const hist=S.movements.filter(m=>m.code===t.code).slice(-6).reverse();
+  const audits=(S.audit||[]).filter(a=>a.tool_code===t.code&&a.company===t.company).slice(0,8);
+  const histHtml=`<h3 style="font-size:14px;margin-top:16px">ประวัติการใช้งานล่าสุด</h3>
+    <ul class="tl">${hist.map(m=>`<li><div class="ti">${({'เบิก':'📤','คืน':'📥','ส่งซ่อม':'⚙️','รับคืนจากซ่อม':'✅','ย้ายไซต์':'🔀'}[m.type]||'•')}</div><div><b>${esc(m.type)}</b> ${m.slip?'ใบ'+esc(m.slip):''}<div class="sub muted">${esc(m.date)} ${m.project?'· '+esc(m.project):''} ${m.actor?'· '+esc(m.actor):''}</div></div></li>`).join('')||'<li class="muted">ยังไม่มีประวัติ</li>'}</ul>
+    <h3 style="font-size:14px;margin-top:14px">📝 ประวัติแก้ไขทะเบียน</h3>
+    <ul class="tl">${audits.map(a=>`<li><div class="ti">📝</div><div><b>${esc(a.action)}</b> ${esc(a.detail||'')}<div class="sub muted">${esc((a.occurred_at||'').slice(0,16).replace('T',' '))} · ${esc(a.user_email||'')}</div></div></li>`).join('')||'<li class="muted">ยังไม่มีการแก้ไข</li>'}</ul>`;
+  if(editable){
+    openModal(`<h3>แก้ไขเครื่องมือ</h3><p class="muted">${esc(t.code)} · ${coBadge(t.company)} · ส่งซ่อมมาแล้ว ${esc(t.repairs)||0} ครั้ง</p>
+      ${toolFormFields(t)}${histHtml}
+      <div class="flexrow" style="margin-top:18px"><button class="btn primary" onclick="saveTool(${i})">💾 บันทึก</button><button class="btn" style="background:#fee2e2;color:#b91c1c" onclick="delTool(${i})">🗑️ ลบ</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+  }else{
+    openModal(`<h3>${esc(t.name)}</h3><p class="muted">${esc(t.code)} · ${coBadge(t.company)}</p>
+      <div style="background:#fef3c7;color:#92400e;padding:9px 12px;border-radius:8px;font-size:13px;margin:8px 0">🔒 เครื่องของบริษัท ${esc(t.company)} — แก้ทะเบียนได้เฉพาะบริษัทตัวเอง · แต่ยัง <b>เบิก/ย้าย/ส่งซ่อม</b> ได้ปกติ</div>
+      <div class="flexrow"><div class="field"><label>หมวด</label><div>${esc(t.cat)}</div></div><div class="field"><label>NO</label><div>${esc(t.no)}</div></div></div>
+      <div class="flexrow"><div class="field"><label>S/N</label><div>${esc(t.sn)||'-'}</div></div><div class="field"><label>สถานะ</label><div>${chip(t.status)}</div></div></div>
+      <div class="field"><label>อยู่ที่/ผู้ถือ</label><div>${esc(t.loc)||'-'}</div></div>
+      <div class="flexrow"><div class="field"><label>วันที่ซื้อ</label><div>${esc(t.purchaseDate)||'-'}</div></div><div class="field"><label>ราคา</label><div>${esc(t.price)||'-'}</div></div><div class="field"><label>ประกัน</label><div>${esc(t.warranty)||'-'}</div></div></div>
+      ${histHtml}
+      <div class="flexrow" style="margin-top:14px"><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+  }
+}
+async function saveTool(i){const t=S.tools[i];
+  if(!canEditCo(t.company)){toast('แก้ได้เฉพาะบริษัทตัวเอง');return;}
+  const cat=$('#ed_cat').value.trim(),no=$('#ed_no').value.trim(),company=$('#ed_company').value;
+  if(!cat||!no){toast('ต้องมี หมวด + NO');return;}
+  const code=(cat+' '+no).trim();
+  if(S.tools.some((x,ix)=>ix!==i&&x.company===company&&x.code===code)){toast('รหัสซ้ำใน '+company+': '+code);return;}
+  const nv={company,cat,no,name:$('#ed_name').value.trim(),brand:$('#ed_brand').value.trim(),sn:$('#ed_sn').value.trim(),status:$('#ed_st').value,loc:$('#ed_loc').value.trim(),note:$('#ed_note').value.trim(),purchaseDate:$('#ed_pdate').value,price:$('#ed_price').value,warranty:$('#ed_warranty').value.trim()};
+  const L={company:'บริษัท',cat:'หมวด',no:'NO',name:'ชื่อ',brand:'ยี่ห้อ',sn:'S/N',status:'สถานะ',loc:'อยู่ที่',note:'หมายเหตุ',purchaseDate:'วันที่ซื้อ',price:'ราคา',warranty:'ประกัน'};
+  const ch=Object.keys(L).filter(k=>String(t[k]||'')!==String(nv[k]||'')).map(k=>`${L[k]}: ${t[k]||'-'}→${nv[k]||'-'}`);
+  const {error}=await sb.from('tools').update({company:company,category:cat,no:no,name:nv.name,brand:nv.brand,serial:nv.sn,status:nv.status,location:nv.loc,note:nv.note,purchase_date:nv.purchaseDate||null,price:(nv.price!==''?Number(nv.price):null),warranty:nv.warranty,updated_at:new Date().toISOString()}).eq('id',t.id);
+  if(error){toast('บันทึกไม่ได้: '+error.message);return;}
+  await ensureLookup('categories',cat,company);
+  await logAudit('แก้ไข',company,code,ch.length?ch.join(' · '):'แก้ไข (ไม่มีอะไรเปลี่ยน)');
+  closeModal();toast('บันทึกแล้ว');await loadAll();go('tools');}
+async function delTool(i){const t=S.tools[i];
+  if(!canEditCo(t.company)){toast('ลบได้เฉพาะบริษัทตัวเอง');return;}
+  if(!confirm(`ลบเครื่อง "${t.name}" (${t.code})?\nจะไปอยู่ "ถังขยะ" กู้คืนได้ภายหลัง`))return;
+  const {error}=await sb.from('tools').update({deleted:true,updated_at:new Date().toISOString()}).eq('id',t.id);
+  if(error){toast('ลบไม่ได้: '+error.message);return;}
+  await logAudit('ลบ',t.company,t.code,'ย้ายไปถังขยะ');
+  closeModal();toast('ลบแล้ว (อยู่ในถังขยะ)');await loadAll();go('tools');}
+async function restoreTool(ti){const t=(S.trash||[])[ti];if(!t)return;
+  if(!canEditCo(t.company)){toast('กู้คืนได้เฉพาะบริษัทตัวเอง');return;}
+  const {error}=await sb.from('tools').update({deleted:false,updated_at:new Date().toISOString()}).eq('id',t.id);
+  if(error){toast('กู้คืนไม่ได้: '+error.message);return;}
+  await logAudit('กู้คืน',t.company,t.code,'กู้คืนจากถังขยะ');
+  toast('กู้คืนแล้ว: '+t.code);await loadAll();go('trash');}
+function addTool(){
+  openModal(`<h3>➕ เพิ่มเครื่องมือใหม่</h3><p class="muted">รหัสจะตั้งจาก หมวด + NO อัตโนมัติ</p>
+    ${toolFormFields({status:'ว่าง',loc:'ออฟฟิต'})}
+    <div class="flexrow" style="margin-top:18px"><button class="btn green" onclick="saveNewTool()">💾 เพิ่มเครื่อง</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
+}
+async function saveNewTool(){
+  const cat=$('#ed_cat').value.trim(),no=$('#ed_no').value.trim(),company=$('#ed_company').value;
+  if(!canEditCo(company)){toast('เพิ่มได้เฉพาะบริษัทตัวเอง');return;}
+  if(!cat||!no){toast('ต้องมี หมวด + NO');return;}
+  const code=(cat+' '+no).trim();
+  if(S.tools.some(t=>t.company===company&&t.code===code)){toast('มีเครื่องรหัสนี้ใน '+company+' แล้ว: '+code);return;}
+  const {error}=await sb.from('tools').insert({company:company,category:cat,no:no,name:$('#ed_name').value.trim(),brand:$('#ed_brand').value.trim(),serial:$('#ed_sn').value.trim(),status:$('#ed_st').value,location:$('#ed_loc').value.trim(),note:$('#ed_note').value.trim(),purchase_date:$('#ed_pdate').value||null,price:($('#ed_price').value!==''?Number($('#ed_price').value):null),warranty:$('#ed_warranty').value.trim()});
+  if(error){toast('เพิ่มไม่ได้: '+error.message);return;}
+  await ensureLookup('categories',cat,company);
+  await logAudit('เพิ่ม',company,code,'เพิ่มเข้าทะเบียน');
+  closeModal();toast('เพิ่มเครื่อง '+company+' แล้ว: '+code);await loadAll();go('tools');}
+
+/* ============ REPAIR (ส่งซ่อม) ============ */
+let selRepair=new Set();
+function renderRepair(){
+  selRepair=new Set();
+  const eligible=S.tools.filter(t=>['ว่าง','ชำรุด','รอส่งซ่อม'].includes(t.status)&&inView(t));
+  $('#view').innerHTML=`
+   <div class="panel">
+    <h3>1) เลือกเครื่องที่จะส่งซ่อม <span class="muted" style="font-weight:400">(เครื่องว่าง/ชำรุด/รอซ่อม ${eligible.length} ตัว)</span></h3>
+    <div class="toolbar"><input class="search" id="rq" placeholder="🔎 ค้นหาเครื่อง…"></div>
+    <div id="rtbl" style="max-height:380px;overflow:auto"></div>
+   </div>
+   <div class="panel" id="rform" style="display:none">
+    <h3>2) ข้อมูลใบส่งซ่อม (บริษัท ${COMPANY}) — เลขที่จะออกอัตโนมัติ <b style="color:var(--blue)">#${String((S.nextSlipByCo&&S.nextSlipByCo[COMPANY])||1).padStart(3,'0')}</b></h3>
+    <div class="flexrow">
+      <div class="field"><label>วันที่ส่ง</label><input id="r_date" type="date" value="${today()}"></div>
+      <div class="field"><label>ร้าน/ช่างซ่อม</label><input id="r_vendor" list="dl_v" placeholder="เช่น สุเทพ"></div>
+      <div class="field"><label>ผู้ส่ง</label><input id="r_sender" list="dl_p"></div>
+    </div>
+    <div id="rsel"></div>
+    <div class="selbar"><b id="rcount">เลือก 0 เครื่อง</b><div class="spacer"></div>
+      <button class="btn primary" id="rgo">👁️ ดูใบส่งซ่อม (ยังไม่บันทึก)</button></div>
+   </div>
+   <datalist id="dl_v">${S.lookups.vendors.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>
+   <datalist id="dl_p">${S.lookups.people.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>`;
+  const draw=()=>{
+    const q=$('#rq').value.trim().toLowerCase();
+    const rows=eligible.filter(t=>!q||(t.name+t.no+t.code).toLowerCase().includes(q));
+    $('#rtbl').innerHTML=`<table><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th>สถานะ</th></tr></thead><tbody>${
+      rows.map(t=>`<tr><td><input type="checkbox" ${selRepair.has(t.i)?'checked':''} onchange="togRepair(${t.i},this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,40)}</td><td>${esc(t.no)}</td><td>${chip(t.status)}</td></tr>`).join('')
+    }</tbody></table>`;
+  };
+  $('#rq').oninput=draw;draw();
+  $('#rgo').onclick=previewRepair;
+  window._rdraw=draw;
+}
+function togRepair(i,on){on?selRepair.add(i):selRepair.delete(i);
+  $('#rform').style.display=selRepair.size?'block':'none';
+  $('#rcount').textContent=`เลือก ${selRepair.size} เครื่อง`;
+  $('#rsel').innerHTML='<table><thead><tr><th>เครื่อง</th><th>NO</th><th>อาการ/สาเหตุ</th></tr></thead><tbody>'+
+    [...selRepair].map(ix=>{const t=S.tools[ix];return `<tr><td>${esc(t.name).slice(0,30)}</td><td>${esc(t.no)}</td><td><input data-rsn="${ix}" placeholder="เช่น ลูกปืนแตก" style="width:100%"></td></tr>`;}).join('')+'</tbody></table>';
+}
+function previewRepair(){
+  if(!selRepair.size)return;
+  const date=$('#r_date').value,vendor=$('#r_vendor').value.trim(),sender=$('#r_sender').value.trim();
+  const rsn={};document.querySelectorAll('[data-rsn]').forEach(el=>rsn[el.dataset.rsn]=el.value);
+  const sel=[...selRepair].map(ix=>S.tools[ix]);
+  const slipN=(S.nextSlipByCo&&S.nextSlipByCo[COMPANY])||1, slip=String(slipN).padStart(3,'0');
+  const items=sel.map(t=>({t,reason:rsn[t.i]||''}));
+  pendingRepair={slipN,slip,date,vendor,sender,items};
+  openModal(`<h3>👁️ ตัวอย่างใบส่งซ่อม #${slip} (${COMPANY})</h3><p class="muted">ดูก่อน — <b>ยังไม่บันทึก</b> · จะบันทึกจริงตอนกด "พิมพ์ + บันทึก"</p>
+    <div style="border:1px solid var(--line);border-radius:8px;padding:10px;max-height:46vh;overflow:auto;margin:8px 0">${repairDocHtml(slip,date,vendor,sender,items)}</div>
+    <div class="flexrow"><button class="btn primary" onclick="commitRepair()">🖨️ พิมพ์ + บันทึกส่งซ่อม</button><button class="btn ghost" onclick="closeModal()">ปิด (ยังไม่บันทึก)</button></div>`);
+}
+async function commitRepair(){
+  if(!pendingRepair)return;
+  const {slipN,slip,date,vendor,sender,items}=pendingRepair;
+  const sres=await sb.from('repair_slips').insert({company:COMPANY,slip_no:slipN,sent_date:date||null,vendor,project:'',sender,status:'ส่งแล้ว'});
+  if(sres.error){toast('บันทึกไม่ได้: '+sres.error.message);return;}
+  for(const it of items){await sb.from('tools').update({status:'ส่งซ่อม',location:vendor||'ร้านซ่อม',updated_at:new Date().toISOString()}).eq('id',it.t.id);}
+  await sb.from('movements').insert(items.map(it=>({company:COMPANY,owner_company:it.t.company,recorded_by:(ME&&ME.email)||'',tool_id:it.t.id,occurred_on:date||null,type:'ส่งซ่อม',slip_no:slipN,actor:sender,counterparty:vendor,reason:it.reason})));
+  await ensureLookup('vendors',vendor);await ensureLookup('people',sender);
+  pendingRepair=null;closeModal();
+  $('#printArea').innerHTML=repairDocHtml(slip,date,vendor,sender,items);window.print();
+  toast(`บันทึก + ออกใบส่งซ่อม #${slip} แล้ว`);
+  await loadAll();go('repair');
+}
+let pendingRepair=null;
+function repairDocHtml(slip,date,vendor,sender,items){
+  return `<div class="doc">
+    <h1>ใบบันทึกการส่งซ่อมเครื่องมือ — บริษัท ${COMPANY==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)'}</h1>
+    <div class="dsub">เลขที่ ${slip}</div>
+    <div class="dhead"><div>วันที่ส่ง: ${esc(date)}<br>ร้าน/ช่างซ่อม: ${esc(vendor)||'.................'}</div><div>ผู้ส่ง: ${esc(sender)||'.................'}<br>จำนวน: ${items.length} เครื่อง</div></div>
+    <table><thead><tr><th>ลำดับ</th><th>รายการเครื่องมือ</th><th>S/N</th><th>NO</th><th>อาการ/สาเหตุ</th><th>วันรับซ่อม</th><th>ซ่อมเสร็จ</th><th>เซ็นรับคืน</th></tr></thead><tbody>${
+      items.map((it,n)=>`<tr><td style="text-align:center">${n+1}</td><td>${esc(it.t.name)}</td><td>${esc(it.t.sn)}</td><td style="text-align:center">${esc(it.t.no)}</td><td>${esc(it.reason)}</td><td></td><td></td><td></td></tr>`).join('')
+    }</tbody></table>
+    <div class="sign"><div>ผู้ส่งซ่อม<br><br>...................<br>(${esc(sender)})</div><div>ผู้รับซ่อม<br><br>...................<br>(${esc(vendor)})</div><div>ผู้รับคืน<br><br>...................<br>(.................)</div></div>
+  </div>`;
+}
+
+/* ============ RECEIVE (รับคืนจากซ่อม) ============ */
+let selRecv=new Set();
+function renderReceive(){
+  selRecv=new Set();
+  const out=S.tools.filter(t=>t.status==='ส่งซ่อม'&&inView(t));
+  const pend=S.slips.filter(s=>s.status!=='รับคืนครบ'&&(!FILTER||s.company===FILTER));
+  $('#view').innerHTML=`
+   <div class="panel">
+     <h3>ใบส่งซ่อมที่ยังไม่ปิด <span class="muted" style="font-weight:400">— ออกผิดยกเลิกได้ คืนสถานะเครื่องอัตโนมัติ</span></h3>
+     <div style="max-height:220px;overflow:auto"><table><thead><tr><th>ใบ</th><th>บ.</th><th>วันที่ส่ง</th><th>ช่าง</th><th class="center">จำนวน</th><th>สถานะ</th><th></th></tr></thead><tbody>${
+       pend.map(s=>`<tr><td><b>${esc(s.no)}</b></td><td>${coBadge(s.company)}</td><td>${esc(s.sent)}</td><td>${esc(s.vendor)||'-'}</td><td class="center">${esc(s.count)}</td><td>${esc(s.status)}</td><td class="right"><button class="btn" style="background:#fee2e2;color:#b91c1c;padding:5px 11px" onclick="cancelSlip('${esc(s.no)}','${esc(s.company)}')">🚫 ยกเลิกใบ</button></td></tr>`).join('')||'<tr><td colspan=7 class="empty">ไม่มีใบค้าง</td></tr>'
+     }</tbody></table></div>
+   </div>
+   <div class="panel">
+     <h3>เครื่องที่อยู่ร้านซ่อม (${out.length} ตัว) — ติ๊กที่ซ่อมเสร็จกลับมา</h3>
+     <div id="rvtbl" style="max-height:420px;overflow:auto"></div>
+   </div>
+   <div class="panel" id="rvform" style="display:none">
+     <div class="flexrow">
+       <div class="field"><label>วันที่รับคืน</label><input id="v_date" type="date" value="${today()}"></div>
+       <div class="field"><label>ผู้เซ็นรับคืน</label><input id="v_recv" list="dl_p2" placeholder="ผู้รับเครื่องกลับ"></div>
+     </div>
+     <div class="selbar"><b id="rvcount">เลือก 0</b><div class="spacer"></div>
+       <button class="btn green" id="rvgo">✅ บันทึกรับคืน + พิมพ์ (เครื่องพร้อมเบิก)</button></div>
+   </div>
+   <datalist id="dl_p2">${S.lookups.people.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>`;
+  const slipOf=code=>{const m=[...S.movements].reverse().find(m=>m.code===code&&m.type==='ส่งซ่อม');return m?m.slip:'';};
+  $('#rvtbl').innerHTML=`<table><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th>ใบส่งซ่อม</th><th>อยู่ที่</th></tr></thead><tbody>${
+    out.map(t=>`<tr><td><input type="checkbox" onchange="togRecv(${t.i},this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,36)}</td><td>${esc(t.no)}</td><td>${esc(slipOf(t.code))}</td><td>${esc(t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=7 class="empty">ไม่มีเครื่องอยู่ร้านซ่อม</td></tr>'
+  }</tbody></table>`;
+  $('#rvgo').onclick=doReceive;
+}
+function togRecv(i,on){on?selRecv.add(i):selRecv.delete(i);$('#rvform').style.display=selRecv.size?'block':'none';$('#rvcount').textContent=`เลือก ${selRecv.size}`;}
+async function doReceive(){
+  if(!selRecv.size)return;
+  const date=$('#v_date').value,recv=$('#v_recv').value;const items=[];
+  for(const ix of [...selRecv]){const t=S.tools[ix];
+    const m=[...S.movements].reverse().find(m=>m.tool_id===t.id&&m.type==='ส่งซ่อม');const slipN=m?m.slipNo:null;
+    await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',t.id);
+    await sb.from('movements').insert({company:(m?m.company:COMPANY),owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'รับคืนจากซ่อม',slip_no:slipN,actor:recv});
+    if(slipN!=null)await sb.from('repair_slips').update({status:'รับคืนครบ',received_date:date||null,receiver:recv}).eq('company',(m?m.company:COMPANY)).eq('slip_no',slipN);
+    items.push({t,slip:slipN!=null?String(slipN).padStart(3,'0'):''});}
+  await ensureLookup('people',recv);
+  $('#printArea').innerHTML=`<div class="doc"><h1>รายการเครื่องมือที่ซ่อมเสร็จ — PAC</h1><div class="dsub">วันที่รับคืน ${esc(date)}</div>
+    <table><thead><tr><th>ลำดับ</th><th>รายการ</th><th>S/N</th><th>NO</th><th>ใบส่งซ่อม</th><th>ผู้เซ็นรับคืน</th></tr></thead><tbody>${
+    items.map((it,n)=>`<tr><td style="text-align:center">${n+1}</td><td>${esc(it.t.name)}</td><td>${esc(it.t.sn)}</td><td style="text-align:center">${esc(it.t.no)}</td><td style="text-align:center">${esc(it.slip)}</td><td>${esc(recv)}</td></tr>`).join('')
+    }</tbody></table></div>`;
+  toast(`รับคืน ${items.length} เครื่อง → พร้อมเบิก`);window.print();await loadAll();setTimeout(()=>go('receive'),400);
+}
+async function cancelSlip(no,co){
+  if(!confirm(`ยกเลิกใบส่งซ่อม #${no} (${co}) ?\nเครื่องในใบที่ยังอยู่ร้านจะกลับเป็น "ว่าง" และลบรายการของใบนี้`))return;
+  const slipN=parseInt(no,10);
+  const tids=S.movements.filter(m=>m.slipNo===slipN&&m.company===co&&m.type==='ส่งซ่อม'&&m.tool_id).map(m=>m.tool_id);
+  for(const tid of tids){const t=S.tools.find(x=>x.id===tid);if(t&&t.status==='ส่งซ่อม'){await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต'}).eq('id',tid);}}
+  await sb.from('movements').delete().eq('company',co).eq('slip_no',slipN).in('type',['ส่งซ่อม','รับคืนจากซ่อม']);
+  await sb.from('repair_slips').delete().eq('company',co).eq('slip_no',slipN);
+  toast('ยกเลิกใบ #'+no+' แล้ว');await loadAll();go('receive');}
+
+/* ============ BORROW (เบิก-คืน) ============ */
+let borrowTab='out',selBor=new Set();
+function renderBorrow(){
+  selBor=new Set();
+  $('#view').innerHTML=`<div class="tabs"><button class="${borrowTab==='out'?'on':''}" onclick="setBT('out')">📤 เบิก (เอาออกไซต์)</button><button class="${borrowTab==='move'?'on':''}" onclick="setBT('move')">🔀 ย้ายไซต์</button><button class="${borrowTab==='in'?'on':''}" onclick="setBT('in')">📥 คืน (กลับออฟฟิต)</button></div><div id="bbody"></div>`;
+  drawBorrow();
+}
+function setBT(t){borrowTab=t;selBor=new Set();renderBorrow();}
+function drawBorrow(){
+  const mode=borrowTab; const out=mode==='out';
+  const list=S.tools.filter(t=>t.status===(out?'ว่าง':'ถูกยืม')&&inView(t));
+  let form,btn,title,lastcol;
+  if(mode==='out'){
+    form=`<div class="flexrow"><div class="field"><label>วันที่ *</label><input id="b_date" type="date" value="${today()}"></div><div class="field"><label>ผู้เบิก *</label><input id="b_who" list="dl_p3"></div><div class="field"><label>โครงการ/ไซต์ *</label><input id="b_proj" list="dl_pr"></div></div>`;
+    btn='📤 บันทึกเบิก'; title='เลือกเครื่อง "ว่าง" ที่จะเบิกออกไซต์'; lastcol='หมวด';
+  } else if(mode==='move'){
+    form=`<div class="flexrow"><div class="field"><label>วันที่ *</label><input id="b_date" type="date" value="${today()}"></div><div class="field"><label>ผู้ที่เอาไป</label><input id="b_who" list="dl_p3"></div><div class="field"><label>ไซต์ใหม่ *</label><input id="b_proj" list="dl_pr"></div></div>`;
+    btn='🔀 บันทึกย้ายไซต์'; title='เลือกเครื่องที่ "ถูกยืม" อยู่ → ย้ายไปไซต์ใหม่ (ไม่ต้องคืนก่อน)'; lastcol='อยู่ที่ตอนนี้';
+  } else {
+    form=`<div class="field"><label>วันที่คืน *</label><input id="b_date" type="date" value="${today()}"></div>`;
+    btn='📥 บันทึกคืน'; title='เลือกเครื่องที่ "ถูกยืม" อยู่ → คืนกลับออฟฟิต'; lastcol='อยู่ที่';
+  }
+  $('#bbody').innerHTML=`<div class="panel">
+    <h3>${title} (${list.length})</h3>
+    <div class="toolbar"><input class="search" id="bq" placeholder="🔎 ค้นหา…"></div>
+    <div id="btbl" style="max-height:360px;overflow:auto"></div></div>
+    <div class="panel" id="bform" style="display:none">${form}
+      <div class="selbar"><b id="bcount">เลือก 0</b><div class="spacer"></div>
+      <button class="btn ${mode==='in'?'green':'primary'}" id="bgo">${btn}</button></div></div>
+    <datalist id="dl_p3">${S.lookups.people.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>
+    <datalist id="dl_pr">${S.lookups.projects.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>`;
+  const draw=()=>{const q=$('#bq').value.trim().toLowerCase();const rows=list.filter(t=>!q||(t.name+t.no+t.code).toLowerCase().includes(q));
+    $('#btbl').innerHTML=`<table><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th>${lastcol}</th></tr></thead><tbody>${
+      rows.map(t=>`<tr><td><input type="checkbox" ${selBor.has(t.i)?'checked':''} onchange="togBor(${t.i},this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,38)}</td><td>${esc(t.no)}</td><td>${esc(out?t.cat:t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่มี</td></tr>'
+    }</tbody></table>`;};
+  $('#bq').oninput=draw;draw();
+  $('#bgo').onclick=(mode==='move'?doMove:doBorrow);
+}
+function togBor(i,on){on?selBor.add(i):selBor.delete(i);$('#bform').style.display=selBor.size?'block':'none';$('#bcount').textContent=`เลือก ${selBor.size}`;}
+async function doBorrow(){
+  if(!selBor.size)return;
+  const out=borrowTab==='out';const date=$('#b_date').value;
+  const who=out?$('#b_who').value.trim():'';const proj=out?$('#b_proj').value.trim():'';
+  if(out&&(!who||!proj)){toast('กรุณากรอก ผู้เบิก + โครงการ/ไซต์ ให้ครบ');return;}
+  const sel=[...selBor].map(ix=>S.tools[ix]);
+  for(const t of sel){
+    if(out){await sb.from('tools').update({status:'ถูกยืม',location:(proj||'')+(who?' / '+who:''),updated_at:new Date().toISOString()}).eq('id',t.id);
+      await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'เบิก',project:proj,actor:who});}
+    else{await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',t.id);
+      await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'คืน'});}
+  }
+  if(out){await ensureLookup('people',who);await ensureLookup('projects',proj);}
+  toast(out?`เบิก ${sel.length} เครื่องแล้ว`:`คืน ${sel.length} เครื่องแล้ว`);await loadAll();renderBorrow();
+}
+async function doMove(){
+  if(!selBor.size)return;
+  const date=$('#b_date').value, who=$('#b_who').value.trim(), proj=$('#b_proj').value.trim();
+  if(!proj){toast('กรุณากรอก ไซต์ใหม่');return;}
+  const sel=[...selBor].map(ix=>S.tools[ix]);
+  for(const t of sel){
+    await sb.from('tools').update({location:proj+(who?' / '+who:''),updated_at:new Date().toISOString()}).eq('id',t.id);
+    await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'ย้ายไซต์',project:proj,actor:who});
+  }
+  await ensureLookup('projects',proj); if(who)await ensureLookup('people',who);
+  toast(`ย้าย ${sel.length} เครื่องไป ${proj} แล้ว`);await loadAll();renderBorrow();
+}
+
+/* ============ cross-company borrow helpers ============ */
+function lastBorrowMov(toolId){const c=S.movements.filter(m=>m.tool_id===toolId&&(m.type==='เบิก'||m.type==='ย้ายไซต์'));return c.sort((a,b)=>String(a.createdAt||a.date).localeCompare(String(b.createdAt||b.date))).pop();}
+function crossBorrows(){const all=[];S.tools.forEach(t=>{if(t.status!=='ถูกยืม')return;const m=lastBorrowMov(t.id);const by=m?m.company:null;if(!by||by===t.company)return;all.push({t,by});});return all;}
+
+/* ============ HISTORY (3 แท็บ) ============ */
+const TYPE_ICON={'เบิก':'📤','คืน':'📥','ส่งซ่อม':'⚙️','รับคืนจากซ่อม':'✅','แจ้งชำรุด':'⚠️','ย้ายไซต์':'🔀'};
+let histTab='recent', histLimit=80, histDraw=null;
+function inViewMov(m){return !FILTER||m.company===FILTER||m.ownerCompany===FILTER;}
+function fmtTime(iso){if(!iso)return '';const d=new Date(iso);if(isNaN(d))return '';const p=n=>String(n).padStart(2,'0');return `${p(d.getHours())}:${p(d.getMinutes())}`;}
+function dayLabel(dstr){if(!dstr)return 'ไม่ระบุวันที่';const y=new Date(Date.now()-86400000).toISOString().slice(0,10);if(dstr===today())return 'วันนี้ ('+dstr+')';if(dstr===y)return 'เมื่อวาน ('+dstr+')';return dstr;}
+function dDiff(a,b){if(!a||!b)return null;const d=Math.round((new Date(b)-new Date(a))/86400000);return isNaN(d)?null:d;}
+function setHT(t){histTab=t;histLimit=80;renderHistory();}
+function histMore(){histLimit+=80;if(histDraw)histDraw();}
+function renderHistory(){
+  $('#view').innerHTML=`<div class="tabs">
+    <button class="${histTab==='recent'?'on':''}" onclick="setHT('recent')">📋 รายการล่าสุด</button>
+    <button class="${histTab==='repair'?'on':''}" onclick="setHT('repair')">🔧 ค้างซ่อม / เวลาซ่อม</button>
+    <button class="${histTab==='tool'?'on':''}" onclick="setHT('tool')">🔍 รายเครื่อง</button>
+  </div><div id="hbody"></div>`;
+  ({recent:histRecent,repair:histRepair,tool:histByTool}[histTab])();
+}
+function histRecent(){
+  $('#hbody').innerHTML=`<div class="panel">
+    <div class="flexrow">
+      <div class="field"><label>ค้นหา</label><input class="search" id="hq" placeholder="รหัส / NO / เลขใบ / คน / โครงการ"></div>
+      <div class="field"><label>ประเภท</label><select id="hf_type"><option value="">ทั้งหมด</option>${['เบิก','คืน','ย้ายไซต์','ส่งซ่อม','รับคืนจากซ่อม','แจ้งชำรุด'].map(x=>`<option>${x}</option>`).join('')}</select></div>
+      <div class="field"><label>ตั้งแต่วันที่</label><input id="hf_from" type="date"></div>
+      <div class="field"><label>ถึงวันที่</label><input id="hf_to" type="date"></div>
+    </div>
+    <div id="htl"></div>
+  </div>`;
+  const draw=()=>{
+    const q=$('#hq').value.trim().toLowerCase(), ty=$('#hf_type').value, from=$('#hf_from').value, to=$('#hf_to').value;
+    let ms=S.movements.filter(inViewMov);
+    if(ty)ms=ms.filter(m=>m.type===ty);
+    if(from)ms=ms.filter(m=>m.date&&m.date>=from);
+    if(to)ms=ms.filter(m=>m.date&&m.date<=to);
+    if(q)ms=ms.filter(m=>((m.code||'')+' '+(m.no||'')+' '+(m.slip||'')+' '+(m.actor||'')+' '+(m.project||'')+' '+(m.vendor||'')+' '+(m.recordedBy||'')).toLowerCase().includes(q));
+    ms=[...ms].sort((a,b)=>{const d=String(b.date||'').localeCompare(String(a.date||''));return d!==0?d:String(b.createdAt||'').localeCompare(String(a.createdAt||''));});
+    const total=ms.length, shown=ms.slice(0,histLimit);
+    let html='', curDay=null;
+    shown.forEach(m=>{const d=m.date||'';if(d!==curDay){curDay=d;html+=`<div class="muted" style="margin:14px 0 6px;font-weight:700;border-bottom:1px solid var(--line);padding-bottom:4px">${esc(dayLabel(d))}</div>`;}
+      html+=`<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9">
+        <div style="font-size:18px">${TYPE_ICON[m.type]||'•'}</div>
+        <div style="flex:1">
+          <div><b>${esc(m.type)}</b> ${esc(m.code)||esc(m.label)} ${m.slip?'· ใบ '+esc(m.slip):''} ${coBadge(m.company)}${m.ownerCompany&&m.ownerCompany!==m.company?' ↔ ของ '+coBadge(m.ownerCompany):''}</div>
+          <div class="sub muted" style="font-size:12px">${m.createdAt?esc(fmtTime(m.createdAt))+' · ':''}${m.project?'📍'+esc(m.project)+' ':''}${m.actor?'· 👤'+esc(m.actor)+' ':''}${m.vendor?'· 🔧'+esc(m.vendor)+' ':''}${m.reason?'· '+esc(m.reason):''}</div>
+          ${m.recordedBy?`<div class="muted" style="font-size:11px">บันทึกโดย ${esc(m.recordedBy)}</div>`:''}
+        </div></div>`;});
+    $('#htl').innerHTML=(html||'<div class="empty">ไม่พบรายการ</div>')+(total>histLimit?`<div style="text-align:center;margin-top:12px"><button class="btn" onclick="histMore()">โหลดเพิ่ม (เหลืออีก ${total-histLimit})</button></div>`:`<div class="muted" style="text-align:center;margin-top:12px;font-size:12px">— แสดง ${Math.min(histLimit,total)}/${total} รายการ —</div>`);
+  };
+  histDraw=draw;
+  $('#hq').oninput=draw;$('#hf_type').onchange=draw;$('#hf_from').onchange=draw;$('#hf_to').onchange=draw;
+  draw();
+}
+function histRepair(){
+  const cntOf=(slipNo,co)=>S.movements.filter(m=>m.slipNo===slipNo&&m.company===co&&m.type==='ส่งซ่อม').length;
+  const pend=S.slips.filter(s=>s.status!=='รับคืนครบ'&&(!FILTER||s.company===FILTER)).map(s=>({s,days:dDiff(s.sent,today())})).sort((a,b)=>(b.days||0)-(a.days||0));
+  const done=S.slips.filter(s=>s.status==='รับคืนครบ'&&s.received&&(!FILTER||s.company===FILTER)).map(s=>({s,days:dDiff(s.sent,s.received)})).sort((a,b)=>String(b.s.received).localeCompare(String(a.s.received))).slice(0,30);
+  $('#hbody').innerHTML=`
+    <div class="panel"><h3>🔧 กำลังซ่อม / ค้างอยู่ (${pend.length}) <span class="muted" style="font-weight:400">— เรียงตามค้างนานสุด</span></h3>
+      <table><thead><tr><th>ใบ</th><th>บ.</th><th>ส่งซ่อม</th><th>ช่าง</th><th class="center">จำนวน</th><th class="center">ค้างมาแล้ว</th></tr></thead><tbody>${
+        pend.map(x=>`<tr><td><b>${esc(x.s.no)}</b></td><td>${coBadge(x.s.company)}</td><td>${esc(x.s.sent)||'-'}</td><td>${esc(x.s.vendor)||'-'}</td><td class="center">${cntOf(x.s.slip_no,x.s.company)}</td><td class="center">${x.days==null?'-':`<b style="color:${x.days>14?'#dc2626':x.days>7?'#d97706':'#16a34a'}">${x.days} วัน</b>`}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่มีเครื่องค้างซ่อม 🎉</td></tr>'
+      }</tbody></table>
+    </div>
+    <div class="panel"><h3>✅ ซ่อมเสร็จล่าสุด (${done.length}) <span class="muted" style="font-weight:400">— ใช้เวลาซ่อมกี่วัน</span></h3>
+      <table><thead><tr><th>ใบ</th><th>บ.</th><th>ส่งซ่อม</th><th>รับคืน</th><th class="center">ใช้เวลา</th></tr></thead><tbody>${
+        done.map(x=>`<tr><td><b>${esc(x.s.no)}</b></td><td>${coBadge(x.s.company)}</td><td>${esc(x.s.sent)||'-'}</td><td>${esc(x.s.received)||'-'}</td><td class="center">${x.days==null?'-':x.days+' วัน'}</td></tr>`).join('')||'<tr><td colspan=5 class="empty">ยังไม่มี</td></tr>'
+      }</tbody></table>
+    </div>`;
+}
+function toolTimelineHtml(t){
+  const mvs=S.movements.filter(m=>m.tool_id===t.id).sort((a,b)=>{const d=String(a.date||'').localeCompare(String(b.date||''));return d!==0?d:String(a.createdAt||'').localeCompare(String(b.createdAt||''));});
+  let lastSent=null;
+  const rows=mvs.map(m=>{let extra='';if(m.type==='ส่งซ่อม')lastSent=m.date;if(m.type==='รับคืนจากซ่อม'&&lastSent){const d=dDiff(lastSent,m.date);if(d!=null&&d>=0)extra=` · ซ่อม ${d} วัน`;lastSent=null;}
+    return `<li><div class="ti">${TYPE_ICON[m.type]||'•'}</div><div><b>${esc(m.type)}</b> ${m.slip?'· ใบ'+esc(m.slip):''} ${coBadge(m.company)}<div class="sub muted" style="font-size:12px">${esc(m.date)} ${m.createdAt?esc(fmtTime(m.createdAt)):''} ${m.project?'· 📍'+esc(m.project):''} ${m.actor?'· 👤'+esc(m.actor):''} ${m.vendor?'· 🔧'+esc(m.vendor):''} ${m.reason?'· '+esc(m.reason):''}${extra}</div>${m.recordedBy?`<div class="muted" style="font-size:11px">บันทึกโดย ${esc(m.recordedBy)}</div>`:''}</div></li>`;}).join('');
+  return `<div style="margin:8px 0"><b>${esc(t.code)}</b> · ${esc(t.name)} ${coBadge(t.company)} · สถานะ: ${esc(t.status)} · อยู่ที่ ${esc(t.loc)||'-'}</div>
+    <ul class="tl">${rows||'<li class="empty">ยังไม่มีประวัติการใช้งาน</li>'}</ul>`;
+}
+function histByTool(){
+  $('#hbody').innerHTML=`<div class="panel">
+    <div class="field"><label>เลือกเครื่อง (พิมพ์รหัส / ชื่อ / NO)</label><input class="search" id="htq" placeholder="เช่น หินเจียร์4 05" list="dl_htools"></div>
+    <datalist id="dl_htools">${S.tools.filter(inView).map(t=>`<option value="${esc(t.code)}">${esc(t.name)} · ${esc(t.company)}</option>`).join('')}</datalist>
+    <div id="htdetail"><div class="empty">พิมพ์เพื่อเลือกเครื่อง แล้วดูประวัติทั้งหมดของเครื่องนั้น</div></div>
+  </div>`;
+  const draw=()=>{const q=$('#htq').value.trim().toLowerCase();if(!q){$('#htdetail').innerHTML='<div class="empty">พิมพ์เพื่อเลือกเครื่อง</div>';return;}
+    const exact=S.tools.filter(t=>inView(t)&&(t.code||'').toLowerCase()===q);
+    const cands=(exact.length?exact:S.tools.filter(t=>inView(t)&&(t.code+' '+t.name+' '+t.no).toLowerCase().includes(q))).slice(0,6);
+    if(!cands.length){$('#htdetail').innerHTML='<div class="empty">ไม่พบเครื่อง</div>';return;}
+    $('#htdetail').innerHTML=(cands.length>1?`<p class="muted" style="font-size:13px">พบ ${cands.length} เครื่องที่ตรงกัน — แสดงทั้งหมด</p>`:'')+cands.map(toolTimelineHtml).join('<hr style="border:none;border-top:1px solid var(--line);margin:16px 0">');
+  };
+  $('#htq').oninput=draw;
+}
+
+/* ============ REPORT + EXPORT ============ */
+function csvDownload(filename,rows){
+  const q=v=>{v=v==null?'':String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+  const csv='﻿'+rows.map(r=>r.map(q).join(',')).join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+}
+function exportTools(){
+  const rows=[['รหัส','บริษัท','หมวด','NO','ชื่อ','ยี่ห้อ','S/N','สถานะ','อยู่ที่','วันที่ซื้อ','ราคา','ประกัน','หมายเหตุ']];
+  S.tools.filter(inView).forEach(t=>rows.push([t.code,t.company,t.cat,t.no,t.name,t.brand,t.sn,t.status,t.loc,t.purchaseDate,t.price,t.warranty,t.note]));
+  csvDownload('ทะเบียนเครื่องมือ.csv',rows);toast('ดาวน์โหลดทะเบียน '+(rows.length-1)+' รายการ');
+}
+function exportMovements(){
+  const rows=[['วันที่','บริษัท','รหัส','ประเภท','เลขใบซ่อม','โครงการ','ผู้ทำ','ช่าง','อาการ/เหตุ']];
+  S.movements.filter(m=>!FILTER||m.company===FILTER).forEach(m=>rows.push([m.date,m.company,m.code,m.type,m.slip,m.project,m.actor,m.vendor,m.reason]));
+  csvDownload('ประวัติเครื่องมือ.csv',rows);toast('ดาวน์โหลดประวัติ '+(rows.length-1)+' รายการ');
+}
+function renderReport(){
+  const t=S.tools.filter(inView);
+  const c=st=>t.filter(x=>x.status===st).length;
+  const totalPrice=t.reduce((s,x)=>s+(x.price?Number(x.price)||0:0),0);
+  const cards=[
+    ['🧰','เครื่องทั้งหมด',t.length,'#0f172a'],
+    ['🟢','ว่าง',c('ว่าง'),'#16a34a'],
+    ['🔵','ถูกยืม',c('ถูกยืม'),'#2563eb'],
+    ['⚙️','ส่งซ่อม',c('ส่งซ่อม'),'#64748b']
+  ].map(x=>`<div class="card"><div class="lab"><span>${x[0]}</span>${x[1]}</div><div class="big" style="color:${x[3]}">${x[2]}</div></div>`).join('');
+  const pac=t.filter(x=>x.company==='PAC').length, lotus=t.filter(x=>x.company==='LOTUS').length;
+  $('#view').innerHTML=`
+    <div class="cards">${cards}</div>
+    <div class="panel"><h3>สรุป (${FILTER||'ทุกบริษัท'})</h3>
+      <p class="muted" style="line-height:1.9">
+        บริษัท: <b>PAC ${pac}</b> · <b>LOTUS ${lotus}</b><br>
+        สถานะอื่น: รอส่งซ่อม ${c('รอส่งซ่อม')} · ชำรุด ${c('ชำรุด')} · สูญหาย ${c('สูญหาย')}<br>
+        มูลค่ารวม (เฉพาะเครื่องที่กรอกราคา): <b>${totalPrice.toLocaleString('th-TH')} บาท</b>
+      </p>
+    </div>
+    <div class="panel"><h3>📥 ดาวน์โหลดเป็นไฟล์ (เปิดด้วย Excel ได้เลย)</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+        <button class="btn primary" onclick="exportTools()">⬇️ ทะเบียนเครื่องมือ (.csv)</button>
+        <button class="btn" onclick="exportMovements()">⬇️ ประวัติเบิก-คืน-ซ่อม (.csv)</button>
+      </div>
+      <p class="muted" style="margin-top:10px;font-size:13px">ดาวน์โหลดตาม "ตัวกรองบริษัท" ที่เลือกอยู่มุมบนขวา · ไฟล์ UTF-8 รองรับภาษาไทยใน Excel</p>
+    </div>`;
+}
+
+/* ============ TRASH (ถังขยะ — กู้คืน) ============ */
+function renderTrash(){
+  const items=S.trash||[];
+  $('#view').innerHTML=`<div class="panel">
+    <h3>ถังขยะ (${items.length}) <span class="muted" style="font-weight:400">— เครื่องที่ถูกลบ · กู้คืนได้เฉพาะบริษัทตัวเอง</span></h3>
+    <table><thead><tr><th>รหัส</th><th>บริษัท</th><th>ชื่อ</th><th>NO</th><th>ลบเมื่อ</th><th></th></tr></thead><tbody>${
+      items.map((t,i)=>`<tr><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.no)}</td><td class="muted">${esc(t.updated)}</td><td class="right">${canEditCo(t.company)?`<button class="btn" style="background:#dcfce7;color:#15803d;padding:6px 14px" onclick="restoreTool(${i})">♻️ กู้คืน</button>`:'<span class="muted" style="font-size:12px">—</span>'}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">ถังขยะว่าง</td></tr>'
+    }</tbody></table>
+  </div>`;
+}
+
+/* ============ AUDIT (ประวัติแก้ไขทั้งระบบ — admin) ============ */
+function renderAudit(){
+  if(ME.role!=='admin'){$('#view').innerHTML='<div class="panel empty">เฉพาะผู้ดูแลระบบ (admin) เท่านั้น</div>';return;}
+  $('#view').innerHTML=`<div class="panel"><div class="toolbar"><input class="search" id="aq" placeholder="🔎 ค้นหา: รหัสเครื่อง / อีเมล / การกระทำ…"></div><div id="atl"></div></div>`;
+  const draw=()=>{const q=$('#aq').value.trim().toLowerCase();
+    let a=(S.audit||[]);
+    if(q)a=a.filter(x=>((x.tool_code||'')+' '+(x.user_email||'')+' '+(x.action||'')+' '+(x.detail||'')).toLowerCase().includes(q));
+    a=a.slice(0,300);
+    $('#atl').innerHTML=a.length?`<table><thead><tr><th>เมื่อ</th><th>ใคร</th><th>บ.</th><th>ทำอะไร</th><th>เครื่อง</th><th>รายละเอียด</th></tr></thead><tbody>${a.map(x=>`<tr><td class="muted" style="white-space:nowrap">${esc((x.occurred_at||'').slice(0,16).replace('T',' '))}</td><td style="font-size:12px">${esc(x.user_email||'')}</td><td>${coBadge(x.company)}</td><td><b>${esc(x.action||'')}</b></td><td>${esc(x.tool_code||'')}</td><td style="font-size:12px">${esc(x.detail||'')}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">ยังไม่มีประวัติ หรือไม่พบ</div>';};
+  $('#aq').oninput=draw;draw();
+}
+
+/* ============ USERS (จัดการผู้ใช้ — admin) ============ */
+async function renderUsers(){
+  if(ME.role!=='admin'){$('#view').innerHTML='<div class="panel empty">เฉพาะผู้ดูแลระบบ (admin) เท่านั้น</div>';return;}
+  const {data:profs,error}=await sb.from('profiles').select('*').order('email');
+  if(error){$('#view').innerHTML='<div class="panel empty">โหลดไม่ได้: '+esc(error.message)+'</div>';return;}
+  $('#view').innerHTML=`<div class="panel">
+    <h3>ผู้ใช้ทั้งหมด (${profs.length}) <span class="muted" style="font-weight:400">— ตั้งบทบาท + บริษัท แล้วกดบันทึก</span></h3>
+    <table><thead><tr><th>อีเมล</th><th>บทบาท</th><th>เห็นบริษัท</th><th></th></tr></thead><tbody>${
+      profs.map(p=>`<tr>
+        <td><b>${esc(p.email||p.id.slice(0,8))}</b></td>
+        <td><select id="ur_${p.id}"><option value="staff" ${p.role==='staff'?'selected':''}>พนักงาน (staff)</option><option value="admin" ${p.role==='admin'?'selected':''}>ผู้ดูแล (admin — เห็นทุกบริษัท)</option></select></td>
+        <td><select id="uc_${p.id}"><option value="" ${!p.company?'selected':''}>— ยังไม่กำหนด (ยังเข้าไม่ได้)</option><option value="PAC" ${p.company==='PAC'?'selected':''}>PAC</option><option value="LOTUS" ${p.company==='LOTUS'?'selected':''}>LOTUS</option></select></td>
+        <td><button class="btn primary" style="padding:6px 14px" onclick="saveUser('${p.id}')">บันทึก</button> ${p.id!==ME.id?`<button class="btn" style="background:#fee2e2;color:#b91c1c;padding:6px 12px" onclick="delUser('${p.id}','${esc(p.email||'')}')">ลบ</button>`:`<span class="muted" style="font-size:12px">(คุณ)</span>`}</td>
+      </tr>`).join('')
+    }</tbody></table>
+    <p class="muted" style="margin-top:12px;font-size:13px">💡 พนักงานใหม่: ให้กด "สมัครบัญชีใหม่" ที่หน้าเว็บก่อน → ชื่อจะมาโผล่ที่นี่ → คุณตั้งบริษัทให้ → เขาถึงจะเห็นข้อมูล</p>
+  </div>`;
+}
+async function saveUser(id){
+  const role=$('#ur_'+id).value, company=$('#uc_'+id).value||null;
+  const {error}=await sb.from('profiles').update({role,company}).eq('id',id);
+  if(error){toast('บันทึกไม่ได้: '+error.message);return;}
+  toast('อัปเดตสิทธิ์แล้ว');renderUsers();
+}
+async function delUser(id,email){
+  if(id===ME.id){toast('ลบบัญชีตัวเองไม่ได้');return;}
+  if(!confirm(`ลบผู้ใช้ ${email}?\nเขาจะหมดสิทธิ์เข้าถึงข้อมูลทันที\n(ถ้าต้องการบล็อกการล็อกอินถาวร ลบบัญชีในแดชบอร์ด Supabase → Authentication อีกที)`))return;
+  const {error}=await sb.from('profiles').delete().eq('id',id);
+  if(error){toast('ลบไม่ได้: '+error.message);return;}
+  toast('ลบผู้ใช้ '+email+' แล้ว');renderUsers();
+}
+
+/* ============ modal ============ */
+function openModal(html){$('#modal').innerHTML=html;$('#scrim').classList.add('on');}
+function closeModal(){$('#scrim').classList.remove('on');}
+$('#scrim').addEventListener('click',e=>{if(e.target.id==='scrim')closeModal();});
+
+init();
+</script>
+</body>
+</html>
