@@ -286,7 +286,7 @@ async function doSignup(){const e=$('#li_email').value.trim(),p=$('#li_pass').va
 async function logout(){await sb.auth.signOut();location.reload();}
 
 /* ============ router ============ */
-const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],scan:['สแกน','สแกน QR → ยืนยันรับ / ส่งคืน / แจ้งชำรุด (ใช้บนมือถือที่หน้างาน)'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],labels:['ป้าย QR','สร้าง QR ไม่ซ้ำของแต่ละเครื่อง → พิมพ์เป็นป้าย'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
+const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],scan:['สแกน','สแกน QR → รับคืนเข้าระบบ (จากไซต์ / จากซ่อม)'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],labels:['ป้าย QR','สร้าง QR ไม่ซ้ำของแต่ละเครื่อง → พิมพ์เป็นป้าย'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
 function go(v){
   if(v==='guide'){window.open('guide.html','_blank');return;}
   if(CUR==='scan'&&v!=='scan'&&window._scanner)stopScanner();
@@ -338,10 +338,10 @@ function renderDash(){
       <table><thead><tr><th>รหัส</th><th>ชื่อ</th><th>ยืมโดย</th><th>อยู่ที่</th></tr></thead><tbody>${_lent.map(x=>`<tr><td><b>${esc(x.t.code)}</b></td><td>${esc(x.t.name).slice(0,30)}</td><td>${coBadge(x.by)}</td><td>${esc(x.t.loc)||'-'}</td></tr>`).join('')}</tbody></table>`:''}
     ${_bor.length?`<p class="muted" style="margin:8px 0 0">📤 คุณกำลังยืมเครื่องของบริษัทอื่นอยู่ ${_bor.length} รายการ</p>`:''}
   </div>`:'';
-  const _late=S.tools.filter(t=>t.receiptPending&&t.dispatchedAt&&inView(t)&&(Date.now()-new Date(t.dispatchedAt))>2*86400000);
-  const pendAlert=_late.length?`<div class="panel" style="border-left:4px solid #dc2626;background:#fef2f2">
-    <h3 style="margin:0 0 6px">⚠️ ค้างยืนยันรับ เกิน 2 วัน (${_late.length}) — อาจตกหล่นระหว่างทาง</h3>
-    <table><thead><tr><th>รหัส</th><th>บ.</th><th>ส่งไป</th><th>ส่งเมื่อ</th></tr></thead><tbody>${_late.slice(0,8).map(t=>`<tr><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.pendingDest)||'-'}</td><td class="muted">${esc(String(t.dispatchedAt).slice(0,10))}</td></tr>`).join('')}</tbody></table>
+  const _late=S.tools.filter(t=>{if(t.status!=='ถูกยืม'||!inView(t))return false;const s=t.dispatchedAt||t.updated;return s&&(Date.now()-new Date(s))>30*86400000;});
+  const pendAlert=_late.length?`<div class="panel" style="border-left:4px solid #d97706;background:#fffbeb">
+    <h3 style="margin:0 0 6px">📍 เครื่องค้างที่ไซต์เกิน 30 วัน — ยังไม่คืน (${_late.length})</h3>
+    <table><thead><tr><th>รหัส</th><th>บ.</th><th>อยู่ที่</th><th class="center">ค้างมา</th></tr></thead><tbody>${_late.slice(0,8).map(t=>{const d=Math.floor((Date.now()-new Date(t.dispatchedAt||t.updated))/86400000);return `<tr><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.loc)||'-'}</td><td class="center"><b>${d} วัน</b></td></tr>`;}).join('')}</tbody></table>
   </div>`:'';
   $('#view').innerHTML=`
     ${pendAlert}
@@ -886,29 +886,23 @@ function showScanCandidates(cands){
 function showScanToolById(id){const t=S.tools.find(x=>x.id===id);if(t)showScanTool(t);}
 function showScanTool(t){
   scanTool=t;
-  const pending=t.receiptPending, dest=t.pendingDest||'', toOffice=pending&&dest==='ออฟฟิต';
   let statusLine='', actions='';
-  if(t.status==='ว่าง'){
-    statusLine=`<span style="background:#dcfce7;color:#15803d;padding:3px 10px;border-radius:8px;font-size:13px">🟢 ว่าง · ที่ออฟฟิต</span>`;
-    actions=`<button class="btn primary" onclick="scanBorrowPrompt()">📤 เบิก (ส่งออกไซต์)</button>`;
-  }else if(t.status==='ถูกยืม'&&pending&&!toOffice){
-    statusLine=`<span style="background:#fef3c7;color:#b45309;padding:3px 10px;border-radius:8px;font-size:13px">🚚 ส่งไป ${esc(dest)} · รอยืนยันรับ</span>`;
-    actions=`<button class="btn green" onclick="scanConfirmReceive()">✅ ยืนยันรับเครื่องนี้</button>`;
-  }else if(t.status==='ถูกยืม'&&pending&&toOffice){
-    statusLine=`<span style="background:#fef3c7;color:#b45309;padding:3px 10px;border-radius:8px;font-size:13px">🚚 ส่งกลับออฟฟิต · รอยืนยันรับ</span>`;
-    actions=`<button class="btn green" onclick="scanConfirmReceive()">✅ ยืนยันรับที่ออฟฟิต</button>`;
-  }else if(t.status==='ถูกยืม'&&!pending){
-    statusLine=`<span style="background:#dbeafe;color:#1d4ed8;padding:3px 10px;border-radius:8px;font-size:13px">📍 อยู่ ${esc(t.loc)||'-'} · ยืนยันแล้ว</span>`;
-    actions=`<button class="btn primary" onclick="scanSendBack()">↩️ ส่งคืน (กลับออฟฟิต)</button>`;
+  if(t.status==='ถูกยืม'){
+    statusLine=`<span style="background:#dbeafe;color:#1d4ed8;padding:3px 10px;border-radius:8px;font-size:13px">📍 อยู่ ${esc(t.loc)||'ไซต์งาน'}</span>`;
+    actions=`<button class="btn green" onclick="scanReceiveSite()">📥 รับคืนเข้าออฟฟิต</button>`;
   }else if(t.status==='ส่งซ่อม'){
     statusLine=`<span style="background:#e2e8f0;color:#475569;padding:3px 10px;border-radius:8px;font-size:13px">⚙️ อยู่ร้านซ่อม</span>`;
-    actions=`<span class="muted" style="font-size:13px">รับคืนจากซ่อมทำที่หน้าคอม</span>`;
+    actions=`<button class="btn green" onclick="scanReceiveRepair()">📥 รับคืนจากซ่อม</button>`;
+  }else if(t.status==='ว่าง'){
+    statusLine=`<span style="background:#dcfce7;color:#15803d;padding:3px 10px;border-radius:8px;font-size:13px">🟢 ว่าง · อยู่ออฟฟิตแล้ว</span>`;
+    actions=`<span class="muted" style="font-size:13px">เครื่องนี้อยู่ออฟฟิตแล้ว — ไม่ต้องรับคืน</span>`;
   }else{
     statusLine=`<span style="background:#e2e8f0;color:#475569;padding:3px 10px;border-radius:8px;font-size:13px">${esc(t.status)}</span>`;
   }
   $('#scanResult').innerHTML=`<div class="panel" style="border-left:4px solid var(--blue)">
     <div style="display:flex;align-items:center;gap:8px"><b style="font-size:18px">${esc(t.code)}</b> ${coBadge(t.company)}</div>
     <div class="muted">${esc(t.name)}</div>
+    ${t.loc?`<div class="muted" style="font-size:12px">ตอนนี้อยู่: ${esc(t.loc)}</div>`:''}
     <div style="margin:12px 0">${statusLine}</div>
     <div style="display:flex;flex-direction:column;gap:8px">${actions}
       <button class="btn" style="background:#fee2e2;color:#b91c1c" onclick="scanReportBroken()">⚠️ แจ้งชำรุด</button>
@@ -921,26 +915,19 @@ async function scanWrite(t,upd,mv,msg){
   await sb.from('movements').insert(Object.assign({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:today()},mv));
   toast(msg); await loadAll(); scanDone(t,msg);
 }
-async function scanConfirmReceive(){ const t=scanTool; if(!t)return;
-  const toOffice=t.pendingDest==='ออฟฟิต';
-  const upd=toOffice?{status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null}
-                    :{receipt_pending:false,pending_dest:null,dispatched_at:null};
-  await scanWrite(t,upd,{type:toOffice?'คืน':'ยืนยันรับ',project:toOffice?'ออฟฟิต':(t.pendingDest||'')},toOffice?'✅ รับเข้าออฟฟิตแล้ว':'✅ ยืนยันรับที่ไซต์แล้ว');
+async function scanReceiveSite(){ const t=scanTool; if(!t)return;
+  await scanWrite(t,{status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null},{type:'คืน',project:'ออฟฟิต',actor:(ME&&ME.email)||''},'📥 รับคืน '+t.code+' เข้าออฟฟิตแล้ว');
 }
-async function scanSendBack(){ const t=scanTool; if(!t)return;
-  await scanWrite(t,{receipt_pending:true,pending_dest:'ออฟฟิต',dispatched_at:new Date().toISOString()},{type:'ส่งคืน',project:'ออฟฟิต'},'↩️ ส่งคืน '+t.code+' — รอออฟฟิตยืนยันรับ');
+async function scanReceiveRepair(){ const t=scanTool; if(!t)return;
+  const m=[...S.movements].reverse().find(x=>x.tool_id===t.id&&x.type==='ส่งซ่อม'); const slipN=m?m.slipNo:null;
+  await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:new Date().toISOString()}).eq('id',t.id);
+  await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:today(),type:'รับคืนจากซ่อม',slip_no:slipN,actor:(ME&&ME.email)||''});
+  if(slipN!=null)await sb.from('repair_slips').update({status:'รับคืนครบ',received_date:today(),receiver:(ME&&ME.email)||''}).eq('company',(m?m.company:COMPANY)).eq('slip_no',slipN);
+  toast('📥 รับคืนจากซ่อม '+t.code+' แล้ว'); await loadAll(); scanDone(t,'รับคืนจากซ่อมแล้ว');
 }
 async function scanReportBroken(){ const t=scanTool; if(!t)return;
   if(!confirm('แจ้งว่า '+t.code+' ชำรุด?'))return;
   await scanWrite(t,{status:'ชำรุด',receipt_pending:false,pending_dest:null,dispatched_at:null},{type:'แจ้งชำรุด',reason:'แจ้งจากสแกนหน้างาน'},'⚠️ แจ้งชำรุด '+t.code+' แล้ว');
-}
-async function scanBorrowPrompt(){ const t=scanTool; if(!t)return;
-  const site=(prompt('เบิก '+t.code+' ส่งไปไซต์ไหน?')||'').trim(); if(!site)return;
-  const who=(prompt('ผู้รับปลายทาง (ถ้ามี)')||'').trim();
-  await sb.from('tools').update({status:'ถูกยืม',location:site+(who?' / '+who:''),receipt_pending:true,pending_dest:site,dispatched_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',t.id);
-  await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:today(),type:'เบิก',project:site,actor:who});
-  await ensureLookup('projects',site); if(who)await ensureLookup('people',who);
-  toast('📤 เบิก '+t.code+' → '+site); await loadAll(); scanDone(t,'ส่งออกไซต์ '+site+' — รอยืนยันรับ');
 }
 function scanDone(t,msg){ scanTool=null;
   $('#scanResult').innerHTML=`<div class="panel" style="text-align:center;border-left:4px solid #16a34a">
