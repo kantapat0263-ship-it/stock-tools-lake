@@ -790,10 +790,11 @@ function histMore(){histLimit+=80;if(histDraw)histDraw();}
 function renderHistory(){
   $('#view').innerHTML=`<div class="tabs">
     <button class="${histTab==='recent'?'on':''}" onclick="setHT('recent')">📋 รายการล่าสุด</button>
+    <button class="${histTab==='slips'?'on':''}" onclick="setHT('slips')">📑 ใบส่งซ่อม</button>
     <button class="${histTab==='repair'?'on':''}" onclick="setHT('repair')">🔧 ค้างซ่อม / เวลาซ่อม</button>
     <button class="${histTab==='tool'?'on':''}" onclick="setHT('tool')">🔍 รายเครื่อง</button>
   </div><div id="hbody"></div>`;
-  ({recent:histRecent,repair:histRepair,tool:histByTool}[histTab])();
+  ({recent:histRecent,slips:histSlips,repair:histRepair,tool:histByTool}[histTab])();
 }
 function histRecent(){
   $('#hbody').innerHTML=`<div class="panel">
@@ -836,12 +837,12 @@ function histRepair(){
   $('#hbody').innerHTML=`
     <div class="panel"><h3>🔧 กำลังซ่อม / ค้างอยู่ (${pend.length}) <span class="muted" style="font-weight:400">— เรียงตามค้างนานสุด</span></h3>
       <table><thead><tr><th>ใบ</th><th>บ.</th><th>ส่งซ่อม</th><th>ช่าง</th><th class="center">จำนวน</th><th class="center">ค้างมาแล้ว</th></tr></thead><tbody>${
-        pend.map(x=>`<tr><td><b>${esc(x.s.no)}</b></td><td>${coBadge(x.s.company)}</td><td>${esc(x.s.sent)||'-'}</td><td>${esc(x.s.vendor)||'-'}</td><td class="center">${cntOf(x.s.slip_no,x.s.company)}</td><td class="center">${x.days==null?'-':`<b style="color:${x.days>14?'#dc2626':x.days>7?'#d97706':'#16a34a'}">${x.days} วัน</b>`}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่มีเครื่องค้างซ่อม 🎉</td></tr>'
+        pend.map(x=>`<tr style="cursor:pointer" onclick="slipDetail(${x.s.slip_no},'${esc(x.s.company)}')"><td><b>${esc(x.s.no)}</b></td><td>${coBadge(x.s.company)}</td><td>${esc(x.s.sent)||'-'}</td><td>${esc(x.s.vendor)||'-'}</td><td class="center">${cntOf(x.s.slip_no,x.s.company)}</td><td class="center">${x.days==null?'-':`<b style="color:${x.days>14?'#dc2626':x.days>7?'#d97706':'#16a34a'}">${x.days} วัน</b>`}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่มีเครื่องค้างซ่อม 🎉</td></tr>'
       }</tbody></table>
     </div>
     <div class="panel"><h3>✅ ซ่อมเสร็จล่าสุด (${done.length}) <span class="muted" style="font-weight:400">— ใช้เวลาซ่อมกี่วัน</span></h3>
       <table><thead><tr><th>ใบ</th><th>บ.</th><th>ส่งซ่อม</th><th>รับคืน</th><th class="center">ใช้เวลา</th></tr></thead><tbody>${
-        done.map(x=>`<tr><td><b>${esc(x.s.no)}</b></td><td>${coBadge(x.s.company)}</td><td>${esc(x.s.sent)||'-'}</td><td>${esc(x.s.received)||'-'}</td><td class="center">${x.days==null?'-':x.days+' วัน'}</td></tr>`).join('')||'<tr><td colspan=5 class="empty">ยังไม่มี</td></tr>'
+        done.map(x=>`<tr style="cursor:pointer" onclick="slipDetail(${x.s.slip_no},'${esc(x.s.company)}')"><td><b>${esc(x.s.no)}</b></td><td>${coBadge(x.s.company)}</td><td>${esc(x.s.sent)||'-'}</td><td>${esc(x.s.received)||'-'}</td><td class="center">${x.days==null?'-':x.days+' วัน'}</td></tr>`).join('')||'<tr><td colspan=5 class="empty">ยังไม่มี</td></tr>'
       }</tbody></table>
     </div>`;
 }
@@ -866,6 +867,54 @@ function histByTool(){
     $('#htdetail').innerHTML=(cands.length>1?`<p class="muted" style="font-size:13px">พบ ${cands.length} เครื่องที่ตรงกัน — แสดงทั้งหมด</p>`:'')+cands.map(toolTimelineHtml).join('<hr style="border:none;border-top:1px solid var(--line);margin:16px 0">');
   };
   $('#htq').oninput=draw;
+}
+
+function slipCount(slipNo,co){return S.movements.filter(m=>m.slipNo===slipNo&&m.company===co&&m.type==='ส่งซ่อม').length;}
+function histSlips(){
+  $('#hbody').innerHTML=`<div class="panel">
+    <h3>📑 ใบส่งซ่อมทั้งหมด <span class="muted" style="font-weight:400">— คลิกที่ใบเพื่อดูรายการเครื่อง + รายละเอียดการส่ง / วันที่</span></h3>
+    <div class="toolbar"><input class="search" id="sq" placeholder="🔎 ค้นหา เลขที่ใบ / ช่าง / ผู้ส่ง"></div>
+    <div id="stbl" style="max-height:540px;overflow:auto"></div>
+  </div>`;
+  const draw=()=>{
+    const q=$('#sq').value.trim().toLowerCase();
+    let list=S.slips.filter(s=>!FILTER||s.company===FILTER);
+    if(q)list=list.filter(s=>((s.no||'')+' '+(s.vendor||'')+' '+(s.sender||'')).toLowerCase().includes(q));
+    list=[...list].sort((a,b)=>a.company!==b.company?a.company.localeCompare(b.company):b.slip_no-a.slip_no);
+    $('#stbl').innerHTML=`<table><thead><tr><th>ใบ</th><th>บ.</th><th>วันส่ง</th><th>ช่าง</th><th>ผู้ส่ง</th><th class="center">จำนวน</th><th>สถานะ</th></tr></thead><tbody>${
+      list.map(s=>`<tr style="cursor:pointer" onclick="slipDetail(${s.slip_no},'${esc(s.company)}')"><td><b>${esc(s.no)}</b></td><td>${coBadge(s.company)}</td><td>${esc(s.sent)||'-'}</td><td>${esc(s.vendor)||'-'}</td><td>${esc(s.sender)||'-'}</td><td class="center">${slipCount(s.slip_no,s.company)}</td><td>${chip(s.status==='รับคืนครบ'?'ว่าง':s.status==='ส่งแล้ว'?'ส่งซ่อม':'รอส่งซ่อม')}</td></tr>`).join('')||'<tr><td colspan=7 class="empty">ไม่มีใบส่งซ่อม</td></tr>'
+    }</tbody></table>`;
+  };
+  $('#sq').oninput=draw;draw();
+}
+function slipDetail(slipNo,co){
+  const s=S.slips.find(x=>x.slip_no===slipNo&&x.company===co);
+  if(!s){toast('ไม่พบใบส่งซ่อม');return;}
+  const sent=S.movements.filter(m=>m.slipNo===slipNo&&m.company===co&&m.type==='ส่งซ่อม');
+  const recvByTool={};
+  S.movements.filter(m=>m.slipNo===slipNo&&m.company===co&&m.type==='รับคืนจากซ่อม').forEach(m=>{if(m.tool_id)recvByTool[m.tool_id]=m;});
+  const backN=sent.filter(m=>m.tool_id&&recvByTool[m.tool_id]).length;
+  const stColor={'ส่งแล้ว':'#d97706','รับคืนบางส่วน':'#2563eb','รับคืนครบ':'#16a34a'}[s.status]||'#64748b';
+  const rows=sent.map((m,i)=>{
+    const r=m.tool_id?recvByTool[m.tool_id]:null;
+    const back=r?`<span style="color:#16a34a">✅ ${esc(r.date)||'รับแล้ว'}</span>`:(s.status==='รับคืนครบ'?'<span style="color:#16a34a">✅ รับแล้ว</span>':'<span style="color:#d97706">⏳ อยู่ร้าน</span>');
+    return `<tr><td class="center">${i+1}</td><td><b>${esc(m.code)||esc(m.label)||'-'}</b></td><td class="center">${esc(m.no)||'-'}</td><td>${esc(m.reason)||'-'}</td><td>${back}</td></tr>`;
+  }).join('');
+  const kv=(k,v)=>`<div><span class="muted">${k}:</span> <b>${v}</b></div>`;
+  openModal(`<h3>📑 ใบส่งซ่อม #${esc(s.no)} ${coBadge(s.company)}</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px;margin:10px 0;padding:11px 14px;background:var(--bg);border-radius:9px">
+      ${kv('วันที่ส่งซ่อม',esc(s.sent)||'-')}
+      ${kv('สถานะใบ',`<span style="color:${stColor}">${esc(s.status)}</span>`)}
+      ${kv('ร้าน/ช่างซ่อม',esc(s.vendor)||'-')}
+      ${kv('ผู้ส่งซ่อม',esc(s.sender)||'-')}
+      ${kv('วันรับคืน',esc(s.received)||'-')}
+      ${kv('ผู้รับคืน',esc(s.receiver)||'-')}
+      ${kv('จำนวนเครื่อง',sent.length+' เครื่อง')}
+      ${kv('รับคืนแล้ว',backN+'/'+sent.length)}
+      ${s.note?`<div style="grid-column:1/3"><span class="muted">หมายเหตุ:</span> ${esc(s.note)}</div>`:''}
+    </div>
+    <div style="max-height:42vh;overflow:auto"><table><thead><tr><th>#</th><th>รายการ / รหัส</th><th>NO</th><th>อาการ/สาเหตุ</th><th>รับคืน</th></tr></thead><tbody>${rows||'<tr><td colspan=5 class="empty">ไม่มีรายการ</td></tr>'}</tbody></table></div>
+    <div class="flexrow" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
 }
 
 /* ============ REPORT + EXPORT ============ */
