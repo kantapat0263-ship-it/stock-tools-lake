@@ -1,5 +1,5 @@
-// Service worker — LOTUS GROUP STOCK (network-first; cache เฉพาะ shell ไว้ใช้ตอนออฟไลน์)
-const CACHE = 'lg-stock-v1';
+// Service worker — LOTUS GROUP STOCK (network-first; HTML ดึงสดเสมอ, cache shell ไว้ใช้ตอนออฟไลน์)
+const CACHE = 'lg-stock-v2';
 const SHELL = ['/', '/index.html', '/guide.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -19,10 +19,11 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   // ปล่อยให้คำขอข้ามโดเมน (Supabase ฯลฯ) วิ่งตรงไปเน็ตเวิร์กตามปกติ
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
-  // network-first: ออนไลน์เห็นของใหม่เสมอ, ออฟไลน์ค่อยใช้แคช
+  // HTML/หน้าเว็บ = ดึงสดเสมอ (bypass cache) เพื่อให้ได้โค้ดใหม่ทันทีหลัง deploy
+  const freshHtml = e.request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html');
   e.respondWith((async () => {
     try {
-      const net = await fetch(e.request);
+      const net = await fetch(e.request, freshHtml ? { cache: 'no-store' } : {});
       const c = await caches.open(CACHE);
       c.put(e.request, net.clone());
       return net;
