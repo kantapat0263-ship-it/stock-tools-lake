@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 :root{--navy:#0f2744;--navydark:#0a1c33;--blue:#2563eb;--bg:#eef2f7;--card:#fff;--line:#e2e8f0;--ink:#0f172a;--muted:#64748b;--green:#16a34a;--amber:#d97706;--red:#dc2626}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -138,7 +139,7 @@ function render(t,mv){
   <div class="hd">
     <div class="top">
       <a href="/"><span style="font-size:16px">‹</span> ปิด</a>
-      <a href="/?scan=1">📷 สแกนเครื่องอื่น</a>
+      <a href="#" onclick="screenScanner();return false">📷 สแกนเครื่องอื่น</a>
     </div>
     <div class="idn">
       <div class="ico">🧰</div>
@@ -219,6 +220,41 @@ async function doLogin(){
   const {error}=await sb.auth.signInWithPassword({email:e,password:p});
   if(error){$('#lmsg').textContent='เข้าไม่ได้: '+error.message;return;}
   boot();
+}
+
+/* ---- กล้องสแกน QR ในหน้านี้ (เต็มจอ ไม่ออกไปหน้าเว็บที่มีเมนู) ---- */
+let _scanner=null;
+function stopScan(){if(_scanner){try{_scanner.stop().then(()=>{try{_scanner.clear()}catch(e){}}).catch(()=>{})}catch(e){}_scanner=null;}}
+function screenScanner(){
+  stopScan();
+  $('#app').innerHTML=`<div class="hd">
+      <div class="top"><a href="#" onclick="stopScan();boot();return false">‹ กลับ</a><span></span></div>
+      <h1 style="font-size:17px;margin:2px 0">📷 สแกน QR เครื่องมือ</h1>
+    </div>
+    <div class="bd">
+      <div id="qrbox" style="width:100%;max-width:320px;margin:0 auto;border-radius:14px;overflow:hidden;background:#0f172a;min-height:240px"></div>
+      <div style="display:flex;gap:8px;margin:12px auto 0;max-width:320px">
+        <button class="btn ghost" id="startc" style="flex:1">เปิดกล้องอีกครั้ง</button>
+        <button class="btn ghost" id="stopc" style="flex:1;display:none">ปิดกล้อง</button>
+      </div>
+      <div class="muted" style="font-size:13px;margin-top:14px;text-align:center">ส่อง QR บนเครื่องมือ — ระบบจะเปิดหน้ารายละเอียดให้อัตโนมัติ</div>
+    </div>`;
+  $('#startc').onclick=startScan;
+  $('#stopc').onclick=()=>{stopScan();$('#stopc').style.display='none';$('#startc').style.display='';};
+  startScan();
+}
+async function startScan(){
+  if(!window.Html5Qrcode){toast('ไลบรารีสแกนยังโหลดไม่เสร็จ ลองรีเฟรช');return;}
+  stopScan();
+  try{
+    const h=new Html5Qrcode('qrbox');_scanner=h;
+    await h.start({facingMode:'environment'},{fps:10,qrbox:{width:220,height:220}},onScan,()=>{});
+    $('#startc').style.display='none';$('#stopc').style.display='';
+  }catch(e){_scanner=null;toast('เปิดกล้องไม่ได้: '+(e.message||e)+' — สแกนด้วยกล้องมือถือก็ได้');}
+}
+function onScan(text){
+  const m=String(text).match(/[?&]t=([0-9a-fA-F-]{6,})/);
+  if(m){stopScan();location.replace('/s.html?t='+m[1]);}
 }
 
 boot();
