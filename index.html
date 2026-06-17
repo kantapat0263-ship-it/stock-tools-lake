@@ -246,14 +246,15 @@ function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.
 function rowToSlip(s){return {id:s.id,slip_no:s.slip_no,no:String(s.slip_no).padStart(3,'0'),sent:(s.sent_date||''),vendor:s.vendor||'',project:s.project||'',sender:s.sender||'',status:s.status||'ส่งแล้ว',received:(s.received_date||''),receiver:s.receiver||'',note:s.note||'',count:'0',company:s.company};}
 function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||''};}
 async function loadAll(){
-  const [t,s,mv,c,p,pe,v,au,tr]=await Promise.all([
+  const [t,s,mv,c,p,pe,v,au,tr,st]=await Promise.all([
     sb.from('tools').select('*').eq('deleted',false),
-    sb.from('repair_slips').select('*').order('slip_no'),
-    sb.from('movements').select('*').order('occurred_on'),
+    sb.from('repair_slips').select('*').eq('deleted',false).order('slip_no'),
+    sb.from('movements').select('*').eq('deleted',false).order('occurred_on'),
     sb.from('categories').select('name'),sb.from('projects').select('name'),
     sb.from('people').select('name'),sb.from('vendors').select('name'),
     sb.from('audit_log').select('*').order('occurred_at',{ascending:false}).limit(1000),
-    sb.from('tools').select('*').eq('deleted',true)]);
+    sb.from('tools').select('*').eq('deleted',true),
+    sb.from('repair_slips').select('*').eq('deleted',true).order('slip_no')]);
   if(t.error){toast('โหลดข้อมูลไม่ได้: '+t.error.message);}
   const byId={};
   S.tools=(t.data||[]).map(rowToTool); S.tools.forEach((x,i)=>{x.i=i;byId[x.id]=x;});
@@ -267,6 +268,7 @@ async function loadAll(){
   S.lookups={categories:nm(c),projects:nm(p),people:nm(pe),vendors:nm(v)};
   S.audit=(au.data||[]);
   S.trash=(tr.data||[]).map(rowToTool);
+  S.slipTrash=(st.data||[]).map(rowToSlip);
   S.nextSlipByCo={};['PAC','LOTUS'].forEach(co=>S.nextSlipByCo[co]=(S.slips.filter(x=>x.company===co).reduce((m,x)=>Math.max(m,x.slip_no||0),0))+1);
 }
 async function ensureLookup(tbl,name,co){name=(name||'').trim();if(!name)return;if((S.lookups[tbl]||[]).includes(name))return;try{await sb.from(tbl).insert({company:co||COMPANY,name});}catch(e){}}
@@ -697,14 +699,35 @@ async function commitReceive(){
   $('#printArea').innerHTML=receiveDocHtml(date,recv,items);window.print();
   toast(`รับคืน ${items.length} เครื่อง → พร้อมเบิก`);await loadAll();setTimeout(()=>go('receive'),400);
 }
-async function cancelSlip(no,co){
-  if(!confirm(`ยกเลิกใบส่งซ่อม #${no} (${co}) ?\nเครื่องในใบที่ยังอยู่ร้านจะกลับเป็น "ว่าง" และลบรายการของใบนี้`))return;
+function cancelSlip(no,co){
+  openModal(`<h3>🚫 ยกเลิกใบส่งซ่อม #${esc(no)} ${coBadge(co)}</h3>
+    <p class="muted" style="font-size:13px;line-height:1.6">ใบนี้จะถูก<b>ย้ายเข้าถังขยะ</b> (กู้คืนได้ภายหลัง — ไม่ลบถาวร) · เครื่องที่ยังอยู่ร้านซ่อมจะกลับเป็นสถานะ "ว่าง"</p>
+    <div class="field" style="margin-top:6px"><label>พิมพ์เลขที่ใบ <b style="color:#dc2626">${esc(no)}</b> เพื่อยืนยัน</label><input id="cfslip" class="search" placeholder="${esc(no)}" autocomplete="off"></div>
+    <div class="flexrow" style="margin-top:12px">
+      <button class="btn" id="cfbtn" style="background:#fecaca;color:#b91c1c;opacity:.5;cursor:not-allowed" disabled onclick="doCancelSlip('${esc(no)}','${esc(co)}')">🚫 ยืนยันยกเลิก → ย้ายเข้าถังขยะ</button>
+      <button class="btn ghost" onclick="closeModal()">ปิด (ไม่ยกเลิก)</button>
+    </div>`);
+  const inp=$('#cfslip'),btn=$('#cfbtn');
+  inp.oninput=()=>{const ok=[String(no),String(parseInt(no,10))].includes(inp.value.trim());btn.disabled=!ok;btn.style.opacity=ok?'1':'.5';btn.style.cursor=ok?'pointer':'not-allowed';};
+  setTimeout(()=>inp.focus(),50);
+}
+async function doCancelSlip(no,co){
   const slipN=parseInt(no,10);
   const tids=S.movements.filter(m=>m.slipNo===slipN&&m.company===co&&m.type==='ส่งซ่อม'&&m.tool_id).map(m=>m.tool_id);
   for(const tid of tids){const t=S.tools.find(x=>x.id===tid);if(t&&t.status==='ส่งซ่อม'){await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต'}).eq('id',tid);}}
-  await sb.from('movements').delete().eq('company',co).eq('slip_no',slipN).in('type',['ส่งซ่อม','รับคืนจากซ่อม']);
-  await sb.from('repair_slips').delete().eq('company',co).eq('slip_no',slipN);
-  toast('ยกเลิกใบ #'+no+' แล้ว');await loadAll();go('receive');}
+  await sb.from('movements').update({deleted:true}).eq('company',co).eq('slip_no',slipN).in('type',['ส่งซ่อม','รับคืนจากซ่อม']);
+  await sb.from('repair_slips').update({deleted:true}).eq('company',co).eq('slip_no',slipN);
+  closeModal();toast('ยกเลิกใบ #'+no+' → ย้ายเข้าถังขยะแล้ว');await loadAll();go('receive');}
+async function restoreSlip(no,co){
+  if(!canEditCo(co)){toast('กู้คืนได้เฉพาะบริษัทที่มีสิทธิ์');return;}
+  const slipN=parseInt(no,10);
+  const {data:mvs}=await sb.from('movements').select('tool_id,type').eq('company',co).eq('slip_no',slipN);
+  await sb.from('repair_slips').update({deleted:false}).eq('company',co).eq('slip_no',slipN);
+  await sb.from('movements').update({deleted:false}).eq('company',co).eq('slip_no',slipN).in('type',['ส่งซ่อม','รับคืนจากซ่อม']);
+  const sentIds=new Set((mvs||[]).filter(m=>m.type==='ส่งซ่อม'&&m.tool_id).map(m=>m.tool_id));
+  const recvIds=new Set((mvs||[]).filter(m=>m.type==='รับคืนจากซ่อม'&&m.tool_id).map(m=>m.tool_id));
+  for(const tid of sentIds){if(recvIds.has(tid))continue;const t=S.tools.find(x=>x.id===tid);if(t&&t.status==='ว่าง')await sb.from('tools').update({status:'ส่งซ่อม'}).eq('id',tid);}
+  toast('กู้คืนใบ #'+no+' จากถังขยะแล้ว');await loadAll();go('trash');}
 
 /* ============ BORROW (เบิก-คืน) ============ */
 let borrowTab='out',selBor=new Set();
@@ -1131,8 +1154,15 @@ async function printLabels(){
 /* ============ TRASH (ถังขยะ — กู้คืน) ============ */
 function renderTrash(){
   const items=S.trash||[];
+  const slips=(S.slipTrash||[]).filter(s=>!FILTER||s.company===FILTER);
   $('#view').innerHTML=`<div class="panel">
-    <h3>ถังขยะ (${items.length}) <span class="muted" style="font-weight:400">— เครื่องที่ถูกลบ · กู้คืนได้เฉพาะบริษัทตัวเอง</span></h3>
+    <h3>🗑️ ใบส่งซ่อมที่ยกเลิก (${slips.length}) <span class="muted" style="font-weight:400">— ย้ายมาจากการยกเลิกใบ · กดกู้คืนกลับเข้าระบบได้</span></h3>
+    <table><thead><tr><th>ใบ</th><th>บ.</th><th>วันส่ง</th><th>ช่าง</th><th>สถานะเดิม</th><th></th></tr></thead><tbody>${
+      slips.map(s=>`<tr><td><b>${esc(s.no)}</b></td><td>${coBadge(s.company)}</td><td>${esc(s.sent)||'-'}</td><td>${esc(s.vendor)||'-'}</td><td>${esc(s.status)}</td><td class="right">${canEditCo(s.company)?`<button class="btn" style="background:#dcfce7;color:#15803d;padding:6px 14px" onclick="restoreSlip('${esc(s.no)}','${esc(s.company)}')">♻️ กู้คืนใบ</button>`:'<span class="muted" style="font-size:12px">—</span>'}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่มีใบที่ยกเลิก</td></tr>'
+    }</tbody></table>
+  </div>
+  <div class="panel">
+    <h3>ถังขยะเครื่องมือ (${items.length}) <span class="muted" style="font-weight:400">— เครื่องที่ถูกลบ · กู้คืนได้เฉพาะบริษัทตัวเอง</span></h3>
     <table><thead><tr><th>รหัส</th><th>บริษัท</th><th>ชื่อ</th><th>NO</th><th>ลบเมื่อ</th><th></th></tr></thead><tbody>${
       items.map((t,i)=>`<tr><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.no)}</td><td class="muted">${esc(t.updated)}</td><td class="right">${canEditCo(t.company)?`<button class="btn" style="background:#dcfce7;color:#15803d;padding:6px 14px" onclick="restoreTool(${i})">♻️ กู้คืน</button>`:'<span class="muted" style="font-size:12px">—</span>'}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">ถังขยะว่าง</td></tr>'
     }</tbody></table>
