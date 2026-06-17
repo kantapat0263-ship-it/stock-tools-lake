@@ -300,8 +300,10 @@ async function init(){
   applyTheme(ME.company);
   await loadAll();
   if(!S.tools.length && ME.role!=='admin'){toast('บัญชีนี้ยังไม่ถูกตั้งสิทธิ์ — แจ้งแอดมินตั้งบริษัท/admin ให้');}
-  const _tp=new URLSearchParams(location.search).get('t');
+  const _q=new URLSearchParams(location.search);
+  const _tp=_q.get('t');
   if(_tp){ go('scan'); const _tt=S.tools.find(x=>x.id===_tp); if(_tt)showScanTool(_tt); }
+  else if(_q.get('scan')){ go('scan'); }
   else go('dash');
 }
 function showLogin(){$('#loginScrim').style.display='flex';document.querySelector('.app').style.display='none';}
