@@ -245,16 +245,28 @@ let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('o
 function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||'')};}
 function rowToSlip(s){return {id:s.id,slip_no:s.slip_no,no:String(s.slip_no).padStart(3,'0'),sent:(s.sent_date||''),vendor:s.vendor||'',project:s.project||'',sender:s.sender||'',status:s.status||'ส่งแล้ว',received:(s.received_date||''),receiver:s.receiver||'',note:s.note||'',count:'0',company:s.company};}
 function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||''};}
+async function fetchAllMov(){
+  const all=[];const PAGE=1000;let from=0;
+  for(;;){
+    const {data,error}=await sb.from('movements').select('*').eq('deleted',false).order('occurred_on').order('id').range(from,from+PAGE-1);
+    if(error){toast('โหลดประวัติไม่ครบ: '+error.message);break;}
+    all.push(...(data||[]));
+    if(!data||data.length<PAGE)break;
+    from+=PAGE;
+  }
+  return all;
+}
 async function loadAll(){
-  const [t,s,mv,c,p,pe,v,au,tr,st]=await Promise.all([
+  const mvP=fetchAllMov();
+  const [t,s,c,p,pe,v,au,tr,st]=await Promise.all([
     sb.from('tools').select('*').eq('deleted',false),
     sb.from('repair_slips').select('*').eq('deleted',false).order('slip_no'),
-    sb.from('movements').select('*').eq('deleted',false).order('occurred_on'),
     sb.from('categories').select('name'),sb.from('projects').select('name'),
     sb.from('people').select('name'),sb.from('vendors').select('name'),
     sb.from('audit_log').select('*').order('occurred_at',{ascending:false}).limit(1000),
     sb.from('tools').select('*').eq('deleted',true),
     sb.from('repair_slips').select('*').eq('deleted',true).order('slip_no')]);
+  const mv={data:await mvP};
   if(t.error){toast('โหลดข้อมูลไม่ได้: '+t.error.message);}
   const byId={};
   S.tools=(t.data||[]).map(rowToTool); S.tools.forEach((x,i)=>{x.i=i;byId[x.id]=x;});
