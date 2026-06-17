@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>สแกนเครื่องมือ — LOTUS GROUP</title>
+<meta name="theme-color" content="#0f2744">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--navy:#0f2744;--navydark:#0a1c33;--blue:#2563eb;--bg:#eef2f7;--card:#fff;--line:#e2e8f0;--ink:#0f172a;--muted:#64748b;--green:#16a34a;--amber:#d97706;--red:#dc2626}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--navydark);color:var(--ink);font-family:'Noto Sans Thai',system-ui,sans-serif;font-size:15px}
+.wrap{max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);display:flex;flex-direction:column}
+/* header */
+.hd{background:var(--navy);color:#fff;padding:14px 16px 18px}
+.hd .top{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#9fb4d1;margin-bottom:14px}
+.hd .top a{color:#9fb4d1;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+.hd .idn{display:flex;align-items:center;gap:13px}
+.hd .ico{width:54px;height:54px;border-radius:14px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:27px;flex-shrink:0}
+.hd .meta{font-size:12px;color:#9fb4d1}
+.hd h1{font-size:19px;font-weight:600;margin:1px 0 2px;line-height:1.25}
+.hd .brand{font-size:13px;color:#cfe0f5}
+.hd .stat{margin-top:13px;display:inline-flex;align-items:center;gap:7px;font-size:13px;padding:6px 12px;border-radius:9px;font-weight:500}
+/* body */
+.bd{padding:14px 14px 30px;flex:1}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 15px;margin-bottom:14px}
+.row{display:flex;justify-content:space-between;padding:6px 0;font-size:14px;border-bottom:1px solid #f1f5f9}
+.row:last-child{border-bottom:0}
+.row .k{color:var(--muted)}
+.row .v{font-weight:500;text-align:right;max-width:62%}
+.sechead{font-size:13px;font-weight:600;color:var(--muted);margin:18px 6px 11px;display:flex;align-items:center;gap:7px}
+/* timeline */
+.tl{position:relative;padding-left:26px}
+.tl:before{content:'';position:absolute;left:7px;top:8px;bottom:8px;width:2px;background:#dbe3ee}
+.ev{position:relative;margin-bottom:16px}
+.ev:last-child{margin-bottom:4px}
+.ev .dot{position:absolute;left:-26px;top:3px;width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1.5px currentColor}
+.ev .tp{font-size:14px;font-weight:600}
+.ev .det{font-size:13px;color:#475569;margin-top:1px}
+.ev .dt{font-size:12px;color:#94a3b8;margin-top:2px}
+.ev .rs{font-size:12.5px;color:var(--amber);margin-top:3px;background:#fff7ed;border-radius:7px;padding:4px 8px;display:inline-block}
+/* actions */
+.acts{display:flex;flex-direction:column;gap:9px;margin-top:6px}
+.btn{width:100%;border:0;border-radius:11px;padding:13px;font:inherit;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px}
+.btn.primary{background:var(--green);color:#fff}
+.btn.danger{background:#fee2e2;color:#b91c1c}
+.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line);font-weight:500}
+.two{display:flex;gap:9px}.two .btn{flex:1}
+/* states */
+.center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 24px;color:var(--muted)}
+.center .big{font-size:46px;margin-bottom:8px}
+.inp{width:100%;padding:12px;border:1px solid var(--line);border-radius:11px;font:inherit;font-size:15px;margin-bottom:9px}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(120px);background:#0f172a;color:#fff;padding:11px 18px;border-radius:11px;font-size:14px;transition:.25s;z-index:50;max-width:90%}
+.toast.on{transform:translateX(-50%) translateY(0)}
+.muted{color:var(--muted)}.sp{height:6px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="center"><div class="big">⏳</div><div>กำลังโหลด…</div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const SB_URL='https://iadnauodmoydxaajtory.supabase.co';
+const SB_KEY='sb_publishable_P7s42m8Z66_0fT0VjCxXrg_wXsc0ONi';
+const sb=window.supabase.createClient(SB_URL,SB_KEY);
+const $=s=>document.querySelector(s);
+const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const today=()=>new Date().toISOString().slice(0,10);
+let TOOL=null, ME=null, TID=null;
+
+let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tmo);tmo=setTimeout(()=>t.classList.remove('on'),2400);}
+
+const STC={'ว่าง':['#16a34a','#dcfce7'],'ถูกยืม':['#2563eb','#dbeafe'],'ส่งซ่อม':['#d97706','#fef3c7'],'รอส่งซ่อม':['#d97706','#fef3c7'],'ชำรุด':['#dc2626','#fee2e2'],'สูญหาย':['#dc2626','#fee2e2']};
+const TYC={'เบิก':['#2563eb','📤'],'คืน':['#16a34a','📥'],'ส่งซ่อม':['#d97706','🔧'],'รับคืนจากซ่อม':['#0d9488','✅'],'แจ้งชำรุด':['#dc2626','⚠️']};
+
+function applyTheme(co){const r=document.documentElement.style;
+  if(co==='LOTUS'){r.setProperty('--navy','#3f4a22');r.setProperty('--navydark','#2a3217');r.setProperty('--blue','#5c7a29');}
+  else{r.setProperty('--navy','#0f2744');r.setProperty('--navydark','#0a1c33');r.setProperty('--blue','#2563eb');}}
+
+function fmtDate(d){if(!d)return '';const M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const p=String(d).slice(0,10).split('-');if(p.length<3)return d;return parseInt(p[2])+' '+M[parseInt(p[1])-1]+' '+(parseInt(p[0])+543);}
+
+async function boot(){
+  TID=new URLSearchParams(location.search).get('t');
+  if(!TID){return screenMsg('🔍','ไม่พบรหัสเครื่อง','ลิงก์นี้ไม่มีรหัสเครื่อง (?t=) — สแกน QR บนเครื่องอีกครั้ง');}
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session)return screenLogin();
+  ME={email:session.user.email};
+  const {data:pr}=await sb.from('profiles').select('role,company').eq('id',session.user.id).maybeSingle();
+  ME.role=pr?pr.role:'staff'; ME.company=pr?pr.company:null;
+  await load();
+}
+
+async function load(){
+  const [{data:t,error:te},{data:mv}]=await Promise.all([
+    sb.from('tools').select('*').eq('id',TID).maybeSingle(),
+    sb.from('movements').select('*').eq('tool_id',TID).order('occurred_on',{ascending:false}).order('created_at',{ascending:false})
+  ]);
+  if(te||!t)return screenMsg('❓','ไม่พบเครื่องนี้','อาจถูกลบ หรือบัญชีของคุณไม่มีสิทธิ์ดูเครื่องของบริษัทนี้');
+  TOOL=t; applyTheme(t.company); render(t,mv||[]);
+}
+
+function render(t,mv){
+  const code=((t.category||'')+' '+(t.no||'')).trim();
+  const [sc,sbg]=STC[t.status]||['#64748b','#f1f5f9'];
+  const canEdit=!!ME;
+
+  let actions='';
+  if(canEdit){
+    if(t.status==='ถูกยืม')actions+=`<button class="btn primary" onclick="actReceiveSite()">📥 รับคืนเข้าออฟฟิต</button>`;
+    else if(t.status==='ส่งซ่อม')actions+=`<button class="btn primary" onclick="actReceiveRepair()">📥 รับคืนจากซ่อม</button>`;
+    if(t.status!=='ชำรุด')actions+=`<button class="btn danger" onclick="actBroken()">⚠️ แจ้งชำรุด</button>`;
+  }else{
+    actions=`<div class="muted" style="font-size:13px;text-align:center;padding:6px">👀 ดูอย่างเดียว — เครื่องของบริษัท ${esc(t.company)} (คุณไม่มีสิทธิ์แก้)</div>`;
+  }
+
+  const events=mv.length?mv.map(m=>{
+    const [c,ic]=TYC[m.type]||['#64748b','•'];
+    const place=m.project||m.counterparty||'';
+    const who=m.actor||m.recorded_by||'';
+    return `<div class="ev" style="color:${c}">
+      <div class="dot"></div>
+      <div class="tp" style="color:#0f172a">${ic} ${esc(m.type)}${place?` <span class="muted" style="font-weight:400">· ${esc(place)}</span>`:''}</div>
+      ${who?`<div class="det">โดย ${esc(who)}</div>`:''}
+      <div class="dt">${esc(fmtDate(m.occurred_on))}${m.slip_no?` · ใบซ่อม #${String(m.slip_no).padStart(3,'0')}`:''}</div>
+      ${m.reason?`<div class="rs">🛠️ ${esc(m.reason)}</div>`:''}
+      ${m.note?`<div class="det" style="color:#64748b">📝 ${esc(m.note)}</div>`:''}
+    </div>`;
+  }).join(''):`<div class="muted" style="font-size:13px;padding:4px 0 0">ยังไม่มีประวัติการเคลื่อนไหว</div>`;
+
+  $('#app').innerHTML=`
+  <div class="hd">
+    <div class="top">
+      <a href="/"><span style="font-size:16px">‹</span> ปิด</a>
+      <a href="/s">📷 สแกนเครื่องอื่น</a>
+    </div>
+    <div class="idn">
+      <div class="ico">🧰</div>
+      <div style="min-width:0">
+        <div class="meta">${esc(t.company)} · NO.${esc(t.no||'-')}</div>
+        <h1>${esc(t.name||'(ไม่ระบุชื่อ)')}</h1>
+        ${t.brand?`<div class="brand">${esc(t.brand)}</div>`:''}
+      </div>
+    </div>
+    <div class="stat" style="background:${sbg};color:${sc}">● ${esc(t.status)}${t.location?` · อยู่ที่ ${esc(t.location)}`:''}</div>
+  </div>
+
+  <div class="bd">
+    <div class="card">
+      <div class="row"><span class="k">รหัส</span><span class="v">${esc(code)||'-'}</span></div>
+      <div class="row"><span class="k">หมวด</span><span class="v">${esc(t.category)||'-'}</span></div>
+      <div class="row"><span class="k">ชื่อ / รุ่น</span><span class="v">${esc(t.name)||'-'}</span></div>
+      <div class="row"><span class="k">ยี่ห้อ</span><span class="v">${esc(t.brand)||'-'}</span></div>
+      ${t.serial?`<div class="row"><span class="k">S/N</span><span class="v">${esc(t.serial)}</span></div>`:''}
+      <div class="row"><span class="k">ที่อยู่ล่าสุด</span><span class="v">${esc(t.location)||'ออฟฟิต'}</span></div>
+      ${t.note?`<div class="row"><span class="k">หมายเหตุ</span><span class="v">${esc(t.note)}</span></div>`:''}
+    </div>
+
+    <div class="sechead">🧭 ประวัติการเดินทาง (${mv.length})</div>
+    <div class="card"><div class="tl">${events}</div></div>
+
+    <div class="acts">${actions}</div>
+  </div>`;
+}
+
+/* ---- actions (ยกตรรกะจาก app.html) ---- */
+async function writeMov(upd,mv,msg){
+  const co=(ME.role==='admin')?TOOL.company:ME.company;
+  await sb.from('tools').update(Object.assign({updated_at:new Date().toISOString()},upd)).eq('id',TOOL.id);
+  await sb.from('movements').insert(Object.assign({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today()},mv));
+  toast(msg); await load();
+}
+async function actReceiveSite(){
+  await writeMov({status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null},
+    {type:'คืน',project:'ออฟฟิต',actor:ME.email},'📥 รับคืนเข้าออฟฟิตแล้ว');
+}
+async function actReceiveRepair(){
+  const {data:m}=await sb.from('movements').select('slip_no,company').eq('tool_id',TOOL.id).eq('type','ส่งซ่อม').order('occurred_on',{ascending:false}).limit(1).maybeSingle();
+  const slipN=m?m.slip_no:null; const co=(ME.role==='admin')?TOOL.company:ME.company;
+  await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:new Date().toISOString()}).eq('id',TOOL.id);
+  await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'รับคืนจากซ่อม',slip_no:slipN,actor:ME.email});
+  if(slipN!=null)await sb.from('repair_slips').update({status:'รับคืนครบ',received_date:today(),receiver:ME.email}).eq('company',m.company).eq('slip_no',slipN);
+  toast('📥 รับคืนจากซ่อมแล้ว'); await load();
+}
+async function actBroken(){
+  if(!confirm('แจ้งว่า '+(TOOL.name||TOOL.no)+' ชำรุด?'))return;
+  await writeMov({status:'ชำรุด',receipt_pending:false,pending_dest:null,dispatched_at:null},
+    {type:'แจ้งชำรุด',reason:'แจ้งจากสแกนหน้างาน',actor:ME.email},'⚠️ แจ้งชำรุดแล้ว');
+}
+
+/* ---- screens ---- */
+function screenMsg(icon,title,sub){
+  $('#app').innerHTML=`<div class="center"><div class="big">${icon}</div>
+    <div style="font-size:17px;font-weight:600;color:#0f172a">${esc(title)}</div>
+    <div style="margin-top:6px;max-width:300px">${esc(sub)}</div>
+    <a href="/" style="margin-top:18px;color:var(--blue);text-decoration:none;font-weight:600">ไปหน้าหลัก ›</a></div>`;
+}
+function screenLogin(){
+  $('#app').innerHTML=`<div class="center" style="justify-content:flex-start;padding-top:60px">
+    <div class="big">🔒</div>
+    <div style="font-size:17px;font-weight:600;color:#0f172a">เข้าสู่ระบบก่อน</div>
+    <div style="margin:6px 0 18px;max-width:280px">ต้องเข้าสู่ระบบเพื่อดูรายละเอียดและบันทึกรายการ</div>
+    <div style="width:100%;max-width:300px;text-align:left">
+      <input class="inp" id="le" type="email" placeholder="อีเมล" autocomplete="username">
+      <input class="inp" id="lp" type="password" placeholder="รหัสผ่าน" autocomplete="current-password">
+      <button class="btn primary" style="background:var(--blue)" onclick="doLogin()">เข้าสู่ระบบ</button>
+      <div id="lmsg" class="muted" style="font-size:13px;margin-top:10px;text-align:center"></div>
+    </div></div>`;
+  $('#lp').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+}
+async function doLogin(){
+  const e=$('#le').value.trim(),p=$('#lp').value; $('#lmsg').textContent='กำลังเข้าสู่ระบบ…';
+  const {error}=await sb.auth.signInWithPassword({email:e,password:p});
+  if(error){$('#lmsg').textContent='เข้าไม่ได้: '+error.message;return;}
+  boot();
+}
+
+boot();
+</script>
+</body>
+</html>
