@@ -1103,15 +1103,17 @@ function scanDone(t,msg){ scanTool=null;
 /* ============ QR LABELS (ป้าย QR — เฟส 1) ============ */
 const QR_BASE='https://stock-tools-lake.vercel.app/s.html?t=';
 let selLabel=new Set(), lblFiltered=[];
-function qrDataURL(text){return new Promise((res,rej)=>{
+function qrDataURL(text,label){return new Promise((res,rej)=>{
   if(!window.qrcode){return rej(new Error('ไลบรารี QR ยังโหลดไม่เสร็จ ลองรีเฟรช'));}
   let gif; try{const qr=qrcode(0,'H');qr.addData(text);qr.make();gif=qr.createDataURL(8,16);}catch(e){return rej(e);}
   const img=new Image();
-  img.onload=()=>{const s=320,c=document.createElement('canvas');c.width=c.height=s;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,s,s);ctx.imageSmoothingEnabled=false;ctx.drawImage(img,0,0,s,s);res(c.toDataURL('image/png'));};
+  img.onload=()=>{const s=320,lh=label?56:0,c=document.createElement('canvas');c.width=s;c.height=s+lh;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.imageSmoothingEnabled=false;ctx.drawImage(img,0,0,s,s);
+    if(label){ctx.fillStyle='#000';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='bold 36px Tahoma,Arial,sans-serif';ctx.fillText(String(label).slice(0,16),s/2,s+lh/2+2);}
+    res(c.toDataURL('image/png'));};
   img.onerror=()=>rej(new Error('โหลดรูป QR ไม่ได้'));
   img.src=gif;
 });}
-async function downloadQR(id,code){ try{ const u=await qrDataURL(QR_BASE+id); const a=document.createElement('a'); a.href=u; a.download='QR_'+String(code||id).replace(/[^\w\-ก-๙]+/g,'_')+'.png'; document.body.appendChild(a); a.click(); a.remove(); toast('ดาวน์โหลด QR แล้ว'); }catch(e){ toast('สร้าง QR ไม่ได้: '+e.message);} }
+async function downloadQR(id,code,no){ try{ const u=await qrDataURL(QR_BASE+id, no||code); const a=document.createElement('a'); a.href=u; a.download='QR_'+String(no||code||id).replace(/[^\w\-ก-๙]+/g,'_')+'.png'; document.body.appendChild(a); a.click(); a.remove(); toast('ดาวน์โหลด QR แล้ว'); }catch(e){ toast('สร้าง QR ไม่ได้: '+e.message);} }
 function togLabel(id,on){on?selLabel.add(id):selLabel.delete(id);$('#lcount').textContent='เลือก '+selLabel.size;}
 function renderLabels(){
   selLabel=new Set();
@@ -1129,7 +1131,7 @@ function renderLabels(){
   const draw=()=>{const q=$('#lq').value.trim().toLowerCase();
     lblFiltered=S.tools.filter(t=>inView(t)&&(!q||(t.code+' '+t.name+' '+t.no+' '+t.cat).toLowerCase().includes(q)));
     $('#ltbl').innerHTML=`<table><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th></th></tr></thead><tbody>${
-      lblFiltered.map(t=>`<tr><td><input type="checkbox" ${selLabel.has(t.id)?'checked':''} onchange="togLabel('${t.id}',this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,40)}</td><td>${esc(t.no)}</td><td class="right"><button class="btn" style="padding:4px 10px" onclick="downloadQR('${t.id}','${esc(t.code)}')">⬇️ QR</button></td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่พบ</td></tr>'
+      lblFiltered.map(t=>`<tr><td><input type="checkbox" ${selLabel.has(t.id)?'checked':''} onchange="togLabel('${t.id}',this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,40)}</td><td>${esc(t.no)}</td><td class="right"><button class="btn" style="padding:4px 10px" onclick="downloadQR('${t.id}','${esc(t.code)}','${esc(t.no)}')">⬇️ QR</button></td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่พบ</td></tr>'
     }</tbody></table>`;
     $('#lcount').textContent='เลือก '+selLabel.size;};
   $('#lq').oninput=draw;
@@ -1146,7 +1148,7 @@ async function printLabels(){
   let cells='';
   for(const t of tools){
     let u=''; try{u=await qrDataURL(QR_BASE+t.id);}catch(e){}
-    cells+=`<div class="lbl"><img src="${u}"><div class="c">${esc(t.code)}</div><div class="n">${esc(t.name)}</div><div class="co">${esc(t.company)}</div></div>`;
+    cells+=`<div class="lbl"><img src="${u}"><div class="no">${esc(t.no)||'(ไม่มี NO)'}</div><div class="n">${esc(t.name)}</div><div class="co">${esc(t.company)}${t.cat?' · '+esc(t.cat):''}</div></div>`;
   }
   const w=window.open('','_blank');
   w.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ป้าย QR (${tools.length} ดวง)</title>
@@ -1155,10 +1157,10 @@ async function printLabels(){
       h1{font-size:14px;margin-bottom:6mm;color:#555}
       .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5mm}
       .lbl{border:1px dashed #bbb;border-radius:6px;padding:6px 4px;text-align:center;page-break-inside:avoid}
-      .lbl img{width:34mm;height:34mm;display:block;margin:0 auto}
-      .lbl .c{font-weight:700;font-size:13px;margin-top:3px}
-      .lbl .n{font-size:9.5px;color:#444;line-height:1.15;max-height:23px;overflow:hidden}
-      .lbl .co{font-size:9px;color:#888}
+      .lbl img{width:32mm;height:32mm;display:block;margin:0 auto}
+      .lbl .no{font-weight:800;font-size:19px;margin-top:3px;letter-spacing:.3px;color:#000;line-height:1.1}
+      .lbl .n{font-size:9px;color:#444;line-height:1.12;max-height:22px;overflow:hidden;margin-top:1px}
+      .lbl .co{font-size:8.5px;color:#888;margin-top:1px}
       @media print{body{padding:5mm}h1{display:none}.lbl{border-color:#ccc}}
     </style></head><body><h1>ป้าย QR เครื่องมือ — ${tools.length} ดวง (พิมพ์/บันทึก PDF)</h1><div class="grid">${cells}</div>
     <scr`+`ipt>window.onload=function(){setTimeout(function(){window.print();},400);}</scr`+`ipt></body></html>`);
