@@ -242,7 +242,7 @@ function count(st){return S.tools.filter(t=>t.status===st&&inView(t)).length;}
 /* ============ toast ============ */
 let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tmo);tmo=setTimeout(()=>t.classList.remove('on'),2200);}
 /* ---- data layer (Supabase) ---- */
-function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||'')};}
+function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||''),createdAt:(r.created_at||'')};}
 function rowToSlip(s){return {id:s.id,slip_no:s.slip_no,no:String(s.slip_no).padStart(3,'0'),sent:(s.sent_date||''),vendor:s.vendor||'',project:s.project||'',sender:s.sender||'',status:s.status||'ส่งแล้ว',received:(s.received_date||''),receiver:s.receiver||'',note:s.note||'',count:'0',company:s.company};}
 function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||''};}
 async function fetchAllMov(){
@@ -276,7 +276,7 @@ async function loadAll(){
   S.movements.forEach(m=>{if(m.type==='ส่งซ่อม'){if(m.tool_id)rc[m.tool_id]=(rc[m.tool_id]||0)+1;if(m.slip)slc[m.slip]=(slc[m.slip]||0)+1;}});
   S.tools.forEach(x=>x.repairs=String(rc[x.id]||0));
   S.slips.forEach(x=>x.count=String(slc[x.no]||0));
-  const nm=d=>(d.data||[]).map(r=>r.name).sort();
+  const nm=d=>[...new Set((d.data||[]).map(r=>r.name).filter(Boolean))].sort();
   S.lookups={categories:nm(c),projects:nm(p),people:nm(pe),vendors:nm(v)};
   S.audit=(au.data||[]);
   S.trash=(tr.data||[]).map(rowToTool);
@@ -418,24 +418,27 @@ function renderTools(){
       <input class="search" id="tq" placeholder="🔎 ค้นหา: ชื่อ / NO / S/N / รหัส…">
       <select id="fcat"><option value="">ทุกหมวด</option>${cats.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
       <select id="fst"><option value="">ทุกสถานะ</option>${Object.keys(STC).map(s=>`<option>${s}</option>`).join('')}</select>
+      <select id="fsort"><option value="">เรียง: ปกติ</option><option value="new">🆕 เพิ่มล่าสุด</option><option value="old">เพิ่มเก่าสุด</option></select>
       <button class="btn primary" onclick="addTool()">➕ เพิ่มเครื่องใหม่</button>
       <span class="muted" id="tcount"></span>
     </div>
     <div id="ttbl"></div>
    </div>`;
   const draw=()=>{
-    const q=$('#tq').value.trim().toLowerCase(),fc=$('#fcat').value,fs=$('#fst').value;
-    const rows=S.tools.filter(t=>{
+    const q=$('#tq').value.trim().toLowerCase(),fc=$('#fcat').value,fs=$('#fst').value,so=$('#fsort').value;
+    let rows=S.tools.filter(t=>{
       if(!inView(t))return false;
       if(fc&&t.cat!==fc)return false; if(fs&&t.status!==fs)return false;
       if(q){const h=(t.code+' '+t.name+' '+t.no+' '+t.sn).toLowerCase();if(!h.includes(q))return false;}
       return true;});
+    if(so==='new')rows=[...rows].sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+    else if(so==='old')rows=[...rows].sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt)));
     $('#tcount').textContent=`${rows.length} เครื่อง`;
     $('#ttbl').innerHTML=`<table><thead><tr><th>รหัส</th><th>บริษัท</th><th>ชื่อ/รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th><th>อยู่ที่/ผู้ถือ</th></tr></thead><tbody>${
       rows.slice(0,300).map(t=>`<tr style="cursor:pointer" onclick="toolDetail(${t.i})"><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td><td>${esc(t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=8 class="empty">ไม่พบ</td></tr>'
     }</tbody></table>${rows.length>300?'<p class="muted center">แสดง 300 แรก — ใช้ค้นหาเพื่อกรอง</p>':''}`;
   };
-  $('#tq').oninput=draw;$('#fcat').onchange=draw;$('#fst').onchange=draw;draw();
+  $('#tq').oninput=draw;$('#fcat').onchange=draw;$('#fst').onchange=draw;$('#fsort').onchange=draw;draw();
 }
 function toolFormFields(t){t=t||{};return `
     <div class="field"><label>บริษัทเจ้าของ *</label><select id="ed_company">${['PAC','LOTUS'].map(c=>`<option value="${c}" ${(t.company||COMPANY)===c?'selected':''}>${c==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)'}</option>`).join('')}</select></div>
