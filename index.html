@@ -634,7 +634,7 @@ function repairDocHtml(slip,date,vendor,sender,items){
         <td class="c">${it?esc(it.t.no):''}</td>
         <td>${it?esc(it.t.loc||''):''}</td>
         <td>${it?esc(it.reason||''):''}</td>
-        <td class="c">${it?esc(date):''}</td>
+        <td class="c">${it?esc(fmtDateTH(date)):''}</td>
         <td></td>
         <td></td>
       </tr>`;}
@@ -647,7 +647,7 @@ function repairDocHtml(slip,date,vendor,sender,items){
         </div>
       </div>
       <div class="rsmeta">
-        <span>วันที่ส่งซ่อม: <b>${esc(date)}</b></span>
+        <span>วันที่ส่งซ่อม: <b>${esc(fmtDateTH(date))}</b></span>
         <span>ร้าน/ช่างซ่อม: <b>${esc(vendor)||'.............................'}</b></span>
         <span>ผู้ส่งซ่อม: <b>${esc(sender)||'.............................'}</b></span>
         <span>จำนวน: <b>${items.length}</b> เครื่อง</span>
@@ -695,7 +695,7 @@ function renderReceive(){
 function togRecv(i,on){on?selRecv.add(i):selRecv.delete(i);$('#rvform').style.display=selRecv.size?'block':'none';$('#rvcount').textContent=`เลือก ${selRecv.size}`;}
 let pendingReceive=null;
 function receiveDocHtml(date,recv,items){
-  return `<div class="doc"><h1>รายการเครื่องมือที่ซ่อมเสร็จ — PAC</h1><div class="dsub">วันที่รับคืน ${esc(date)}</div>
+  return `<div class="doc"><h1>รายการเครื่องมือที่ซ่อมเสร็จ — PAC</h1><div class="dsub">วันที่รับคืน ${esc(fmtDateTH(date))}</div>
     <table><thead><tr><th>ลำดับ</th><th>รายการ</th><th>S/N</th><th>NO</th><th>ใบส่งซ่อม</th><th>ผู้เซ็นรับคืน</th></tr></thead><tbody>${
     items.map((it,n)=>`<tr><td style="text-align:center">${n+1}</td><td>${esc(itemDesc(it.t))}</td><td>${esc(it.t.sn)}</td><td style="text-align:center">${esc(it.t.no)}</td><td style="text-align:center">${esc(it.slip)}</td><td>${esc(recv)}</td></tr>`).join('')
     }</tbody></table></div>`;
@@ -812,6 +812,7 @@ async function doBorrow(){
 }
 let pendingBorrow=null;
 function itemDesc(t){const n=(t.name||'').trim(),c=(t.cat||'').trim();return (c&&n&&n.length<=12)?(c+' '+n):(n||c);}
+function fmtDateTH(iso){if(!iso)return '';const p=String(iso).slice(0,10).split('-');if(p.length<3)return String(iso);const M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const d=parseInt(p[2],10),mo=parseInt(p[1],10),y=parseInt(p[0],10);if(!d||!mo||!y||mo>12)return String(iso);return d+' '+M[mo-1]+' '+(y+543);}
 function borrowDocHtml(items,who,proj,date){
   const co=COMPANY==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)';
   const PER=13, pages=Math.max(1,Math.ceil(items.length/PER));
@@ -831,7 +832,7 @@ function borrowDocHtml(items,who,proj,date){
       <div class="rsmeta">
         <span>ผู้เบิก: <b>${esc(who)||'.....................'}</b></span>
         <span>โครงการที่เบิก: <b>${esc(proj)||'.....................'}</b></span>
-        <span>วันที่ส่งโครงการ: <b>${esc(date)||'......./......./.........'}</b></span>
+        <span>วันที่ส่งโครงการ: <b>${esc(fmtDateTH(date))||'......./......./.........'}</b></span>
         <span>จำนวน: <b>${items.length}</b> เครื่อง</span>
       </div>
       <table>${colg}${thead}<tbody>${rows}</tbody></table>
