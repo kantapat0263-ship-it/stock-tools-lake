@@ -540,7 +540,7 @@ function renderRepair(){
    <div class="panel">
     <h3>1) เลือกเครื่องที่จะส่งซ่อม <span class="muted" style="font-weight:400">(เครื่องว่าง/ชำรุด/รอซ่อม ${eligible.length} ตัว)</span></h3>
     <div class="toolbar"><input class="search" id="rq" placeholder="🔎 ค้นหาเครื่อง…"></div>
-    <div id="rtbl" style="max-height:380px;overflow:auto"></div>
+    <div id="rtbl" style="min-height:340px;max-height:calc(100vh - 240px);overflow:auto"></div>
    </div>
    <div class="panel" id="rform" style="display:none">
     <h3>2) ข้อมูลใบส่งซ่อม (บริษัท ${COMPANY}) — เลขที่จะออกอัตโนมัติ <b style="color:var(--blue)">#${String((S.nextSlipByCo&&S.nextSlipByCo[COMPANY])||1).padStart(3,'0')}</b></h3>
