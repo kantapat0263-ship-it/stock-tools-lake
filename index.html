@@ -767,7 +767,7 @@ function drawBorrow(){
   let form,btn,title,lastcol;
   if(mode==='out'){
     form=`<div class="flexrow"><div class="field"><label>วันที่ *</label><input id="b_date" type="date" value="${today()}"></div><div class="field"><label>ผู้เบิก *</label><input id="b_who" list="dl_p3"></div><div class="field"><label>โครงการ/ไซต์ *</label><input id="b_proj" list="dl_pr"></div></div>`;
-    btn='📤 บันทึกเบิก'; title='เลือกเครื่อง "ว่าง" ที่จะเบิกออกไซต์'; lastcol='หมวด';
+    btn='👁️ ดูใบส่งไซต์ (ยังไม่บันทึก)'; title='เลือกเครื่อง "ว่าง" ที่จะเบิกออกไซต์'; lastcol='หมวด';
   } else if(mode==='move'){
     form=`<div class="flexrow"><div class="field"><label>วันที่ *</label><input id="b_date" type="date" value="${today()}"></div><div class="field"><label>ผู้ที่เอาไป</label><input id="b_who" list="dl_p3"></div><div class="field"><label>ไซต์ใหม่ *</label><input id="b_proj" list="dl_pr"></div></div>`;
     btn='🔀 บันทึกย้ายไซต์'; title='เลือกเครื่องที่ "ถูกยืม" อยู่ → ย้ายไปไซต์ใหม่ (ไม่ต้องคืนก่อน)'; lastcol='อยู่ที่ตอนนี้';
@@ -792,7 +792,7 @@ function drawBorrow(){
     }</tbody></table>${pg.html}`;};
   PG_REDRAW['borrow']=draw;
   $('#bq').oninput=()=>{pgReset('borrow');draw();};draw();
-  $('#bgo').onclick=(mode==='move'?doMove:doBorrow);
+  $('#bgo').onclick=(mode==='out'?previewBorrow:mode==='move'?doMove:doBorrow);
 }
 function togBor(i,on){on?selBor.add(i):selBor.delete(i);$('#bform').style.display=selBor.size?'block':'none';$('#bcount').textContent=`เลือก ${selBor.size}`;}
 async function doBorrow(){
@@ -809,6 +809,60 @@ async function doBorrow(){
   }
   if(out){await ensureLookup('people',who);await ensureLookup('projects',proj);}
   toast(out?`เบิก ${sel.length} เครื่องแล้ว`:`คืน ${sel.length} เครื่องแล้ว`);await loadAll();renderBorrow();
+}
+let pendingBorrow=null;
+function borrowDocHtml(items,who,proj,date){
+  const co=COMPANY==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)';
+  const PER=13, pages=Math.max(1,Math.ceil(items.length/PER));
+  const colg=`<colgroup><col style="width:4%"><col style="width:25%"><col style="width:13%"><col style="width:11%"><col style="width:18%"><col style="width:10%"><col style="width:10%"><col style="width:9%"></colgroup>`;
+  const thead=`<thead><tr><th>ลำดับ</th><th>รายการเครื่องมือ</th><th>S/N</th><th>รหัสเครื่องมือ</th><th>เจ้าหน้าที่เซ็นรับเครื่อง (ชื่อ)</th><th>ลายเซ็น</th><th>วันที่รับ</th><th>เวลาที่รับ</th></tr></thead>`;
+  let out='';
+  for(let p=0;p<pages;p++){
+    let rows='';
+    for(let r=0;r<PER;r++){const gi=p*PER+r,it=items[gi];
+      rows+=`<tr><td class="c">${gi+1}</td><td>${it?esc(it.name):''}</td><td class="c">${it?esc(it.sn):''}</td><td class="c">${it?esc(it.code):''}</td><td></td><td></td><td></td><td></td></tr>`;}
+    out+=`<div class="doc land rsdoc rspage">
+      <div class="rshd">
+        <div class="rshd-l">บริษัท ${co}</div>
+        <div class="rshd-c"><div class="rsttl">ใบส่งเครื่องมือไปไซต์งาน ${COMPANY}</div><div class="rssub">${pages>1?`หน้า ${p+1}/${pages}`:''}</div></div>
+        <div class="rshd-r"><div class="rsorig">ORIGINAL</div></div>
+      </div>
+      <div class="rsmeta">
+        <span>ผู้เบิก: <b>${esc(who)||'.....................'}</b></span>
+        <span>โครงการที่เบิก: <b>${esc(proj)||'.....................'}</b></span>
+        <span>วันที่ส่งโครงการ: <b>${esc(date)||'......./......./.........'}</b></span>
+        <span>จำนวน: <b>${items.length}</b> เครื่อง</span>
+      </div>
+      <table>${colg}${thead}<tbody>${rows}</tbody></table>
+      <div style="display:flex;justify-content:space-around;margin-top:20px;font-size:12px;text-align:center">
+        <div style="flex:1">ผู้เบิก<br><br>.............................<br>(${esc(who)})</div>
+        <div style="flex:1">เซ็นรับรองผู้เบิก (อีกครั้ง)<br><br>.............................<br>(.............................)</div>
+      </div>
+    </div>`;
+  }
+  return out;
+}
+function previewBorrow(){
+  if(!selBor.size){toast('ยังไม่ได้เลือกเครื่อง');return;}
+  const date=$('#b_date').value, who=$('#b_who').value.trim(), proj=$('#b_proj').value.trim();
+  if(!who||!proj){toast('กรุณากรอก ผู้เบิก + โครงการ/ไซต์ ให้ครบ');return;}
+  const items=[...selBor].map(ix=>S.tools[ix]);
+  pendingBorrow={items,who,proj,date};
+  openModal(`<h3>👁️ ตัวอย่างใบส่งเครื่องมือไปไซต์งาน</h3><p class="muted">ดูก่อน — <b>ยังไม่บันทึก</b> · จะบันทึกจริงตอนกด "พิมพ์ + บันทึก"</p>
+    <div style="border:1px solid var(--line);border-radius:8px;padding:10px;max-height:46vh;overflow:auto;margin:8px 0">${borrowDocHtml(items,who,proj,date)}</div>
+    <div class="flexrow"><button class="btn primary" onclick="commitBorrow()">🖨️ พิมพ์ + บันทึกเบิก</button><button class="btn ghost" onclick="closeModal()">ปิด (ยังไม่บันทึก)</button></div>`);
+}
+async function commitBorrow(){
+  if(!pendingBorrow)return;
+  const {items,who,proj,date}=pendingBorrow;
+  for(const t of items){
+    await sb.from('tools').update({status:'ถูกยืม',location:(proj||'')+(who?' / '+who:''),receipt_pending:true,pending_dest:proj,dispatched_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',t.id);
+    await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'เบิก',project:proj,actor:who});
+  }
+  await ensureLookup('people',who);await ensureLookup('projects',proj);
+  pendingBorrow=null;closeModal();
+  $('#printArea').innerHTML=borrowDocHtml(items,who,proj,date);window.print();
+  toast(`เบิก ${items.length} เครื่อง → ออกใบส่งไซต์แล้ว`);await loadAll();renderBorrow();
 }
 async function doMove(){
   if(!selBor.size)return;
