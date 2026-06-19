@@ -817,7 +817,7 @@ function borrowDocHtml(items,who,proj,date){
   const co=COMPANY==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)';
   const PER=13, pages=Math.max(1,Math.ceil(items.length/PER));
   const colg=`<colgroup><col style="width:4%"><col style="width:25%"><col style="width:13%"><col style="width:11%"><col style="width:18%"><col style="width:10%"><col style="width:10%"><col style="width:9%"></colgroup>`;
-  const thead=`<thead><tr><th>ลำดับ</th><th>รายการเครื่องมือ</th><th>S/N</th><th>รหัสเครื่องมือ</th><th>เจ้าหน้าที่เซ็นรับเครื่อง (ชื่อ)</th><th>ลายเซ็น</th><th>วันที่รับ</th><th>เวลาที่รับ</th></tr></thead>`;
+  const thead=`<thead><tr><th>ลำดับ</th><th>รายการเครื่องมือ</th><th>S/N</th><th>รหัสเครื่องมือ</th><th>เจ้าหน้าที่เซ็นรับเครื่อง (ชื่อ)</th><th>ชื่อบรรจง</th><th>วันที่รับ</th><th>เวลาที่รับ</th></tr></thead>`;
   let out='';
   for(let p=0;p<pages;p++){
     let rows='';
