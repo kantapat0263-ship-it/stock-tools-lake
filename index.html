@@ -775,7 +775,7 @@ function drawBorrow(){
     <div class="panel">
     <h3>${title} (${list.length})</h3>
     <div class="toolbar"><input class="search" id="bq" placeholder="🔎 ค้นหา…"></div>
-    <div id="btbl" style="max-height:360px;overflow:auto"></div></div>
+    <div id="btbl" style="min-height:340px;max-height:calc(100vh - 240px);overflow:auto"></div></div>
     <datalist id="dl_p3">${S.lookups.people.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>
     <datalist id="dl_pr">${S.lookups.projects.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>`;
   const draw=()=>{const q=$('#bq').value.trim().toLowerCase();const rows=list.filter(t=>!q||(t.name+t.no+t.code).toLowerCase().includes(q));
