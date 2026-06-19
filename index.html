@@ -816,13 +816,13 @@ function fmtDateTH(iso){if(!iso)return '';const p=String(iso).slice(0,10).split(
 function borrowDocHtml(items,who,proj,date){
   const co=COMPANY==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)';
   const PER=13, pages=Math.max(1,Math.ceil(items.length/PER));
-  const colg=`<colgroup><col style="width:4%"><col style="width:25%"><col style="width:13%"><col style="width:11%"><col style="width:18%"><col style="width:10%"><col style="width:10%"><col style="width:9%"></colgroup>`;
-  const thead=`<thead><tr><th>ลำดับ</th><th>รายการเครื่องมือ</th><th>S/N</th><th>รหัสเครื่องมือ</th><th>เจ้าหน้าที่เซ็นรับเครื่อง (ชื่อ)</th><th>ชื่อบรรจง</th><th>วันที่รับ</th><th>เวลาที่รับ</th></tr></thead>`;
+  const colg=`<colgroup><col style="width:4%"><col style="width:25%"><col style="width:13%"><col style="width:11%"><col style="width:28%"><col style="width:10%"><col style="width:9%"></colgroup>`;
+  const thead=`<thead><tr><th>ลำดับ</th><th>รายการเครื่องมือ</th><th>S/N</th><th>รหัสเครื่องมือ</th><th>เจ้าหน้าที่เซ็นรับเครื่อง(ชื่อบรรจง)</th><th>วันที่รับ</th><th>เวลาที่รับ</th></tr></thead>`;
   let out='';
   for(let p=0;p<pages;p++){
     let rows='';
     for(let r=0;r<PER;r++){const gi=p*PER+r,it=items[gi];
-      rows+=`<tr><td class="c">${gi+1}</td><td>${it?esc(itemDesc(it)):''}</td><td class="c">${it?esc(it.sn):''}</td><td class="c">${it?esc(it.no):''}</td><td></td><td></td><td></td><td></td></tr>`;}
+      rows+=`<tr><td class="c">${gi+1}</td><td>${it?esc(itemDesc(it)):''}</td><td class="c">${it?esc(it.sn):''}</td><td class="c">${it?esc(it.no):''}</td><td></td><td></td><td></td></tr>`;}
     out+=`<div class="doc land rsdoc rspage">
       <div class="rshd">
         <div class="rshd-l">บริษัท ${co}</div>
