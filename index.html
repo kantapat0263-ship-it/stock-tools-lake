@@ -1117,16 +1117,27 @@ function qrDataURL(text,label){return new Promise((res,rej)=>{
   img.src=gif;
 });}
 async function downloadQR(id,code,no){ try{ const u=await qrDataURL(QR_BASE+id, no||code); const a=document.createElement('a'); a.href=u; a.download='QR_'+String(no||code||id).replace(/[^\w\-ก-๙]+/g,'_')+'.png'; document.body.appendChild(a); a.click(); a.remove(); toast('ดาวน์โหลด QR แล้ว'); }catch(e){ toast('สร้าง QR ไม่ได้: '+e.message);} }
+function copyNfcUrl(id){const u=QR_BASE+id;
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(u).then(()=>toast('คัดลอก URL แล้ว — เอาไปเขียนลงแท็ก NFC ได้เลย')).catch(()=>window.prompt('คัดลอก URL นี้ (Ctrl+C):',u));}
+  else window.prompt('คัดลอก URL นี้ (Ctrl+C):',u);}
+function exportNfcUrls(){
+  const tools=selLabel.size?S.tools.filter(t=>selLabel.has(t.id)):lblFiltered;
+  if(!tools.length){toast('ไม่มีเครื่องให้ส่งออก');return;}
+  const rows=[['รหัส','NO','ชื่อ','บริษัท','URL (เขียนลง NFC)']];
+  tools.forEach(t=>rows.push([t.code,t.no,t.name,t.company,QR_BASE+t.id]));
+  csvDownload('URL_NFC.csv',rows);toast('ดาวน์โหลด URL '+(rows.length-1)+' รายการ');}
 function togLabel(id,on){on?selLabel.add(id):selLabel.delete(id);$('#lcount').textContent='เลือก '+selLabel.size;}
 function renderLabels(){
   selLabel=new Set();
   $('#view').innerHTML=`<div class="panel">
-    <h3>🏷️ ป้าย QR เครื่องมือ <span class="muted" style="font-weight:400">— QR ไม่ซ้ำของแต่ละตัว · เลือกแล้วพิมพ์เป็นแผ่นป้าย หรือกด ⬇️ ดาวน์โหลดทีละตัว</span></h3>
+    <h3>🏷️ ป้าย QR / NFC <span class="muted" style="font-weight:400">— รหัสไม่ซ้ำของแต่ละตัว · พิมพ์เป็นป้าย, ดาวน์โหลด QR, หรือคัดลอก URL ไปเขียนลงแท็ก NFC</span></h3>
     <div class="toolbar"><input class="search" id="lq" placeholder="🔎 ค้นหา ชื่อ / หมวด / NO / รหัส">
       <button class="btn" id="lall" style="margin-left:8px">เลือกทั้งหมดที่เห็น</button>
       <button class="btn" id="lnone">ล้าง</button></div>
+    <div style="background:#eff6ff;border-left:4px solid var(--blue);padding:9px 12px;border-radius:8px;margin:10px 0;font-size:13px;line-height:1.6">📲 <b>ทำแท็ก NFC:</b> กด <b>📋 URL</b> ท้ายแถวเพื่อคัดลอก แล้วเขียนลงแท็กด้วยแอป (เช่น “NFC Tools”) แบบ <b>URL/Link</b> · แตะมือถือ = เปิดหน้าเดียวกับ QR รับของได้เลย · <b>แท็กติดบนโลหะต้องใช้แบบ on-metal</b></div>
     <div class="selbar" style="position:sticky;top:10px;z-index:5;background:var(--card);box-shadow:0 6px 16px rgba(0,0,0,.10);border-radius:10px;padding:10px 14px;margin:10px 0">
       <b id="lcount">เลือก 0</b><div class="spacer"></div>
+      <button class="btn" id="lurls">⬇️ URL ทั้งหมด (NFC/CSV)</button>
       <button class="btn primary" id="lprint">🖨️ พิมพ์ / บันทึก PDF (ที่เลือก)</button>
     </div>
     <div id="ltbl"></div>
@@ -1134,13 +1145,14 @@ function renderLabels(){
   const draw=()=>{const q=$('#lq').value.trim().toLowerCase();
     lblFiltered=S.tools.filter(t=>inView(t)&&(!q||(t.code+' '+t.name+' '+t.no+' '+t.cat).toLowerCase().includes(q)));
     $('#ltbl').innerHTML=`<table><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th></th></tr></thead><tbody>${
-      lblFiltered.map(t=>`<tr><td><input type="checkbox" ${selLabel.has(t.id)?'checked':''} onchange="togLabel('${t.id}',this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,40)}</td><td>${esc(t.no)}</td><td class="right"><button class="btn" style="padding:4px 10px" onclick="downloadQR('${t.id}','${esc(t.code)}','${esc(t.no)}')">⬇️ QR</button></td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่พบ</td></tr>'
+      lblFiltered.map(t=>`<tr><td><input type="checkbox" ${selLabel.has(t.id)?'checked':''} onchange="togLabel('${t.id}',this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,40)}</td><td>${esc(t.no)}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:4px 8px" onclick="copyNfcUrl('${t.id}')">📋 URL</button> <button class="btn" style="padding:4px 8px" onclick="downloadQR('${t.id}','${esc(t.code)}','${esc(t.no)}')">⬇️ QR</button></td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่พบ</td></tr>'
     }</tbody></table>`;
     $('#lcount').textContent='เลือก '+selLabel.size;};
   $('#lq').oninput=draw;
   $('#lall').onclick=()=>{lblFiltered.forEach(t=>selLabel.add(t.id));draw();};
   $('#lnone').onclick=()=>{selLabel=new Set();draw();};
   $('#lprint').onclick=printLabels;
+  $('#lurls').onclick=exportNfcUrls;
   draw();
 }
 async function printLabels(){
