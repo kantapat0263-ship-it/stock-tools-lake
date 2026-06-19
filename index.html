@@ -130,8 +130,8 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
 #printArea{display:none}
 @media print{
   body{background:#fff}
-  .app{display:none}
-  #printArea{display:block;font-family:Tahoma,'Noto Sans Thai',sans-serif;color:#000;padding:0}
+  .app,.scrim{display:none !important}
+  #printArea{display:block !important;font-family:Tahoma,'Noto Sans Thai',sans-serif;color:#000;padding:0}
   @page{size:A4 portrait;margin:12mm}
   @page land{size:A4 landscape;margin:8mm}
 }
