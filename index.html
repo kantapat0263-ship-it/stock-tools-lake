@@ -834,9 +834,8 @@ function borrowDocHtml(items,who,proj,date){
         <span>จำนวน: <b>${items.length}</b> เครื่อง</span>
       </div>
       <table>${colg}${thead}<tbody>${rows}</tbody></table>
-      <div style="display:flex;justify-content:space-around;margin-top:20px;font-size:12px;text-align:center">
-        <div style="flex:1">ผู้เบิก<br><br>.............................<br>(${esc(who)})</div>
-        <div style="flex:1">เซ็นรับรองผู้เบิก (อีกครั้ง)<br><br>.............................<br>(.............................)</div>
+      <div style="display:flex;margin-top:20px;font-size:12px;text-align:center">
+        <div style="width:42%">ผู้เบิก<br><br>.............................<br>(${esc(who)})</div>
       </div>
     </div>`;
   }
