@@ -929,7 +929,8 @@ function borrowBatches(){
     const mv=S.movements.filter(m=>m.tool_id===t.id&&m.type==='เบิก').sort((a,b)=>String((a.date||'')+(a.createdAt||'')).localeCompare(String((b.date||'')+(b.createdAt||'')))).pop();
     const date=mv?mv.date:'',proj=mv?mv.project:'',who=mv?mv.actor:'';
     const key=date+'|'+proj+'|'+who+'|'+t.company;
-    (groups[key]=groups[key]||{date,project:proj,who,company:t.company,tools:[]}).tools.push(t);
+    const g=groups[key]=groups[key]||{date,project:proj,who,company:t.company,tools:[],movIds:[]};
+    g.tools.push(t); g.movIds.push(mv?mv.id:null);
   });
   return Object.values(groups).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
 }
@@ -938,7 +939,7 @@ function histBorrows(){
   $('#hbody').innerHTML=`<div class="panel">
     <h3>📋 ใบเบิก / ส่งไซต์ (ของที่ยังไม่คืน) <span class="muted" style="font-weight:400">— พิมพ์ใบส่งไซต์ย้อนหลังได้ (เช่น เครื่องที่เบิกไปก่อนมีระบบใบ)</span></h3>
     <table><thead><tr><th>โครงการ / ไซต์</th><th>บ.</th><th>ผู้เบิก</th><th>วันที่เบิก</th><th class="center">จำนวน</th><th></th></tr></thead><tbody>${
-      batches.map((b,i)=>`<tr><td><b>${esc(b.project)||'-'}</b></td><td>${coBadge(b.company)}</td><td>${esc(b.who)||'-'}</td><td>${esc(b.date)||'-'}</td><td class="center">${b.tools.length}</td><td class="right"><button class="btn" style="background:var(--blue);color:#fff;padding:5px 12px" onclick="reprintBorrow(${i})">🖨️ พิมพ์ใบส่งไซต์</button></td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่มีของที่เบิกค้างอยู่</td></tr>'
+      batches.map((b,i)=>`<tr><td><b>${esc(b.project)||'-'}</b></td><td>${coBadge(b.company)}</td><td>${esc(b.who)||'-'}</td><td>${esc(b.date)||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 11px" onclick="editBorrowBatchForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:var(--blue);color:#fff;padding:5px 11px" onclick="reprintBorrow(${i})">🖨️ พิมพ์</button></td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่มีของที่เบิกค้างอยู่</td></tr>'
     }</tbody></table></div>`;
 }
 function reprintBorrow(i){
@@ -946,6 +947,29 @@ function reprintBorrow(i){
   const prev=COMPANY; COMPANY=b.company;
   $('#printArea').innerHTML=borrowDocHtml(b.tools,b.who,b.project,b.date);
   COMPANY=prev; window.print();
+}
+function editBorrowBatchForm(i){
+  const b=(window._bb||[])[i]; if(!b){toast('ไม่พบรายการ');return;}
+  openModal(`<h3>✏️ แก้ไขใบส่งไซต์ ${coBadge(b.company)}</h3>
+    <div class="flexrow">
+      <div class="field"><label>วันที่</label><input id="eb_date" type="date" value="${esc(b.date)}"></div>
+      <div class="field"><label>ผู้เบิก</label><input id="eb_who" value="${esc(b.who)}"></div>
+      <div class="field"><label>โครงการ / ไซต์</label><input id="eb_proj" value="${esc(b.project)}"></div>
+    </div>
+    <p class="muted" style="font-size:12px">มีผลกับ ${b.tools.length} เครื่องในใบนี้ (ระบบจะอัปเดตที่อยู่เครื่องให้ด้วย)</p>
+    <div class="flexrow" style="margin-top:8px"><button class="btn primary" onclick="saveBorrowBatch(${i})">💾 บันทึก</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+}
+async function saveBorrowBatch(i){
+  const b=(window._bb||[])[i]; if(!b)return;
+  const date=$('#eb_date').value, who=$('#eb_who').value.trim(), proj=$('#eb_proj').value.trim();
+  if(!who||!proj){toast('กรอก ผู้เบิก + โครงการ ให้ครบ');return;}
+  for(let j=0;j<b.tools.length;j++){
+    const t=b.tools[j], movId=b.movIds[j];
+    if(movId)await sb.from('movements').update({occurred_on:date||null,project:proj,actor:who}).eq('id',movId);
+    if(t.status==='ถูกยืม')await sb.from('tools').update({location:proj+' / '+who,pending_dest:proj,updated_at:new Date().toISOString()}).eq('id',t.id);
+  }
+  await ensureLookup('people',who);await ensureLookup('projects',proj);
+  closeModal();toast('แก้ไขใบส่งไซต์แล้ว');await loadAll();go('history');
 }
 function histRecent(){
   $('#hbody').innerHTML=`<div class="panel">
@@ -1065,7 +1089,33 @@ function slipDetail(slipNo,co){
       ${s.note?`<div style="grid-column:1/3"><span class="muted">หมายเหตุ:</span> ${esc(s.note)}</div>`:''}
     </div>
     <div style="max-height:42vh;overflow:auto"><table><thead><tr><th>#</th><th>รายการ / รหัส</th><th>NO</th><th>อาการ/สาเหตุ</th><th>รับคืน</th></tr></thead><tbody>${rows||'<tr><td colspan=5 class="empty">ไม่มีรายการ</td></tr>'}</tbody></table></div>
-    <div class="flexrow" style="margin-top:12px"><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+    <div class="flexrow" style="margin-top:12px"><button class="btn primary" onclick="editSlipForm(${slipNo},'${esc(co)}')">✏️ แก้ไขใบ</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+}
+function editSlipForm(slipNo,co){
+  const s=S.slips.find(x=>x.slip_no===slipNo&&x.company===co); if(!s){toast('ไม่พบใบ');return;}
+  const sent=S.movements.filter(m=>m.slipNo===slipNo&&m.company===co&&m.type==='ส่งซ่อม');
+  window._es={slipNo,co,movs:sent};
+  openModal(`<h3>✏️ แก้ไขใบส่งซ่อม #${esc(s.no)} ${coBadge(co)}</h3>
+    <div class="flexrow">
+      <div class="field"><label>วันที่ส่งซ่อม</label><input id="es_date" type="date" value="${esc(s.sent)}"></div>
+      <div class="field"><label>ร้าน/ช่างซ่อม</label><input id="es_vendor" value="${esc(s.vendor)}"></div>
+      <div class="field"><label>ผู้ส่ง</label><input id="es_sender" value="${esc(s.sender)}"></div>
+    </div>
+    <div class="field"><label>หมายเหตุ</label><input id="es_note" value="${esc(s.note)}"></div>
+    <div class="muted" style="font-size:13px;margin:8px 0 2px">อาการ/สาเหตุ รายเครื่อง</div>
+    <div style="max-height:34vh;overflow:auto"><table><thead><tr><th>เครื่อง / NO</th><th>อาการ/สาเหตุ</th></tr></thead><tbody>${
+      sent.map((m,i)=>`<tr><td>${esc(m.code||m.label)||'-'} ${esc(m.no)||''}</td><td><input data-er="${i}" value="${esc(m.reason)}" style="width:100%"></td></tr>`).join('')||'<tr><td colspan=2 class="empty">ไม่มีเครื่อง</td></tr>'
+    }</tbody></table></div>
+    <div class="flexrow" style="margin-top:10px"><button class="btn primary" onclick="saveSlip()">💾 บันทึก</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+}
+async function saveSlip(){
+  const e=window._es; if(!e)return;
+  const sent=$('#es_date').value, vendor=$('#es_vendor').value.trim(), sender=$('#es_sender').value.trim(), note=$('#es_note').value.trim();
+  await sb.from('repair_slips').update({sent_date:sent||null,vendor,sender,note}).eq('company',e.co).eq('slip_no',e.slipNo);
+  const reasons={}; document.querySelectorAll('[data-er]').forEach(el=>reasons[el.dataset.er]=el.value);
+  for(let i=0;i<e.movs.length;i++){const m=e.movs[i]; if(m.id&&reasons[i]!==undefined&&reasons[i]!==(m.reason||''))await sb.from('movements').update({reason:reasons[i]}).eq('id',m.id);}
+  await ensureLookup('vendors',vendor);await ensureLookup('people',sender);
+  closeModal();toast('แก้ไขใบส่งซ่อม #'+String(e.slipNo).padStart(3,'0')+' แล้ว');await loadAll();go('history');
 }
 
 /* ============ REPORT + EXPORT ============ */
