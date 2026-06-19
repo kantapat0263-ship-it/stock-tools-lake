@@ -434,11 +434,14 @@ function renderTools(){
     if(so==='new')rows=[...rows].sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
     else if(so==='old')rows=[...rows].sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt)));
     $('#tcount').textContent=`${rows.length} เครื่อง`;
+    const pg=pgSlice('tools',rows);
     $('#ttbl').innerHTML=`<table><thead><tr><th>รหัส</th><th>บริษัท</th><th>ชื่อ/รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th><th>อยู่ที่/ผู้ถือ</th></tr></thead><tbody>${
-      rows.slice(0,300).map(t=>`<tr style="cursor:pointer" onclick="toolDetail(${t.i})"><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td><td>${esc(t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=8 class="empty">ไม่พบ</td></tr>'
-    }</tbody></table>${rows.length>300?'<p class="muted center">แสดง 300 แรก — ใช้ค้นหาเพื่อกรอง</p>':''}`;
+      pg.rows.map(t=>`<tr style="cursor:pointer" onclick="toolDetail(${t.i})"><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td><td>${esc(t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=8 class="empty">ไม่พบ</td></tr>'
+    }</tbody></table>${pg.html}`;
   };
-  $('#tq').oninput=draw;$('#fcat').onchange=draw;$('#fst').onchange=draw;$('#fsort').onchange=draw;draw();
+  PG_REDRAW['tools']=draw;
+  const td=()=>{pgReset('tools');draw();};
+  $('#tq').oninput=td;$('#fcat').onchange=td;$('#fst').onchange=td;$('#fsort').onchange=td;draw();
 }
 function toolFormFields(t){t=t||{};return `
     <div class="field"><label>บริษัทเจ้าของ *</label><select id="ed_company">${['PAC','LOTUS'].map(c=>`<option value="${c}" ${(t.company||COMPANY)===c?'selected':''}>${c==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)'}</option>`).join('')}</select></div>
@@ -540,7 +543,7 @@ function renderRepair(){
    <div class="panel">
     <h3>1) เลือกเครื่องที่จะส่งซ่อม <span class="muted" style="font-weight:400">(เครื่องว่าง/ชำรุด/รอซ่อม ${eligible.length} ตัว)</span></h3>
     <div class="toolbar"><input class="search" id="rq" placeholder="🔎 ค้นหาเครื่อง…"></div>
-    <div id="rtbl" style="min-height:340px;max-height:calc(100vh - 240px);overflow:auto"></div>
+    <div id="rtbl"></div>
    </div>
    <div class="panel" id="rform" style="display:none">
     <h3>2) ข้อมูลใบส่งซ่อม (บริษัท ${COMPANY}) — เลขที่จะออกอัตโนมัติ <b style="color:var(--blue)">#${String((S.nextSlipByCo&&S.nextSlipByCo[COMPANY])||1).padStart(3,'0')}</b></h3>
@@ -558,11 +561,13 @@ function renderRepair(){
   const draw=()=>{
     const q=$('#rq').value.trim().toLowerCase();
     const rows=eligible.filter(t=>!q||(t.name+t.no+t.code).toLowerCase().includes(q));
+    const pg=pgSlice('repair',rows);
     $('#rtbl').innerHTML=`<table><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th>สถานะ</th></tr></thead><tbody>${
-      rows.map(t=>`<tr><td><input type="checkbox" ${selRepair.has(t.i)?'checked':''} onchange="togRepair(${t.i},this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,40)}</td><td>${esc(t.no)}</td><td>${chip(t.status)}</td></tr>`).join('')
-    }</tbody></table>`;
+      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selRepair.has(t.i)?'checked':''} onchange="togRepair(${t.i},this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,40)}</td><td>${esc(t.no)}</td><td>${chip(t.status)}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่พบ</td></tr>'
+    }</tbody></table>${pg.html}`;
   };
-  $('#rq').oninput=draw;draw();
+  PG_REDRAW['repair']=draw;
+  $('#rq').oninput=()=>{pgReset('repair');draw();};draw();
   $('#rgo').onclick=previewRepair;
   window._rdraw=draw;
 }
@@ -676,13 +681,15 @@ function renderReceive(){
    </div>
    <div class="panel">
      <h3>เครื่องที่อยู่ร้านซ่อม (${out.length} ตัว) — ติ๊กที่ซ่อมเสร็จกลับมา</h3>
-     <div id="rvtbl" style="max-height:420px;overflow:auto"></div>
+     <div id="rvtbl"></div>
    </div>
    <datalist id="dl_p2">${S.lookups.people.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>`;
   const slipOf=code=>{const m=[...S.movements].reverse().find(m=>m.code===code&&m.type==='ส่งซ่อม');return m?m.slip:'';};
-  $('#rvtbl').innerHTML=`<table><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th>ใบส่งซ่อม</th><th>อยู่ที่</th></tr></thead><tbody>${
-    out.map(t=>`<tr><td><input type="checkbox" onchange="togRecv(${t.i},this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,36)}</td><td>${esc(t.no)}</td><td>${esc(slipOf(t.code))}</td><td>${esc(t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=7 class="empty">ไม่มีเครื่องอยู่ร้านซ่อม</td></tr>'
-  }</tbody></table>`;
+  const drawRv=()=>{const pg=pgSlice('receive',out);
+    $('#rvtbl').innerHTML=`<table><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th>ใบส่งซ่อม</th><th>อยู่ที่</th></tr></thead><tbody>${
+      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selRecv.has(t.i)?'checked':''} onchange="togRecv(${t.i},this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,36)}</td><td>${esc(t.no)}</td><td>${esc(slipOf(t.code))}</td><td>${esc(t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=7 class="empty">ไม่มีเครื่องอยู่ร้านซ่อม</td></tr>'
+    }</tbody></table>${pg.html}`;};
+  PG_REDRAW['receive']=drawRv; drawRv();
   $('#rvgo').onclick=previewReceive;
 }
 function togRecv(i,on){on?selRecv.add(i):selRecv.delete(i);$('#rvform').style.display=selRecv.size?'block':'none';$('#rvcount').textContent=`เลือก ${selRecv.size}`;}
@@ -775,14 +782,16 @@ function drawBorrow(){
     <div class="panel">
     <h3>${title} (${list.length})</h3>
     <div class="toolbar"><input class="search" id="bq" placeholder="🔎 ค้นหา…"></div>
-    <div id="btbl" style="min-height:340px;max-height:calc(100vh - 240px);overflow:auto"></div></div>
+    <div id="btbl"></div></div>
     <datalist id="dl_p3">${S.lookups.people.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>
     <datalist id="dl_pr">${S.lookups.projects.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>`;
   const draw=()=>{const q=$('#bq').value.trim().toLowerCase();const rows=list.filter(t=>!q||(t.name+t.no+t.code).toLowerCase().includes(q));
+    const pg=pgSlice('borrow',rows);
     $('#btbl').innerHTML=`<table><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th>${lastcol}</th></tr></thead><tbody>${
-      rows.map(t=>`<tr><td><input type="checkbox" ${selBor.has(t.i)?'checked':''} onchange="togBor(${t.i},this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,38)}</td><td>${esc(t.no)}</td><td>${esc(out?t.cat:t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่มี</td></tr>'
-    }</tbody></table>`;};
-  $('#bq').oninput=draw;draw();
+      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selBor.has(t.i)?'checked':''} onchange="togBor(${t.i},this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,38)}</td><td>${esc(t.no)}</td><td>${esc(out?t.cat:t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่มี</td></tr>'
+    }</tbody></table>${pg.html}`;};
+  PG_REDRAW['borrow']=draw;
+  $('#bq').oninput=()=>{pgReset('borrow');draw();};draw();
   $('#bgo').onclick=(mode==='move'?doMove:doBorrow);
 }
 function togBor(i,on){on?selBor.add(i):selBor.delete(i);$('#bform').style.display=selBor.size?'block':'none';$('#bcount').textContent=`เลือก ${selBor.size}`;}
@@ -824,6 +833,26 @@ let histTab='recent', histLimit=80, histDraw=null;
 function inViewMov(m){return !FILTER||m.company===FILTER||m.ownerCompany===FILTER;}
 function fmtTime(iso){if(!iso)return '';const d=new Date(iso);if(isNaN(d))return '';return d.toLocaleTimeString('en-GB',{timeZone:'Asia/Bangkok',hour:'2-digit',minute:'2-digit',hour12:false});}
 function fmtDTH(iso){if(!iso)return '';const d=new Date(iso);if(isNaN(d))return '';return d.toLocaleString('en-GB',{timeZone:'Asia/Bangkok',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).replace(',','');}
+/* ===== pagination (ใช้ซ้ำทุกหน้า) ===== */
+const PG={},PG_REDRAW={};
+function pgState(k){return PG[k]||(PG[k]={page:1,size:50});}
+function pgReset(k){pgState(k).page=1;}
+function pgSlice(k,items){const st=pgState(k),total=items.length,pages=Math.max(1,Math.ceil(total/st.size));
+  if(st.page>pages)st.page=pages; if(st.page<1)st.page=1;
+  const from=(st.page-1)*st.size, rows=st.size>=1e9?items:items.slice(from,from+st.size);
+  return {rows,html:pgBar(k,total,from,rows.length,pages)};}
+function pgBar(k,total,from,shown,pages){if(!total)return '';const st=pgState(k);
+  const opts=[25,50,100].map(n=>`<option value="${n}" ${st.size===n?'selected':''}>${n}/หน้า</option>`).join('')+`<option value="1000000000" ${st.size>=1e9?'selected':''}>ทั้งหมด</option>`;
+  return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin:12px 2px 2px;font-size:13px">
+    <span class="muted">แสดง ${from+1}–${from+shown} จาก ${total}</span>
+    <select onchange="pgSize('${k}',this.value)" style="padding:4px 6px;width:auto">${opts}</select>
+    <button class="btn" style="padding:3px 11px" ${st.page<=1?'disabled':''} onclick="pgGo('${k}',${st.page-1})">‹</button>
+    <span style="white-space:nowrap">หน้า <input type="number" min="1" max="${pages}" value="${st.page}" style="width:50px;text-align:center;padding:3px" onchange="pgGo('${k}',this.value)"> / ${pages}</span>
+    <button class="btn" style="padding:3px 11px" ${st.page>=pages?'disabled':''} onclick="pgGo('${k}',${st.page+1})">›</button>
+  </div>`;}
+function pgSize(k,v){const st=pgState(k);st.size=parseInt(v,10)||50;st.page=1;pgRedraw(k);}
+function pgGo(k,p){pgState(k).page=Math.max(1,parseInt(p,10)||1);pgRedraw(k);}
+function pgRedraw(k){PG_REDRAW[k]&&PG_REDRAW[k]();}
 function dayLabel(dstr){if(!dstr)return 'ไม่ระบุวันที่';const y=new Date(Date.now()-86400000).toISOString().slice(0,10);if(dstr===today())return 'วันนี้ ('+dstr+')';if(dstr===y)return 'เมื่อวาน ('+dstr+')';return dstr;}
 function dDiff(a,b){if(!a||!b)return null;const d=Math.round((new Date(b)-new Date(a))/86400000);return isNaN(d)?null:d;}
 function setHT(t){histTab=t;histLimit=80;renderHistory();}
@@ -1145,11 +1174,13 @@ function renderLabels(){
   </div>`;
   const draw=()=>{const q=$('#lq').value.trim().toLowerCase();
     lblFiltered=S.tools.filter(t=>inView(t)&&(!q||(t.code+' '+t.name+' '+t.no+' '+t.cat).toLowerCase().includes(q)));
+    const pg=pgSlice('labels',lblFiltered);
     $('#ltbl').innerHTML=`<table><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th></th></tr></thead><tbody>${
-      lblFiltered.map(t=>`<tr><td><input type="checkbox" ${selLabel.has(t.id)?'checked':''} onchange="togLabel('${t.id}',this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,40)}</td><td>${esc(t.no)}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:4px 8px" onclick="copyNfcUrl('${t.id}')">📋 URL</button> <button class="btn" style="padding:4px 8px" onclick="downloadQR('${t.id}','${esc(t.code)}','${esc(t.no)}')">⬇️ QR</button></td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่พบ</td></tr>'
-    }</tbody></table>`;
+      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selLabel.has(t.id)?'checked':''} onchange="togLabel('${t.id}',this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,40)}</td><td>${esc(t.no)}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:4px 8px" onclick="copyNfcUrl('${t.id}')">📋 URL</button> <button class="btn" style="padding:4px 8px" onclick="downloadQR('${t.id}','${esc(t.code)}','${esc(t.no)}')">⬇️ QR</button></td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่พบ</td></tr>'
+    }</tbody></table>${pg.html}`;
     $('#lcount').textContent='เลือก '+selLabel.size;};
-  $('#lq').oninput=draw;
+  PG_REDRAW['labels']=draw;
+  $('#lq').oninput=()=>{pgReset('labels');draw();};
   $('#lall').onclick=()=>{lblFiltered.forEach(t=>selLabel.add(t.id));draw();};
   $('#lnone').onclick=()=>{selLabel=new Set();draw();};
   $('#lprint').onclick=printLabels;
@@ -1208,9 +1239,10 @@ function renderAudit(){
   const draw=()=>{const q=$('#aq').value.trim().toLowerCase();
     let a=(S.audit||[]);
     if(q)a=a.filter(x=>((x.tool_code||'')+' '+(x.user_email||'')+' '+(x.action||'')+' '+(x.detail||'')).toLowerCase().includes(q));
-    a=a.slice(0,300);
-    $('#atl').innerHTML=a.length?`<table><thead><tr><th>เมื่อ</th><th>ใคร</th><th>บ.</th><th>ทำอะไร</th><th>เครื่อง</th><th>รายละเอียด</th></tr></thead><tbody>${a.map(x=>`<tr><td class="muted" style="white-space:nowrap">${esc(fmtDTH(x.occurred_at))}</td><td style="font-size:12px">${esc(x.user_email||'')}</td><td>${coBadge(x.company)}</td><td><b>${esc(x.action||'')}</b></td><td>${esc(x.tool_code||'')}</td><td style="font-size:12px">${esc(x.detail||'')}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">ยังไม่มีประวัติ หรือไม่พบ</div>';};
-  $('#aq').oninput=draw;draw();
+    const pg=pgSlice('audit',a);
+    $('#atl').innerHTML=pg.rows.length?`<table><thead><tr><th>เมื่อ</th><th>ใคร</th><th>บ.</th><th>ทำอะไร</th><th>เครื่อง</th><th>รายละเอียด</th></tr></thead><tbody>${pg.rows.map(x=>`<tr><td class="muted" style="white-space:nowrap">${esc(fmtDTH(x.occurred_at))}</td><td style="font-size:12px">${esc(x.user_email||'')}</td><td>${coBadge(x.company)}</td><td><b>${esc(x.action||'')}</b></td><td>${esc(x.tool_code||'')}</td><td style="font-size:12px">${esc(x.detail||'')}</td></tr>`).join('')}</tbody></table>${pg.html}`:'<div class="empty">ยังไม่มีประวัติ หรือไม่พบ</div>';};
+  PG_REDRAW['audit']=draw;
+  $('#aq').oninput=()=>{pgReset('audit');draw();};draw();
 }
 
 /* ============ USERS (จัดการผู้ใช้ — admin) ============ */
