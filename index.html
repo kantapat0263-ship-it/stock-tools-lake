@@ -914,11 +914,37 @@ function histMore(){histLimit+=80;if(histDraw)histDraw();}
 function renderHistory(){
   $('#view').innerHTML=`<div class="tabs">
     <button class="${histTab==='recent'?'on':''}" onclick="setHT('recent')">📋 รายการล่าสุด</button>
+    <button class="${histTab==='borrows'?'on':''}" onclick="setHT('borrows')">📋 ใบเบิก/ส่งไซต์</button>
     <button class="${histTab==='slips'?'on':''}" onclick="setHT('slips')">📑 ใบส่งซ่อม</button>
     <button class="${histTab==='repair'?'on':''}" onclick="setHT('repair')">🔧 ค้างซ่อม / เวลาซ่อม</button>
     <button class="${histTab==='tool'?'on':''}" onclick="setHT('tool')">🔍 รายเครื่อง</button>
   </div><div id="hbody"></div>`;
-  ({recent:histRecent,slips:histSlips,repair:histRepair,tool:histByTool}[histTab])();
+  ({recent:histRecent,borrows:histBorrows,slips:histSlips,repair:histRepair,tool:histByTool}[histTab])();
+}
+function borrowBatches(){
+  const groups={};
+  S.tools.forEach(t=>{
+    if(t.status!=='ถูกยืม'||!inView(t))return;
+    const mv=S.movements.filter(m=>m.tool_id===t.id&&m.type==='เบิก').sort((a,b)=>String((a.date||'')+(a.createdAt||'')).localeCompare(String((b.date||'')+(b.createdAt||'')))).pop();
+    const date=mv?mv.date:'',proj=mv?mv.project:'',who=mv?mv.actor:'';
+    const key=date+'|'+proj+'|'+who+'|'+t.company;
+    (groups[key]=groups[key]||{date,project:proj,who,company:t.company,tools:[]}).tools.push(t);
+  });
+  return Object.values(groups).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+}
+function histBorrows(){
+  const batches=borrowBatches(); window._bb=batches;
+  $('#hbody').innerHTML=`<div class="panel">
+    <h3>📋 ใบเบิก / ส่งไซต์ (ของที่ยังไม่คืน) <span class="muted" style="font-weight:400">— พิมพ์ใบส่งไซต์ย้อนหลังได้ (เช่น เครื่องที่เบิกไปก่อนมีระบบใบ)</span></h3>
+    <table><thead><tr><th>โครงการ / ไซต์</th><th>บ.</th><th>ผู้เบิก</th><th>วันที่เบิก</th><th class="center">จำนวน</th><th></th></tr></thead><tbody>${
+      batches.map((b,i)=>`<tr><td><b>${esc(b.project)||'-'}</b></td><td>${coBadge(b.company)}</td><td>${esc(b.who)||'-'}</td><td>${esc(b.date)||'-'}</td><td class="center">${b.tools.length}</td><td class="right"><button class="btn" style="background:var(--blue);color:#fff;padding:5px 12px" onclick="reprintBorrow(${i})">🖨️ พิมพ์ใบส่งไซต์</button></td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่มีของที่เบิกค้างอยู่</td></tr>'
+    }</tbody></table></div>`;
+}
+function reprintBorrow(i){
+  const b=(window._bb||[])[i]; if(!b){toast('ไม่พบรายการ');return;}
+  const prev=COMPANY; COMPANY=b.company;
+  $('#printArea').innerHTML=borrowDocHtml(b.tools,b.who,b.project,b.date);
+  COMPANY=prev; window.print();
 }
 function histRecent(){
   $('#hbody').innerHTML=`<div class="panel">
