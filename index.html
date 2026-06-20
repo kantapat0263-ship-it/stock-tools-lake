@@ -173,7 +173,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
 .btbl td.c{text-align:center}
 .bsign{display:flex;margin-top:18px;text-align:center;font-size:10px;gap:8px}
 .bsign>div{flex:1}
-.brecv{margin-top:12px;font-size:10px}
+.brecv{margin-top:14px;font-size:10px;text-align:left;line-height:2}
 .doc{width:100%;color:#000;font-family:Tahoma,'Noto Sans Thai',sans-serif}
 .doc h1{text-align:center;font-size:18px;margin:0 0 2px}
 .doc .dsub{text-align:center;font-size:12px;margin-bottom:10px}
@@ -861,9 +861,10 @@ function borrowDocHtml(items,who,proj,date,no){
         <tbody>${rows}</tbody></table>
       <div class="bsign">
         <div>ผู้เบิก<br><br>.................<br>(${esc(who)})</div>
-        <div>เจ้าหน้าที่เซ็นรับเครื่อง (ชื่อบรรจง)<br><br>.................<br>(.................)</div>
+        <div>เจ้าหน้าที่เซ็นรับเครื่อง (ชื่อบรรจง)<br><br>.................<br>(.................)
+          <div class="brecv">วันที่รับ ....../....../........<br>เวลาที่รับ ............... น.</div>
+        </div>
       </div>
-      <div class="brecv">วันที่รับ ....../....../........&nbsp;&nbsp;&nbsp; เวลาที่รับ ............... น.</div>
     </div>`;
   }
   let out='';
