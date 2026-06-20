@@ -565,21 +565,21 @@ function renderRepair(){
   selRepair=new Set();
   const eligible=S.tools.filter(t=>['ว่าง','ชำรุด','รอส่งซ่อม'].includes(t.status)&&inView(t));
   $('#view').innerHTML=`
-   <div class="panel">
-    <h3>1) เลือกเครื่องที่จะส่งซ่อม <span class="muted" style="font-weight:400">(เครื่องว่าง/ชำรุด/รอซ่อม ${eligible.length} ตัว)</span></h3>
-    <div class="toolbar"><input class="search" id="rq" placeholder="🔎 ค้นหาเครื่อง…"></div>
-    <div id="rtbl"></div>
-   </div>
-   <div class="panel" id="rform" style="display:none">
-    <h3>2) ข้อมูลใบส่งซ่อม (บริษัท ${COMPANY}) — เลขที่จะออกอัตโนมัติ <b style="color:var(--blue)">#${String((S.nextSlipByCo&&S.nextSlipByCo[COMPANY])||1).padStart(3,'0')}</b></h3>
+   <div class="panel" id="rform" style="display:none;position:sticky;top:10px;z-index:5;box-shadow:0 6px 16px rgba(0,0,0,.10)">
+    <h3>ข้อมูลใบส่งซ่อม (บริษัท ${COMPANY}) — เลขที่จะออกอัตโนมัติ <b style="color:var(--blue)">#${String((S.nextSlipByCo&&S.nextSlipByCo[COMPANY])||1).padStart(3,'0')}</b></h3>
     <div class="flexrow">
       <div class="field"><label>วันที่ส่ง</label><input id="r_date" type="date" value="${today()}"></div>
       <div class="field"><label>ร้าน/ช่างซ่อม</label><input id="r_vendor" list="dl_v" placeholder="เช่น สุเทพ"></div>
       <div class="field"><label>ผู้ส่ง</label><input id="r_sender" list="dl_p"></div>
     </div>
-    <div id="rsel"></div>
+    <div id="rsel" style="max-height:32vh;overflow:auto"></div>
     <div class="selbar"><b id="rcount">เลือก 0 เครื่อง</b><div class="spacer"></div>
       <button class="btn primary" id="rgo">👁️ ดูใบส่งซ่อม (ยังไม่บันทึก)</button></div>
+   </div>
+   <div class="panel">
+    <h3>เลือกเครื่องที่จะส่งซ่อม <span class="muted" style="font-weight:400">(เครื่องว่าง/ชำรุด/รอซ่อม ${eligible.length} ตัว)</span></h3>
+    <div class="toolbar"><input class="search" id="rq" placeholder="🔎 ค้นหาเครื่อง…"></div>
+    <div id="rtbl"></div>
    </div>
    <datalist id="dl_v">${S.lookups.vendors.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>
    <datalist id="dl_p">${S.lookups.people.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>`;
