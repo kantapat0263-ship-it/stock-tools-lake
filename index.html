@@ -980,8 +980,11 @@ function reprintBorrow(i){
   $('#printArea').innerHTML=borrowDocHtml(b.tools,b.who,b.project,b.date,b.no);
   COMPANY=prev; window.print();
 }
+function _togglePick(boxId){const b=$('#'+boxId);b.style.display=(b.style.display==='none'?'block':'none');}
+function _filterPick(listId,inputId){const q=$('#'+inputId).value.trim().toLowerCase();$('#'+listId).querySelectorAll('[data-pickrow]').forEach(el=>{el.style.display=(!q||el.textContent.toLowerCase().includes(q))?'':'none';});}
 function editBorrowBatchForm(i){
   const b=(window._bb||[])[i]; if(!b){toast('ไม่พบรายการ');return;}
+  const elig=S.tools.filter(t=>t.status==='ว่าง'&&inView(t));
   openModal(`<h3>✏️ แก้ไขใบส่งไซต์ ${coBadge(b.company)}</h3>
     <div class="flexrow">
       <div class="field"><label>วันที่</label><input id="eb_date" type="date" value="${esc(b.date)}"></div>
@@ -992,6 +995,13 @@ function editBorrowBatchForm(i){
     <div style="max-height:30vh;overflow:auto"><table><thead><tr><th>เครื่อง / NO</th><th class="center">เอาออก</th></tr></thead><tbody>${
       b.tools.map((t,j)=>`<tr><td>${esc(t.code)||esc(t.name)||'-'} ${esc(t.no)||''}</td><td class="center"><input type="checkbox" data-brm="${j}"></td></tr>`).join('')||'<tr><td colspan=2 class="empty">ไม่มีเครื่อง</td></tr>'
     }</tbody></table></div>
+    <div style="margin-top:10px"><button class="btn" onclick="_togglePick('eb_addbox')">➕ เพิ่มเครื่องเข้าใบนี้</button></div>
+    <div id="eb_addbox" style="display:none;margin-top:8px;border-top:1px dashed var(--line);padding-top:8px">
+      <input class="search" id="eb_addq" oninput="_filterPick('eb_addlist','eb_addq')" placeholder="🔎 ค้นหาเครื่องว่าง…" style="margin-bottom:6px;width:100%">
+      <div id="eb_addlist" style="max-height:26vh;overflow:auto">${
+        elig.map(t=>`<label data-pickrow style="display:flex;gap:8px;align-items:center;padding:5px 2px;border-bottom:0.5px solid var(--line)"><input type="checkbox" data-badd="${t.id}"><b>${esc(t.code)}</b> <span style="flex:1">${esc(t.name).slice(0,30)}</span> ${coBadge(t.company)}</label>`).join('')||'<div class="empty">ไม่มีเครื่องว่าง</div>'
+      }</div>
+    </div>
     <div class="flexrow" style="margin-top:10px"><button class="btn primary" onclick="saveBorrowBatch(${i})">💾 บันทึก</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
 }
 async function saveBorrowBatch(i){
@@ -1008,8 +1018,13 @@ async function saveBorrowBatch(i){
     if(movId)await sb.from('movements').update({occurred_on:date||null,project:proj,actor:who}).eq('id',movId);
     if(t.status==='ถูกยืม')await sb.from('tools').update({location:proj+' / '+who,pending_dest:proj,updated_at:new Date().toISOString()}).eq('id',t.id);
   }
+  const adds=[...document.querySelectorAll('[data-badd]:checked')].map(c=>c.getAttribute('data-badd'));
+  for(const tid of adds){const t=S.tools.find(x=>x.id===tid); if(!t)continue;
+    await sb.from('tools').update({status:'ถูกยืม',location:proj+' / '+who,receipt_pending:true,pending_dest:proj,dispatched_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',tid);
+    await sb.from('movements').insert({company:b.company,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:tid,occurred_on:date||null,type:'เบิก',project:proj,actor:who,borrow_no:b.no});
+  }
   await ensureLookup('people',who);await ensureLookup('projects',proj);
-  closeModal();toast('แก้ไขใบส่งไซต์แล้ว');await loadAll();go('history');
+  closeModal();toast(adds.length?`แก้ไขใบส่งไซต์ + เพิ่ม ${adds.length} เครื่องแล้ว`:'แก้ไขใบส่งไซต์แล้ว');await loadAll();go('history');
 }
 function histRecent(){
   $('#hbody').innerHTML=`<div class="panel">
@@ -1134,6 +1149,7 @@ function slipDetail(slipNo,co){
 function editSlipForm(slipNo,co){
   const s=S.slips.find(x=>x.slip_no===slipNo&&x.company===co); if(!s){toast('ไม่พบใบ');return;}
   const sent=S.movements.filter(m=>m.slipNo===slipNo&&m.company===co&&m.type==='ส่งซ่อม');
+  const elig=S.tools.filter(t=>['ว่าง','ชำรุด','รอส่งซ่อม'].includes(t.status)&&inView(t));
   window._es={slipNo,co,movs:sent};
   openModal(`<h3>✏️ แก้ไขใบส่งซ่อม #${esc(s.no)} ${coBadge(co)}</h3>
     <div class="flexrow">
@@ -1147,6 +1163,13 @@ function editSlipForm(slipNo,co){
       sent.map((m,i)=>`<tr><td>${esc(m.code||m.label)||'-'} ${esc(m.no)||''}</td><td><input data-er="${i}" value="${esc(m.reason)}" style="width:100%"></td><td class="center"><input type="checkbox" data-rm="${i}" title="เอาเครื่องนี้ออกจากใบ"></td></tr>`).join('')||'<tr><td colspan=3 class="empty">ไม่มีเครื่อง</td></tr>'
     }</tbody></table></div>
     <div class="muted" style="font-size:11px;margin-top:3px">ติ๊ก "เอาออก" เครื่องที่ไม่ต้องการในใบ แล้วกดบันทึก (เครื่องจะกลับเป็น "ว่าง")</div>
+    <div style="margin-top:10px"><button class="btn" onclick="_togglePick('es_addbox')">➕ เพิ่มเครื่องเข้าใบนี้</button></div>
+    <div id="es_addbox" style="display:none;margin-top:8px;border-top:1px dashed var(--line);padding-top:8px">
+      <input class="search" id="es_addq" oninput="_filterPick('es_addlist','es_addq')" placeholder="🔎 ค้นหาเครื่อง…" style="margin-bottom:6px;width:100%">
+      <div id="es_addlist" style="max-height:26vh;overflow:auto"><table><thead><tr><th></th><th>เครื่อง</th><th>อาการ/สาเหตุ</th></tr></thead><tbody>${
+        elig.map(t=>`<tr data-pickrow><td><input type="checkbox" data-radd="${t.id}"></td><td><b>${esc(t.code)}</b> ${coBadge(t.company)}</td><td><input data-rar="${t.id}" placeholder="เช่น ลูกปืนแตก" style="width:100%"></td></tr>`).join('')||'<tr><td colspan=3 class="empty">ไม่มีเครื่อง</td></tr>'
+      }</tbody></table></div>
+    </div>
     <div class="flexrow" style="margin-top:10px"><button class="btn primary" onclick="saveSlip()">💾 บันทึก</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
 }
 async function saveSlip(){
@@ -1161,8 +1184,14 @@ async function saveSlip(){
       continue;}
     const r=document.querySelector(`[data-er="${i}"]`);
     if(m.id&&r&&r.value!==(m.reason||''))await sb.from('movements').update({reason:r.value}).eq('id',m.id);}
+  const adds=[...document.querySelectorAll('[data-radd]:checked')].map(c=>c.getAttribute('data-radd'));
+  for(const tid of adds){const t=S.tools.find(x=>x.id===tid); if(!t)continue;
+    const rs=document.querySelector(`[data-rar="${tid}"]`); const reason=rs?rs.value.trim():'';
+    await sb.from('tools').update({status:'ส่งซ่อม',location:vendor||'ร้านซ่อม',updated_at:new Date().toISOString()}).eq('id',tid);
+    await sb.from('movements').insert({company:e.co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:tid,occurred_on:sent||null,type:'ส่งซ่อม',slip_no:e.slipNo,actor:sender,counterparty:vendor,reason});
+  }
   await ensureLookup('vendors',vendor);await ensureLookup('people',sender);
-  closeModal();toast('แก้ไขใบส่งซ่อม #'+String(e.slipNo).padStart(3,'0')+' แล้ว');await loadAll();go('history');
+  closeModal();toast(adds.length?`แก้ไขใบส่งซ่อม #${String(e.slipNo).padStart(3,'0')} + เพิ่ม ${adds.length} เครื่องแล้ว`:'แก้ไขใบส่งซ่อม #'+String(e.slipNo).padStart(3,'0')+' แล้ว');await loadAll();go('history');
 }
 
 /* ============ REPORT + EXPORT ============ */
