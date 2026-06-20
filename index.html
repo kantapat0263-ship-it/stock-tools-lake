@@ -151,6 +151,27 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
 .rsdoc td{height:23px;vertical-align:middle}
 .rspage{page:land;break-after:page}
 .rspage:last-of-type{break-after:auto}
+/* ใบส่งเครื่องมือ 2 สำเนา/แผ่น */
+.bpair{display:flex;width:100%;align-items:stretch}
+.bcopy{flex:1;padding:0 5mm;font-size:10px;color:#000;min-width:0}
+.bcut{border-left:1.5px dashed #888;margin:0 1mm}
+.bhd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1.5px solid #000;padding-bottom:4px;margin-bottom:4px}
+.blogo{width:15mm;height:12mm;border:1px solid #ccc;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;color:#777;flex-shrink:0}
+.bttl{text-align:center;flex:1;padding:0 2mm}
+.bt1{font-size:16px;font-weight:bold}
+.bt2{font-size:10px}
+.bno{text-align:center;font-size:10px;flex-shrink:0;white-space:nowrap}
+.bno b{font-size:14px}
+.binfo{font-size:11px;margin-bottom:5px}
+.binfo .r{display:flex;justify-content:space-between;gap:6px}
+.btbl{width:100%;border-collapse:collapse;table-layout:fixed;font-size:10px;margin-bottom:2px}
+.btbl th,.btbl td{border:1px solid #000;padding:3px;word-wrap:break-word}
+.btbl th{background:#f0f0f0;text-align:center;font-weight:bold}
+.btbl td{height:22px;vertical-align:middle}
+.btbl td.c{text-align:center}
+.bsign{display:flex;margin-top:18px;text-align:center;font-size:10px;gap:8px}
+.bsign>div{flex:1}
+.brecv{margin-top:12px;font-size:10px}
 .doc{width:100%;color:#000;font-family:Tahoma,'Noto Sans Thai',sans-serif}
 .doc h1{text-align:center;font-size:18px;margin:0 0 2px}
 .doc .dsub{text-align:center;font-size:12px;margin-bottom:10px}
@@ -244,7 +265,7 @@ let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('o
 /* ---- data layer (Supabase) ---- */
 function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||''),createdAt:(r.created_at||'')};}
 function rowToSlip(s){return {id:s.id,slip_no:s.slip_no,no:String(s.slip_no).padStart(3,'0'),sent:(s.sent_date||''),vendor:s.vendor||'',project:s.project||'',sender:s.sender||'',status:s.status||'ส่งแล้ว',received:(s.received_date||''),receiver:s.receiver||'',note:s.note||'',count:'0',company:s.company};}
-function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||''};}
+function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||'',borrowNo:(m.borrow_no!=null?m.borrow_no:null)};}
 async function fetchAllMov(){
   const all=[];const PAGE=1000;let from=0;
   for(;;){
@@ -282,6 +303,7 @@ async function loadAll(){
   S.trash=(tr.data||[]).map(rowToTool);
   S.slipTrash=(st.data||[]).map(rowToSlip);
   S.nextSlipByCo={};['PAC','LOTUS'].forEach(co=>S.nextSlipByCo[co]=(S.slips.filter(x=>x.company===co).reduce((m,x)=>Math.max(m,x.slip_no||0),0))+1);
+  S.nextBorrowByCo={};['PAC','LOTUS'].forEach(co=>S.nextBorrowByCo[co]=(S.movements.filter(x=>x.company===co&&x.type==='เบิก'&&x.borrowNo!=null).reduce((m,x)=>Math.max(m,x.borrowNo),0))+1);
 }
 async function ensureLookup(tbl,name,co){name=(name||'').trim();if(!name)return;if((S.lookups[tbl]||[]).includes(name))return;try{await sb.from(tbl).insert({company:co||COMPANY,name});}catch(e){}}
 async function reload(view){await loadAll();go(view||CUR);}
@@ -813,33 +835,37 @@ async function doBorrow(){
 let pendingBorrow=null;
 function itemDesc(t){const n=(t.name||'').trim(),c=(t.cat||'').trim();return (c&&n&&n.length<=12)?(c+' '+n):(n||c);}
 function fmtDateTH(iso){if(!iso)return '';const p=String(iso).slice(0,10).split('-');if(p.length<3)return String(iso);const M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const d=parseInt(p[2],10),mo=parseInt(p[1],10),y=parseInt(p[0],10);if(!d||!mo||!y||mo>12)return String(iso);return d+' '+M[mo-1]+' '+(y+543);}
-function borrowDocHtml(items,who,proj,date){
+function borrowDocHtml(items,who,proj,date,no){
   const co=COMPANY==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)';
+  const noTxt=(no!=null&&no!=='')?String(no).padStart(3,'0'):'..........';
   const PER=13, pages=Math.max(1,Math.ceil(items.length/PER));
-  const colg=`<colgroup><col style="width:4%"><col style="width:25%"><col style="width:13%"><col style="width:11%"><col style="width:28%"><col style="width:10%"><col style="width:9%"></colgroup>`;
-  const thead=`<thead><tr><th>ลำดับ</th><th>รายการเครื่องมือ</th><th>S/N</th><th>รหัสเครื่องมือ</th><th>เจ้าหน้าที่เซ็นรับเครื่อง(ชื่อบรรจง)</th><th>วันที่รับ</th><th>เวลาที่รับ</th></tr></thead>`;
-  let out='';
-  for(let p=0;p<pages;p++){
+  function copy(p){
     let rows='';
     for(let r=0;r<PER;r++){const gi=p*PER+r,it=items[gi];
-      rows+=`<tr><td class="c">${gi+1}</td><td>${it?esc(itemDesc(it)):''}</td><td class="c">${it?esc(it.sn):''}</td><td class="c">${it?esc(it.no):''}</td><td></td><td></td><td></td></tr>`;}
-    out+=`<div class="doc land rsdoc rspage">
-      <div class="rshd">
-        <div class="rshd-l">บริษัท ${co}</div>
-        <div class="rshd-c"><div class="rsttl">ใบส่งเครื่องมือไปไซต์งาน ${COMPANY}</div><div class="rssub">${pages>1?`หน้า ${p+1}/${pages}`:''}</div></div>
-        <div class="rshd-r"><div class="rsorig">ORIGINAL</div></div>
+      rows+=`<tr><td class="c">${gi+1}</td><td>${it?esc(itemDesc(it)):''}</td><td class="c">${it?esc(it.sn):''}</td><td class="c">${it?esc(it.no):''}</td></tr>`;}
+    return `<div class="bcopy">
+      <div class="bhd">
+        <div class="blogo">${esc(COMPANY)}</div>
+        <div class="bttl"><div class="bt1">ใบส่งเครื่องมือ</div><div class="bt2">บริษัท ${co}</div></div>
+        <div class="bno">เลขที่<br><b>${noTxt}</b>${pages>1?`<br><span style="font-weight:400">หน้า ${p+1}/${pages}</span>`:''}</div>
       </div>
-      <div class="rsmeta">
-        <span>ผู้เบิก: <b>${esc(who)||'.....................'}</b></span>
-        <span>โครงการที่เบิก: <b>${esc(proj)||'.....................'}</b></span>
-        <span>วันที่ส่งโครงการ: <b>${esc(fmtDateTH(date))||'......./......./.........'}</b></span>
-        <span>จำนวน: <b>${items.length}</b> เครื่อง</span>
+      <div class="binfo">
+        <div class="r"><span>โครงการ/ไซต์: <b>${esc(proj)||'.................'}</b></span><span>วันที่: <b>${esc(fmtDateTH(date))||'..../..../....'}</b></span></div>
+        <div>ผู้เบิก: <b>${esc(who)||'.................'}</b></div>
       </div>
-      <table>${colg}${thead}<tbody>${rows}</tbody></table>
-      <div style="display:flex;margin-top:20px;font-size:12px;text-align:center">
-        <div style="width:42%">ผู้เบิก<br><br>.............................<br>(${esc(who)})</div>
+      <table class="btbl"><colgroup><col style="width:9%"><col style="width:49%"><col style="width:22%"><col style="width:20%"></colgroup>
+        <thead><tr><th>ลำดับ</th><th>รายการเครื่องมือ</th><th>S/N</th><th>รหัสเครื่องมือ</th></tr></thead>
+        <tbody>${rows}</tbody></table>
+      <div class="bsign">
+        <div>ผู้เบิก<br><br>.................<br>(${esc(who)})</div>
+        <div>เจ้าหน้าที่เซ็นรับเครื่อง (ชื่อบรรจง)<br><br>.................<br>(.................)</div>
       </div>
+      <div class="brecv">วันที่รับ ....../....../........&nbsp;&nbsp;&nbsp; เวลาที่รับ ............... น.</div>
     </div>`;
+  }
+  let out='';
+  for(let p=0;p<pages;p++){
+    out+=`<div class="doc land rspage"><div class="bpair">${copy(p)}<div class="bcut"></div>${copy(p)}</div></div>`;
   }
   return out;
 }
@@ -849,21 +875,23 @@ function previewBorrow(){
   if(!who||!proj){toast('กรุณากรอก ผู้เบิก + โครงการ/ไซต์ ให้ครบ');return;}
   const items=[...selBor].map(ix=>S.tools[ix]);
   pendingBorrow={items,who,proj,date};
-  openModal(`<h3>👁️ ตัวอย่างใบส่งเครื่องมือไปไซต์งาน</h3><p class="muted">ดูก่อน — <b>ยังไม่บันทึก</b> · จะบันทึกจริงตอนกด "พิมพ์ + บันทึก"</p>
-    <div style="border:1px solid var(--line);border-radius:8px;padding:10px;max-height:46vh;overflow:auto;margin:8px 0">${borrowDocHtml(items,who,proj,date)}</div>
+  openModal(`<h3>👁️ ตัวอย่างใบส่งเครื่องมือ</h3><p class="muted">ดูก่อน — <b>ยังไม่บันทึก</b> · 2 สำเนา (ตัดครึ่งเก็บฝั่งละ 1) · จะบันทึกจริงตอนกด "พิมพ์ + บันทึก"</p>
+    <div style="border:1px solid var(--line);border-radius:8px;padding:10px;max-height:46vh;overflow:auto;margin:8px 0">${borrowDocHtml(items,who,proj,date,(S.nextBorrowByCo&&S.nextBorrowByCo[COMPANY])||'')}</div>
     <div class="flexrow"><button class="btn primary" onclick="commitBorrow()">🖨️ พิมพ์ + บันทึกเบิก</button><button class="btn ghost" onclick="closeModal()">ปิด (ยังไม่บันทึก)</button></div>`);
 }
 async function commitBorrow(){
   if(!pendingBorrow)return;
   const {items,who,proj,date}=pendingBorrow;
+  const {data:mx}=await sb.from('movements').select('borrow_no').eq('company',COMPANY).eq('type','เบิก').not('borrow_no','is',null).order('borrow_no',{ascending:false}).limit(1).maybeSingle();
+  const bn=((mx&&mx.borrow_no)||0)+1;
   for(const t of items){
     await sb.from('tools').update({status:'ถูกยืม',location:(proj||'')+(who?' / '+who:''),receipt_pending:true,pending_dest:proj,dispatched_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',t.id);
-    await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'เบิก',project:proj,actor:who});
+    await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'เบิก',project:proj,actor:who,borrow_no:bn});
   }
   await ensureLookup('people',who);await ensureLookup('projects',proj);
   pendingBorrow=null;closeModal();
-  $('#printArea').innerHTML=borrowDocHtml(items,who,proj,date);window.print();
-  toast(`เบิก ${items.length} เครื่อง → ออกใบส่งไซต์แล้ว`);await loadAll();renderBorrow();
+  $('#printArea').innerHTML=borrowDocHtml(items,who,proj,date,bn);window.print();
+  toast(`เบิก ${items.length} เครื่อง → ออกใบส่งไซต์ #${String(bn).padStart(3,'0')} แล้ว`);await loadAll();renderBorrow();
 }
 async function doMove(){
   if(!selBor.size)return;
@@ -929,23 +957,23 @@ function borrowBatches(){
     const mv=S.movements.filter(m=>m.tool_id===t.id&&m.type==='เบิก').sort((a,b)=>String((a.date||'')+(a.createdAt||'')).localeCompare(String((b.date||'')+(b.createdAt||'')))).pop();
     const date=mv?mv.date:'',proj=mv?mv.project:'',who=mv?mv.actor:'';
     const key=date+'|'+proj+'|'+who+'|'+t.company;
-    const g=groups[key]=groups[key]||{date,project:proj,who,company:t.company,tools:[],movIds:[]};
+    const g=groups[key]=groups[key]||{date,project:proj,who,company:t.company,no:(mv?mv.borrowNo:null),tools:[],movIds:[]};
     g.tools.push(t); g.movIds.push(mv?mv.id:null);
   });
-  return Object.values(groups).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  return Object.values(groups).sort((a,b)=>(b.no||0)-(a.no||0)||String(b.date).localeCompare(String(a.date)));
 }
 function histBorrows(){
   const batches=borrowBatches(); window._bb=batches;
   $('#hbody').innerHTML=`<div class="panel">
     <h3>📋 ใบเบิก / ส่งไซต์ (ของที่ยังไม่คืน) <span class="muted" style="font-weight:400">— พิมพ์ใบส่งไซต์ย้อนหลังได้ (เช่น เครื่องที่เบิกไปก่อนมีระบบใบ)</span></h3>
-    <table><thead><tr><th>โครงการ / ไซต์</th><th>บ.</th><th>ผู้เบิก</th><th>วันที่เบิก</th><th class="center">จำนวน</th><th></th></tr></thead><tbody>${
-      batches.map((b,i)=>`<tr><td><b>${esc(b.project)||'-'}</b></td><td>${coBadge(b.company)}</td><td>${esc(b.who)||'-'}</td><td>${esc(b.date)||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 11px" onclick="editBorrowBatchForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:var(--blue);color:#fff;padding:5px 11px" onclick="reprintBorrow(${i})">🖨️ พิมพ์</button></td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่มีของที่เบิกค้างอยู่</td></tr>'
+    <table><thead><tr><th>เลขที่</th><th>โครงการ / ไซต์</th><th>บ.</th><th>ผู้เบิก</th><th>วันที่เบิก</th><th class="center">จำนวน</th><th></th></tr></thead><tbody>${
+      batches.map((b,i)=>`<tr><td><b>${b.no!=null?String(b.no).padStart(3,'0'):'-'}</b></td><td><b>${esc(b.project)||'-'}</b></td><td>${coBadge(b.company)}</td><td>${esc(b.who)||'-'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 11px" onclick="editBorrowBatchForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:var(--blue);color:#fff;padding:5px 11px" onclick="reprintBorrow(${i})">🖨️ พิมพ์</button></td></tr>`).join('')||'<tr><td colspan=7 class="empty">ไม่มีของที่เบิกค้างอยู่</td></tr>'
     }</tbody></table></div>`;
 }
 function reprintBorrow(i){
   const b=(window._bb||[])[i]; if(!b){toast('ไม่พบรายการ');return;}
   const prev=COMPANY; COMPANY=b.company;
-  $('#printArea').innerHTML=borrowDocHtml(b.tools,b.who,b.project,b.date);
+  $('#printArea').innerHTML=borrowDocHtml(b.tools,b.who,b.project,b.date,b.no);
   COMPANY=prev; window.print();
 }
 function editBorrowBatchForm(i){
