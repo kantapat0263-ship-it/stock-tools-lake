@@ -244,7 +244,7 @@ const LOGO={LOTUS:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAACDCAYAAAD
 let FILTER='';
 function inView(t){return !FILTER||t.company===FILTER;}
 function coBadge(co){return `<span class="chip" style="background:${co==='LOTUS'?'#ede9fe':'#e0f2fe'};color:${co==='LOTUS'?'#7c3aed':'#0369a1'};font-size:11px;padding:2px 8px">${esc(co||'-')}</span>`;}
-function setView(co){FILTER=co; if(co)COMPANY=co; document.querySelectorAll('#coswitch button').forEach(b=>b.classList.toggle('on',(b.dataset.co||'')===co)); go(CUR);}
+function setView(co){FILTER=co; if(co&&ME&&ME.role==='admin')COMPANY=co; document.querySelectorAll('#coswitch button').forEach(b=>b.classList.toggle('on',(b.dataset.co||'')===co)); go(CUR);}
 function applyTheme(co){const r=document.documentElement.style;
   if(co==='LOTUS'){r.setProperty('--navy','#3f4a22');r.setProperty('--navy2','#55652f');r.setProperty('--navydark','#2a3217');r.setProperty('--blue','#5c7a29');r.setProperty('--blue-d','#465f1f');}
   else{r.setProperty('--navy','#0f2744');r.setProperty('--navy2','#16365c');r.setProperty('--navydark','#0a1c33');r.setProperty('--blue','#2563eb');r.setProperty('--blue-d','#1d4ed8');}}
@@ -321,7 +321,7 @@ async function init(){
   document.querySelector('.app').style.display='flex';
   $('#uemail').textContent=ME.email; $('#urole').textContent=(ME.role==='admin'?'ผู้ดูแลระบบ':'พนักงาน '+(ME.company||''));
   if(ME.role==='admin'){$('#navUsers').style.display='';$('#navAudit').style.display='';}
-  if(ME.role!=='admin'&&ME.company)COMPANY=ME.company;
+  if(ME.role!=='admin'&&ME.company){COMPANY=ME.company;FILTER=ME.company;document.querySelectorAll('#coswitch button').forEach(b=>b.classList.toggle('on',(b.dataset.co||'')===FILTER));}
   applyTheme(ME.company);
   await loadAll();
   if(!S.tools.length && ME.role!=='admin'){toast('บัญชีนี้ยังไม่ถูกตั้งสิทธิ์ — แจ้งแอดมินตั้งบริษัท/admin ให้');}
