@@ -794,7 +794,7 @@ function renderBorrow(){
 }
 function setBT(t){borrowTab=t;selBor=new Set();renderBorrow();}
 function drawBorrow(){
-  const mode=borrowTab;
+  const mode=borrowTab; const out=mode==='out';
   const list=S.tools.filter(t=>t.status===(out?'ว่าง':'ถูกยืม')&&inView(t));
   let form,btn,title;
   if(mode==='out'){
