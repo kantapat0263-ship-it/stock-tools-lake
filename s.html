@@ -114,9 +114,12 @@ function render(t,mv){
 
   let actions='';
   if(canEdit){
-    if(t.status==='ถูกยืม')actions+=`<button class="btn primary" onclick="actReceiveSite()">📥 รับคืนเข้าออฟฟิต</button>`;
-    else if(t.status==='ส่งซ่อม')actions+=`<button class="btn primary" onclick="actReceiveRepair()">📥 รับคืนจากซ่อม</button>`;
-    if(t.status!=='ชำรุด')actions+=`<button class="btn danger" onclick="actBroken()">⚠️ แจ้งชำรุด</button>`;
+    if(t.status==='ถูกยืม'||t.status==='ส่งซ่อม'){
+      actions+=`<input id="rnote" class="inp" placeholder="โน้ตสภาพ (ไม่บังคับ)" style="margin-bottom:9px">`;
+      actions+=`<button class="btn primary" onclick="${t.status==='ถูกยืม'?'actReceiveSite()':'actReceiveRepair()'}">📥 ${t.status==='ถูกยืม'?'รับคืนเข้าออฟฟิต':'รับคืนจากซ่อม'}</button>`;
+    }else{
+      actions=`<div class="muted" style="font-size:13px;text-align:center;padding:6px">— เครื่องนี้สถานะ ${esc(t.status)} ไม่มีรายการรับคืน</div>`;
+    }
   }else{
     actions=`<div class="muted" style="font-size:13px;text-align:center;padding:6px">👀 ดูอย่างเดียว — เครื่องของบริษัท ${esc(t.company)} (คุณไม่มีสิทธิ์แก้)</div>`;
   }
@@ -149,7 +152,7 @@ function render(t,mv){
         ${t.brand?`<div class="brand">${esc(t.brand)}</div>`:''}
       </div>
     </div>
-    <div class="stat" style="background:${sbg};color:${sc}">● ${esc(t.status)}${t.location?` · อยู่ที่ ${esc(t.location)}`:''}</div>
+    <div class="stat" style="background:${sbg};color:${sc}">● ${esc(t.status)}${t.location?` · อยู่ที่ ${esc(t.location)}`:''}${daysBadge(t)}</div>
   </div>
 
   <div class="bd">
@@ -170,29 +173,41 @@ function render(t,mv){
   </div>`;
 }
 
-/* ---- actions (ยกตรรกะจาก app.html) ---- */
-async function writeMov(upd,mv,msg){
-  const co=(ME.role==='admin')?TOOL.company:ME.company;
-  await sb.from('tools').update(Object.assign({updated_at:new Date().toISOString()},upd)).eq('id',TOOL.id);
-  await sb.from('movements').insert(Object.assign({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today()},mv));
-  toast(msg); await load();
-}
+/* ---- actions (รับเข้าระบบ — store) ---- */
+let LAST=null;
+const now=()=>new Date().toISOString();
+function noteVal(){const e=$('#rnote');return e&&e.value.trim()?e.value.trim():null;}
+function snapTool(t){return {status:t.status,location:t.location,receipt_pending:t.receipt_pending,pending_dest:t.pending_dest,dispatched_at:t.dispatched_at};}
+function daysBadge(t){if(t.status!=='ถูกยืม')return '';const b=t.dispatched_at||t.updated_at;if(!b)return '';const d=Math.floor((Date.now()-new Date(b).getTime())/86400000);if(isNaN(d)||d<0)return '';return ` · ค้าง ${d} วัน${d>30?' ⚠️':''}`;}
+function afterAction(msg){screenScanner({msg,name:LAST?LAST.name:''});}
+
 async function actReceiveSite(){
-  await writeMov({status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null},
-    {type:'คืน',project:'ออฟฟิต',actor:ME.email},'📥 รับคืนเข้าออฟฟิตแล้ว');
+  const note=noteVal(),prev=snapTool(TOOL),co=(ME.role==='admin')?TOOL.company:ME.company;
+  await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:now()}).eq('id',TOOL.id);
+  const {data:ins}=await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'คืน',project:'ออฟฟิต',actor:ME.email,note}).select('id').maybeSingle();
+  LAST={label:'รับคืนเข้าออฟฟิต',toolId:TOOL.id,name:(TOOL.no||TOOL.name||''),prevTool:prev,movId:ins&&ins.id,slip:null};
+  afterAction('📥 รับคืนเข้าออฟฟิตแล้ว');
 }
 async function actReceiveRepair(){
+  const note=noteVal(),prev=snapTool(TOOL),co=(ME.role==='admin')?TOOL.company:ME.company;
   const {data:m}=await sb.from('movements').select('slip_no,company').eq('tool_id',TOOL.id).eq('type','ส่งซ่อม').order('occurred_on',{ascending:false}).limit(1).maybeSingle();
-  const slipN=m?m.slip_no:null; const co=(ME.role==='admin')?TOOL.company:ME.company;
-  await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:new Date().toISOString()}).eq('id',TOOL.id);
-  await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'รับคืนจากซ่อม',slip_no:slipN,actor:ME.email});
+  const slipN=m?m.slip_no:null; let slipPrev=null;
+  if(slipN!=null){const {data:sp}=await sb.from('repair_slips').select('status,received_date,receiver').eq('company',m.company).eq('slip_no',slipN).maybeSingle();
+    if(sp)slipPrev={company:m.company,slip_no:slipN,prev:{status:sp.status,received_date:sp.received_date,receiver:sp.receiver}};}
+  await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:now()}).eq('id',TOOL.id);
+  const {data:ins}=await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'รับคืนจากซ่อม',slip_no:slipN,actor:ME.email,note}).select('id').maybeSingle();
   if(slipN!=null)await sb.from('repair_slips').update({status:'รับคืนครบ',received_date:today(),receiver:ME.email}).eq('company',m.company).eq('slip_no',slipN);
-  toast('📥 รับคืนจากซ่อมแล้ว'); await load();
+  LAST={label:'รับคืนจากซ่อม',toolId:TOOL.id,name:(TOOL.no||TOOL.name||''),prevTool:prev,movId:ins&&ins.id,slip:slipPrev};
+  afterAction('📥 รับคืนจากซ่อมแล้ว');
 }
-async function actBroken(){
-  if(!confirm('แจ้งว่า '+(TOOL.name||TOOL.no)+' ชำรุด?'))return;
-  await writeMov({status:'ชำรุด',receipt_pending:false,pending_dest:null,dispatched_at:null},
-    {type:'แจ้งชำรุด',reason:'แจ้งจากสแกนหน้างาน',actor:ME.email},'⚠️ แจ้งชำรุดแล้ว');
+async function undoLast(){
+  if(!LAST){toast('ไม่มีรายการให้ยกเลิก');return;}
+  const L=LAST; LAST=null;
+  await sb.from('tools').update(Object.assign({updated_at:now()},L.prevTool)).eq('id',L.toolId);
+  if(L.movId)await sb.from('movements').delete().eq('id',L.movId);
+  if(L.slip)await sb.from('repair_slips').update(L.slip.prev).eq('company',L.slip.company).eq('slip_no',L.slip.slip_no);
+  toast('↩️ ยกเลิกรายการแล้ว — คืนสถานะเดิม');
+  location.replace('/s.html?t='+L.toolId);
 }
 
 /* ---- screens ---- */
@@ -225,13 +240,18 @@ async function doLogin(){
 /* ---- กล้องสแกน QR ในหน้านี้ (เต็มจอ ไม่ออกไปหน้าเว็บที่มีเมนู) ---- */
 let _scanner=null;
 function stopScan(){if(_scanner){try{_scanner.stop().then(()=>{try{_scanner.clear()}catch(e){}}).catch(()=>{})}catch(e){}_scanner=null;}}
-function screenScanner(){
+function screenScanner(banner){
   stopScan();
+  const bn=banner?`<div style="background:#dcfce7;color:#166534;padding:10px 12px;border-radius:11px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <span style="font-size:13.5px">✅ ${esc(banner.msg)}${banner.name?` <b>${esc(banner.name)}</b>`:''}</span>
+      <button class="btn ghost" style="width:auto;padding:7px 12px;font-size:13px" onclick="undoLast()">↩️ ยกเลิก</button>
+    </div>`:'';
   $('#app').innerHTML=`<div class="hd">
-      <div class="top"><a href="#" onclick="stopScan();boot();return false">‹ กลับ</a><span></span></div>
-      <h1 style="font-size:17px;margin:2px 0">📷 สแกน QR เครื่องมือ</h1>
+      <div class="top"><a href="#" onclick="stopScan();boot();return false">‹ เสร็จ / ดูเครื่องนี้</a><span></span></div>
+      <h1 style="font-size:17px;margin:2px 0">📷 สแกนเครื่องถัดไป</h1>
     </div>
     <div class="bd">
+      ${bn}
       <div id="qrbox" style="width:100%;max-width:320px;margin:0 auto;border-radius:14px;overflow:hidden;background:#0f172a;min-height:240px"></div>
       <div style="display:flex;gap:8px;margin:12px auto 0;max-width:320px">
         <button class="btn ghost" id="startc" style="flex:1">เปิดกล้องอีกครั้ง</button>
