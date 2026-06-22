@@ -173,6 +173,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
 .btbl td.c{text-align:center}
 .bsign{display:flex;margin-top:18px;text-align:center;font-size:10px;gap:8px}
 .bsign>div{flex:1}
+.bsline{display:inline-block;width:92%;border-bottom:1px dotted #000;margin-bottom:2px}
 .brecv{margin-top:14px;font-size:10px;text-align:left;line-height:2}
 .doc{width:100%;color:#000;font-family:Tahoma,'Noto Sans Thai',sans-serif}
 .doc h1{text-align:center;font-size:18px;margin:0 0 2px}
@@ -266,7 +267,7 @@ function count(st){return S.tools.filter(t=>t.status===st&&inView(t)).length;}
 /* ============ toast ============ */
 let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tmo);tmo=setTimeout(()=>t.classList.remove('on'),2200);}
 /* ---- data layer (Supabase) ---- */
-function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||''),createdAt:(r.created_at||''),tagged:!!r.tagged,taggedAt:(r.tagged_at||'')};}
+function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||''),createdAt:(r.created_at||''),tagged:!!r.tagged,taggedAt:(r.tagged_at||''),model:r.model||''};}
 function rowToSlip(s){return {id:s.id,slip_no:s.slip_no,no:String(s.slip_no).padStart(3,'0'),sent:(s.sent_date||''),vendor:s.vendor||'',project:s.project||'',sender:s.sender||'',status:s.status||'ส่งแล้ว',received:(s.received_date||''),receiver:s.receiver||'',note:s.note||'',count:'0',company:s.company};}
 function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||'',borrowNo:(m.borrow_no!=null?m.borrow_no:null)};}
 async function fetchAllMov(){
@@ -306,7 +307,8 @@ async function loadAll(){
   S.trash=(tr.data||[]).map(rowToTool);
   S.slipTrash=(st.data||[]).map(rowToSlip);
   S.nextSlipByCo={};['PAC','LOTUS'].forEach(co=>S.nextSlipByCo[co]=(S.slips.filter(x=>x.company===co).reduce((m,x)=>Math.max(m,x.slip_no||0),0))+1);
-  S.nextBorrowByCo={};['PAC','LOTUS'].forEach(co=>S.nextBorrowByCo[co]=(S.movements.filter(x=>x.company===co&&x.type==='เบิก'&&x.borrowNo!=null).reduce((m,x)=>Math.max(m,x.borrowNo),0))+1);
+  const {data:cntRows}=await sb.from('app_counters').select('company,value').eq('name','borrow');
+  S.nextBorrowByCo={};['PAC','LOTUS'].forEach(co=>{const r=(cntRows||[]).find(x=>x.company===co);let v=((r&&r.value)||0)+1;if(v>999)v=1;S.nextBorrowByCo[co]=v;});
 }
 async function ensureLookup(tbl,name,co){name=(name||'').trim();if(!name)return;if((S.lookups[tbl]||[]).includes(name))return;try{await sb.from(tbl).insert({company:co||COMPANY,name});}catch(e){}}
 async function reload(view){await loadAll();go(view||CUR);}
@@ -474,10 +476,11 @@ function toolFormFields(t){t=t||{};return `
       <div class="field"><label>หมวด *</label><input id="ed_cat" list="dl_cat" value="${esc(t.cat)}"></div>
       <div class="field"><label>NO (เลขบนเครื่อง) *</label><input id="ed_no" value="${esc(t.no)}"></div>
     </div>
-    <div class="field"><label>ชื่อ / รุ่น *</label><input id="ed_name" value="${esc(t.name)}"></div>
+    <div class="field"><label>ชื่อ *</label><input id="ed_name" value="${esc(t.name)}"></div>
     <div class="flexrow">
       <div class="field"><label>ยี่ห้อ</label><input id="ed_brand" value="${esc(t.brand)}"></div>
-      <div class="field"><label>S/N <span class="muted">(ใส่ทีหลังได้)</span></label><input id="ed_sn" value="${esc(t.sn)}"></div>
+      <div class="field"><label>รุ่น</label><input id="ed_model" value="${esc(t.model||'')}"></div>
+      <div class="field"><label>S/N <span class="muted">(ทีหลังได้)</span></label><input id="ed_sn" value="${esc(t.sn)}"></div>
     </div>
     <div class="flexrow">
       <div class="field"><label>สถานะ</label><select id="ed_st">${Object.keys(STC).map(s=>`<option ${s===(t.status||'ว่าง')?'selected':''}>${s}</option>`).join('')}</select></div>
@@ -490,7 +493,7 @@ function toolFormFields(t){t=t||{};return `
     </div>
     <div class="field"><label>หมายเหตุ</label><input id="ed_note" value="${esc(t.note)}"></div>
     <datalist id="dl_cat">${S.lookups.categories.map(c=>`<option>${esc(c)}</option>`).join('')}</datalist>`;}
-function readToolForm(t){t.cat=$('#ed_cat').value.trim();t.no=$('#ed_no').value.trim();t.name=$('#ed_name').value.trim();t.brand=$('#ed_brand').value.trim();t.sn=$('#ed_sn').value.trim();t.status=$('#ed_st').value;t.loc=$('#ed_loc').value.trim();t.note=$('#ed_note').value.trim();t.code=(t.cat+' '+t.no).trim();t.updated=today();return t;}
+function readToolForm(t){t.cat=$('#ed_cat').value.trim();t.no=$('#ed_no').value.trim();t.name=$('#ed_name').value.trim();t.brand=$('#ed_brand').value.trim();t.model=$('#ed_model').value.trim();t.sn=$('#ed_sn').value.trim();t.status=$('#ed_st').value;t.loc=$('#ed_loc').value.trim();t.note=$('#ed_note').value.trim();t.code=(t.cat+' '+t.no).trim();t.updated=today();return t;}
 function toolDetail(i){
   const t=S.tools[i];
   const editable=canEditCo(t.company);
@@ -521,10 +524,10 @@ async function saveTool(i){const t=S.tools[i];
   if(!cat||!no){toast('ต้องมี หมวด + NO');return;}
   const code=(cat+' '+no).trim();
   if(S.tools.some((x,ix)=>ix!==i&&x.company===company&&x.code===code)){toast('รหัสซ้ำใน '+company+': '+code);return;}
-  const nv={company,cat,no,name:$('#ed_name').value.trim(),brand:$('#ed_brand').value.trim(),sn:$('#ed_sn').value.trim(),status:$('#ed_st').value,loc:$('#ed_loc').value.trim(),note:$('#ed_note').value.trim(),purchaseDate:$('#ed_pdate').value,price:$('#ed_price').value,warranty:$('#ed_warranty').value.trim()};
-  const L={company:'บริษัท',cat:'หมวด',no:'NO',name:'ชื่อ',brand:'ยี่ห้อ',sn:'S/N',status:'สถานะ',loc:'อยู่ที่',note:'หมายเหตุ',purchaseDate:'วันที่ซื้อ',price:'ราคา',warranty:'ประกัน'};
+  const nv={company,cat,no,name:$('#ed_name').value.trim(),brand:$('#ed_brand').value.trim(),model:$('#ed_model').value.trim(),sn:$('#ed_sn').value.trim(),status:$('#ed_st').value,loc:$('#ed_loc').value.trim(),note:$('#ed_note').value.trim(),purchaseDate:$('#ed_pdate').value,price:$('#ed_price').value,warranty:$('#ed_warranty').value.trim()};
+  const L={company:'บริษัท',cat:'หมวด',no:'NO',name:'ชื่อ',brand:'ยี่ห้อ',model:'รุ่น',sn:'S/N',status:'สถานะ',loc:'อยู่ที่',note:'หมายเหตุ',purchaseDate:'วันที่ซื้อ',price:'ราคา',warranty:'ประกัน'};
   const ch=Object.keys(L).filter(k=>String(t[k]||'')!==String(nv[k]||'')).map(k=>`${L[k]}: ${t[k]||'-'}→${nv[k]||'-'}`);
-  const {error}=await sb.from('tools').update({company:company,category:cat,no:no,name:nv.name,brand:nv.brand,serial:nv.sn,status:nv.status,location:nv.loc,note:nv.note,purchase_date:nv.purchaseDate||null,price:(nv.price!==''?Number(nv.price):null),warranty:nv.warranty,updated_at:new Date().toISOString()}).eq('id',t.id);
+  const {error}=await sb.from('tools').update({company:company,category:cat,no:no,name:nv.name,brand:nv.brand,model:nv.model,serial:nv.sn,status:nv.status,location:nv.loc,note:nv.note,purchase_date:nv.purchaseDate||null,price:(nv.price!==''?Number(nv.price):null),warranty:nv.warranty,updated_at:new Date().toISOString()}).eq('id',t.id);
   if(error){toast('บันทึกไม่ได้: '+error.message);return;}
   await ensureLookup('categories',cat,company);
   await logAudit('แก้ไข',company,code,ch.length?ch.join(' · '):'แก้ไข (ไม่มีอะไรเปลี่ยน)');
@@ -553,7 +556,7 @@ async function saveNewTool(){
   if(!cat||!no){toast('ต้องมี หมวด + NO');return;}
   const code=(cat+' '+no).trim();
   if(S.tools.some(t=>t.company===company&&t.code===code)){toast('มีเครื่องรหัสนี้ใน '+company+' แล้ว: '+code);return;}
-  const {error}=await sb.from('tools').insert({company:company,category:cat,no:no,name:$('#ed_name').value.trim(),brand:$('#ed_brand').value.trim(),serial:$('#ed_sn').value.trim(),status:$('#ed_st').value,location:$('#ed_loc').value.trim(),note:$('#ed_note').value.trim(),purchase_date:$('#ed_pdate').value||null,price:($('#ed_price').value!==''?Number($('#ed_price').value):null),warranty:$('#ed_warranty').value.trim()});
+  const {error}=await sb.from('tools').insert({company:company,category:cat,no:no,name:$('#ed_name').value.trim(),brand:$('#ed_brand').value.trim(),model:$('#ed_model').value.trim(),serial:$('#ed_sn').value.trim(),status:$('#ed_st').value,location:$('#ed_loc').value.trim(),note:$('#ed_note').value.trim(),purchase_date:$('#ed_pdate').value||null,price:($('#ed_price').value!==''?Number($('#ed_price').value):null),warranty:$('#ed_warranty').value.trim()});
   if(error){toast('เพิ่มไม่ได้: '+error.message);return;}
   await ensureLookup('categories',cat,company);
   await logAudit('เพิ่ม',company,code,'เพิ่มเข้าทะเบียน');
@@ -845,7 +848,7 @@ function borrowDocHtml(items,who,proj,date,no){
   function copy(p){
     let rows='';
     for(let r=0;r<PER;r++){const gi=p*PER+r,it=items[gi];
-      rows+=`<tr><td class="c">${gi+1}</td><td>${it?esc(itemDesc(it)):''}</td><td class="c">${it?esc(it.sn):''}</td><td class="c">${it?esc(it.no):''}</td><td class="c">${it?esc(it.company||''):''}</td></tr>`;}
+      rows+=`<tr><td class="c">${gi+1}</td><td>${it?esc(it.cat||it.name):''}</td><td>${it?esc(it.brand||''):''}</td><td>${it?esc(it.model||''):''}</td><td class="c">${it?esc(it.sn):''}</td><td class="c">${it?esc(it.no):''}</td><td class="c">${it?esc(it.company||''):''}</td></tr>`;}
     return `<div class="bcopy">
       <div class="bhd">
         <div class="blogo">${LOGO[COMPANY]?`<img src="${LOGO[COMPANY]}" alt="${esc(COMPANY)}">`:esc(COMPANY)}</div>
@@ -856,12 +859,12 @@ function borrowDocHtml(items,who,proj,date,no){
         <div class="r"><span>โครงการ/ไซต์: <b>${esc(proj)||'.................'}</b></span><span>วันที่: <b>${esc(fmtDateTH(date))||'..../..../....'}</b></span></div>
         <div>ผู้เบิก: <b>${esc(who)||'.................'}</b></div>
       </div>
-      <table class="btbl"><colgroup><col style="width:8%"><col style="width:42%"><col style="width:17%"><col style="width:20%"><col style="width:13%"></colgroup>
-        <thead><tr><th>ลำดับ</th><th>รายการเครื่องมือ</th><th>S/N</th><th>รหัสเครื่องมือ</th><th>บ.</th></tr></thead>
+      <table class="btbl"><colgroup><col style="width:6%"><col style="width:27%"><col style="width:13%"><col style="width:15%"><col style="width:13%"><col style="width:18%"><col style="width:8%"></colgroup>
+        <thead><tr><th>ลำดับ</th><th>รายการ</th><th>ยี่ห้อ</th><th>รุ่น</th><th>S/N</th><th>รหัส</th><th>บ.</th></tr></thead>
         <tbody>${rows}</tbody></table>
       <div class="bsign">
-        <div>ผู้เบิก<br><br>.................<br>(${esc(who)})</div>
-        <div>เจ้าหน้าที่เซ็นรับเครื่อง (ชื่อบรรจง)<br><br>.................<br>(.................)
+        <div>ผู้เบิก<br><br><span class="bsline"></span><br>(${esc(who)})</div>
+        <div>เจ้าหน้าที่เซ็นรับเครื่อง (ชื่อบรรจง)<br><br><span class="bsline"></span><br>(.................)
           <div class="brecv">วันที่รับ ....../....../........<br>เวลาที่รับ ............... น.</div>
         </div>
       </div>
@@ -886,8 +889,9 @@ function previewBorrow(){
 async function commitBorrow(){
   if(!pendingBorrow)return;
   const {items,who,proj,date}=pendingBorrow;
-  const {data:mx}=await sb.from('movements').select('borrow_no').eq('company',COMPANY).eq('type','เบิก').not('borrow_no','is',null).order('borrow_no',{ascending:false}).limit(1).maybeSingle();
-  const bn=((mx&&mx.borrow_no)||0)+1;
+  const {data:bnData,error:bnErr}=await sb.rpc('next_borrow_no',{p_company:COMPANY});
+  if(bnErr){toast('ออกเลขใบไม่ได้: '+bnErr.message);return;}
+  const bn=bnData;
   for(const t of items){
     await sb.from('tools').update({status:'ถูกยืม',location:(proj||'')+(who?' / '+who:''),receipt_pending:true,pending_dest:proj,dispatched_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',t.id);
     await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'เบิก',project:proj,actor:who,borrow_no:bn});
