@@ -267,7 +267,10 @@ function count(st){return S.tools.filter(t=>t.status===st&&inView(t)).length;}
 /* ============ toast ============ */
 let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tmo);tmo=setTimeout(()=>t.classList.remove('on'),2200);}
 /* ---- data layer (Supabase) ---- */
-function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||''),createdAt:(r.created_at||''),tagged:!!r.tagged,taggedAt:(r.tagged_at||''),model:r.model||''};}
+function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||''),createdAt:(r.created_at||''),tagged:!!r.tagged,taggedAt:(r.tagged_at||''),model:r.model||'',imageUrl:r.image_url||''};}
+function modelKey(t){return (t&&t.brand&&t.model)?((t.brand+' '+t.model).toUpperCase().replace(/[^A-Z0-9]+/g,'')):'';}
+function toolImgHtml(t){const url=t.imageUrl||(modelKey(t)?('/m/'+modelKey(t)+'.png'):'');if(!url)return '';
+  return `<div style="text-align:center;margin:2px 0 12px"><img src="${esc(url)}" alt="" style="max-width:100%;max-height:150px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;padding:4px" onerror="this.parentNode.style.display='none'"></div>`;}
 function rowToSlip(s){return {id:s.id,slip_no:s.slip_no,no:String(s.slip_no).padStart(3,'0'),sent:(s.sent_date||''),vendor:s.vendor||'',project:s.project||'',sender:s.sender||'',status:s.status||'ส่งแล้ว',received:(s.received_date||''),receiver:s.receiver||'',note:s.note||'',count:'0',company:s.company};}
 function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||'',borrowNo:(m.borrow_no!=null?m.borrow_no:null)};}
 async function fetchAllMov(){
@@ -505,10 +508,11 @@ function toolDetail(i){
     <ul class="tl">${audits.map(a=>`<li><div class="ti">📝</div><div><b>${esc(a.action)}</b> ${esc(a.detail||'')}<div class="sub muted">${esc(fmtDTH(a.occurred_at))} · ${esc(a.user_email||'')}</div></div></li>`).join('')||'<li class="muted">ยังไม่มีการแก้ไข</li>'}</ul>`;
   if(editable){
     openModal(`<h3>แก้ไขเครื่องมือ</h3><p class="muted">${esc(t.code)} · ${coBadge(t.company)} · ส่งซ่อมมาแล้ว ${esc(t.repairs)||0} ครั้ง</p>
-      ${toolFormFields(t)}${histHtml}
+      ${toolImgHtml(t)}${toolFormFields(t)}${histHtml}
       <div class="flexrow" style="margin-top:18px"><button class="btn primary" onclick="saveTool(${i})">💾 บันทึก</button><button class="btn" style="background:#fee2e2;color:#b91c1c" onclick="delTool(${i})">🗑️ ลบ</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
   }else{
     openModal(`<h3>${esc(t.name)}</h3><p class="muted">${esc(t.code)} · ${coBadge(t.company)}</p>
+      ${toolImgHtml(t)}
       <div style="background:#fef3c7;color:#92400e;padding:9px 12px;border-radius:8px;font-size:13px;margin:8px 0">🔒 เครื่องของบริษัท ${esc(t.company)} — แก้ทะเบียนได้เฉพาะบริษัทตัวเอง · แต่ยัง <b>เบิก/ย้าย/ส่งซ่อม</b> ได้ปกติ</div>
       <div class="flexrow"><div class="field"><label>หมวด</label><div>${esc(t.cat)}</div></div><div class="field"><label>NO</label><div>${esc(t.no)}</div></div></div>
       <div class="flexrow"><div class="field"><label>S/N</label><div>${esc(t.sn)||'-'}</div></div><div class="field"><label>สถานะ</label><div>${chip(t.status)}</div></div></div>
