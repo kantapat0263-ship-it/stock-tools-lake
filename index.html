@@ -1387,7 +1387,7 @@ function labelCanvas(t){
   return c;
 }
 function labelDataURL(t){return labelCanvas(t).toDataURL('image/png');}
-function downloadLabel(id){const t=byId[id]||S.tools.find(x=>x.id===id);if(!t){toast('ไม่พบเครื่อง');return;}
+function downloadLabel(id){const t=(S.tools||[]).find(x=>x.id===id);if(!t){toast('ไม่พบเครื่อง');return;}
   try{const a=document.createElement('a');a.href=labelDataURL(t);a.download='label_'+String(t.no||t.code||id).replace(/[^\w\-ก-๙]+/g,'_')+'.png';document.body.appendChild(a);a.click();a.remove();toast('ดาวน์โหลดป้ายแล้ว');}catch(e){toast('สร้างป้ายไม่ได้: '+e.message);} }
 async function downloadLabelsSel(){
   const tools=S.tools.filter(t=>selLabel.has(t.id));
