@@ -497,8 +497,43 @@ function toolFormFields(t){t=t||{};return `
       <div class="field"><label>ประกัน</label><input id="ed_warranty" value="${esc(t.warranty)}" placeholder="เช่น ถึง 2027 / 1 ปี"></div>
     </div>
     <div class="field"><label>หมายเหตุ</label><input id="ed_note" value="${esc(t.note)}"></div>
+    ${t.id?`<div class="field"><label>รูปสินค้า</label>
+      <input type="file" id="ed_imgfile" accept="image/*" style="font-size:12px" onchange="uploadToolImg(${t.i})">
+      ${t.imageUrl?`<button type="button" class="btn" style="padding:4px 10px;font-size:12px;margin-left:8px" onclick="removeToolImg(${t.i})">ลบรูปอัปโหลด</button>`:''}
+      <div class="muted" style="font-size:11px;margin-top:4px">อัปโหลด/ถ่ายรูป → ใช้กับทุกเครื่องรุ่นเดียวกัน · รูปที่อัปจะแทนรูปอัตโนมัติ</div></div>`:''}
     <datalist id="dl_cat">${S.lookups.categories.map(c=>`<option>${esc(c)}</option>`).join('')}</datalist>`;}
 function readToolForm(t){t.cat=$('#ed_cat').value.trim();t.no=$('#ed_no').value.trim();t.name=$('#ed_name').value.trim();t.brand=$('#ed_brand').value.trim();t.model=$('#ed_model').value.trim();t.sn=$('#ed_sn').value.trim();t.status=$('#ed_st').value;t.loc=$('#ed_loc').value.trim();t.note=$('#ed_note').value.trim();t.code=(t.cat+' '+t.no).trim();t.updated=today();return t;}
+async function uploadToolImg(i){
+  const t=S.tools[i]; const inp=$('#ed_imgfile'); const f=inp&&inp.files&&inp.files[0];
+  if(!f){return;}
+  if(!/^image\//.test(f.type)){toast('ต้องเป็นไฟล์รูป');return;}
+  if(f.size>5*1024*1024){toast('ไฟล์ใหญ่เกิน 5MB');return;}
+  toast('กำลังอัปโหลดรูป…');
+  const ext=((f.name.split('.').pop()||'png').toLowerCase().replace(/[^a-z0-9]/g,''))||'png';
+  const base=modelKey(t)||('t'+t.id);
+  const path=base+'_'+Date.now()+'.'+ext;
+  const up=await sb.storage.from('tool-img').upload(path,f,{upsert:true,contentType:f.type});
+  if(up.error){toast('อัปโหลดไม่ได้: '+up.error.message);return;}
+  const url=sb.storage.from('tool-img').getPublicUrl(path).data.publicUrl;
+  const k=modelKey(t);
+  const ids=k?S.tools.filter(x=>modelKey(x)===k).map(x=>x.id):[t.id];
+  const {error}=await sb.from('tools').update({image_url:url,updated_at:new Date().toISOString()}).in('id',ids);
+  if(error){toast('บันทึกไม่ได้: '+error.message);return;}
+  S.tools.forEach(x=>{if(ids.includes(x.id))x.imageUrl=url;});
+  toast('✅ ใส่รูปแล้ว ('+ids.length+' เครื่องรุ่นนี้)');
+  toolDetail(i);
+}
+async function removeToolImg(i){
+  const t=S.tools[i]; if(!t.imageUrl)return;
+  if(!confirm('ลบรูปที่อัปโหลดของรุ่นนี้? (จะกลับไปใช้รูปอัตโนมัติ/ไอคอน)'))return;
+  const k=modelKey(t);
+  const ids=k?S.tools.filter(x=>modelKey(x)===k&&x.imageUrl===t.imageUrl).map(x=>x.id):[t.id];
+  const {error}=await sb.from('tools').update({image_url:null,updated_at:new Date().toISOString()}).in('id',ids);
+  if(error){toast('ลบไม่ได้: '+error.message);return;}
+  S.tools.forEach(x=>{if(ids.includes(x.id))x.imageUrl='';});
+  toast('ลบรูปอัปโหลดแล้ว');
+  toolDetail(i);
+}
 function toolDetail(i){
   const t=S.tools[i];
   const editable=canEditCo(t.company);
