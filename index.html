@@ -266,7 +266,7 @@ function count(st){return S.tools.filter(t=>t.status===st&&inView(t)).length;}
 /* ============ toast ============ */
 let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tmo);tmo=setTimeout(()=>t.classList.remove('on'),2200);}
 /* ---- data layer (Supabase) ---- */
-function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||''),createdAt:(r.created_at||'')};}
+function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||''),createdAt:(r.created_at||''),tagged:!!r.tagged,taggedAt:(r.tagged_at||'')};}
 function rowToSlip(s){return {id:s.id,slip_no:s.slip_no,no:String(s.slip_no).padStart(3,'0'),sent:(s.sent_date||''),vendor:s.vendor||'',project:s.project||'',sender:s.sender||'',status:s.status||'ส่งแล้ว',received:(s.received_date||''),receiver:s.receiver||'',note:s.note||'',count:'0',company:s.company};}
 function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||'',borrowNo:(m.borrow_no!=null?m.borrow_no:null)};}
 async function fetchAllMov(){
@@ -1342,7 +1342,14 @@ function scanDone(t,msg){ scanTool=null;
 
 /* ============ QR LABELS (ป้าย QR — เฟส 1) ============ */
 const QR_BASE='https://stock-tools-lake.vercel.app/s.html?t=';
-let selLabel=new Set(), lblFiltered=[];
+let selLabel=new Set(), lblFiltered=[], lblOnlyUntagged=false;
+async function toggleTag(id,on){
+  const t=S.tools.find(x=>x.id===id); if(!t)return;
+  t.tagged=on; t.taggedAt=on?new Date().toISOString():'';
+  await sb.from('tools').update({tagged:on,tagged_at:on?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq('id',id);
+  toast(on?'✅ ติด TAG/QR แล้ว: '+(t.no||t.code):'ยกเลิกสถานะ TAG: '+(t.no||t.code));
+  if(PG_REDRAW['labels'])PG_REDRAW['labels']();
+}
 function qrDataURL(text,label){return new Promise((res,rej)=>{
   if(!window.qrcode){return rej(new Error('ไลบรารี QR ยังโหลดไม่เสร็จ ลองรีเฟรช'));}
   let gif; try{const qr=qrcode(0,'H');qr.addData(text);qr.make();gif=qr.createDataURL(8,16);}catch(e){return rej(e);}
@@ -1365,12 +1372,14 @@ function exportNfcUrls(){
   csvDownload('URL_NFC.csv',rows);toast('ดาวน์โหลด URL '+(rows.length-1)+' รายการ');}
 function togLabel(id,on){on?selLabel.add(id):selLabel.delete(id);$('#lcount').textContent='เลือก '+selLabel.size;}
 function renderLabels(){
-  selLabel=new Set();
+  selLabel=new Set(); lblOnlyUntagged=false;
   $('#view').innerHTML=`<div class="panel">
     <h3>🏷️ ป้าย QR / NFC <span class="muted" style="font-weight:400">— รหัสไม่ซ้ำของแต่ละตัว · พิมพ์เป็นป้าย, ดาวน์โหลด QR, หรือคัดลอก URL ไปเขียนลงแท็ก NFC</span></h3>
     <div class="toolbar"><input class="search" id="lq" placeholder="🔎 ค้นหา ชื่อ / หมวด / NO / รหัส">
       <button class="btn" id="lall" style="margin-left:8px">เลือกทั้งหมดที่เห็น</button>
-      <button class="btn" id="lnone">ล้าง</button></div>
+      <button class="btn" id="lnone">ล้าง</button>
+      <button class="btn" id="luntag" style="margin-left:8px">☐ เฉพาะยังไม่ติด TAG</button></div>
+    <div id="ltagcount" style="font-size:13px;margin:8px 0"></div>
     <div style="background:#eff6ff;border-left:4px solid var(--blue);padding:9px 12px;border-radius:8px;margin:10px 0;font-size:13px;line-height:1.6">📲 <b>ทำแท็ก NFC:</b> กด <b>📋 URL</b> ท้ายแถวเพื่อคัดลอก แล้วเขียนลงแท็กด้วยแอป (เช่น “NFC Tools”) แบบ <b>URL/Link</b> · แตะมือถือ = เปิดหน้าเดียวกับ QR รับของได้เลย · <b>แท็กติดบนโลหะต้องใช้แบบ on-metal</b></div>
     <div class="selbar" style="position:sticky;top:10px;z-index:5;background:var(--card);box-shadow:0 6px 16px rgba(0,0,0,.10);border-radius:10px;padding:10px 14px;margin:10px 0">
       <b id="lcount">เลือก 0</b><div class="spacer"></div>
@@ -1380,16 +1389,19 @@ function renderLabels(){
     <div id="ltbl"></div>
   </div>`;
   const draw=()=>{const q=$('#lq').value.trim().toLowerCase();
-    lblFiltered=S.tools.filter(t=>inView(t)&&(!q||(t.code+' '+t.name+' '+t.no+' '+t.cat).toLowerCase().includes(q)));
+    const inv=S.tools.filter(t=>inView(t)); const done=inv.filter(t=>t.tagged).length;
+    $('#ltagcount').innerHTML=`🏷️ ติด TAG/QR แล้ว <b style="color:#16a34a">${done}</b> / ${inv.length} เครื่อง · ยังไม่ติด <b style="color:#dc2626">${inv.length-done}</b>`;
+    lblFiltered=inv.filter(t=>(!q||(t.code+' '+t.name+' '+t.no+' '+t.cat).toLowerCase().includes(q))&&(!lblOnlyUntagged||!t.tagged));
     const pg=pgSlice('labels',lblFiltered);
-    $('#ltbl').innerHTML=`<table><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th></th></tr></thead><tbody>${
-      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selLabel.has(t.id)?'checked':''} onchange="togLabel('${t.id}',this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,40)}</td><td>${esc(t.no)}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:4px 8px" onclick="copyNfcUrl('${t.id}')">📋 URL</button> <button class="btn" style="padding:4px 8px" onclick="downloadQR('${t.id}','${esc(t.code)}','${esc(t.no)}')">⬇️ QR</button></td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่พบ</td></tr>'
+    $('#ltbl').innerHTML=`<table><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th class="center">ติด TAG</th><th></th></tr></thead><tbody>${
+      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selLabel.has(t.id)?'checked':''} onchange="togLabel('${t.id}',this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,40)}</td><td>${esc(t.no)}</td><td class="center"><input type="checkbox" ${t.tagged?'checked':''} onchange="toggleTag('${t.id}',this.checked)" title="${t.tagged&&t.taggedAt?('ติดเมื่อ '+esc(fmtDateTH(t.taggedAt))):'ติ๊กเมื่อแกะติด TAG/QR เครื่องนี้แล้ว'}">${t.tagged?' <span style="color:#16a34a">✓</span>':''}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:4px 8px" onclick="copyNfcUrl('${t.id}')">📋 URL</button> <button class="btn" style="padding:4px 8px" onclick="downloadQR('${t.id}','${esc(t.code)}','${esc(t.no)}')">⬇️ QR</button></td></tr>`).join('')||'<tr><td colspan=7 class="empty">ไม่พบ</td></tr>'
     }</tbody></table>${pg.html}`;
     $('#lcount').textContent='เลือก '+selLabel.size;};
   PG_REDRAW['labels']=draw;
   $('#lq').oninput=()=>{pgReset('labels');draw();};
   $('#lall').onclick=()=>{lblFiltered.forEach(t=>selLabel.add(t.id));draw();};
   $('#lnone').onclick=()=>{selLabel=new Set();draw();};
+  $('#luntag').onclick=()=>{lblOnlyUntagged=!lblOnlyUntagged;$('#luntag').classList.toggle('primary',lblOnlyUntagged);$('#luntag').textContent=(lblOnlyUntagged?'☑':'☐')+' เฉพาะยังไม่ติด TAG';pgReset('labels');draw();};
   $('#lprint').onclick=printLabels;
   $('#lurls').onclick=exportNfcUrls;
   draw();
