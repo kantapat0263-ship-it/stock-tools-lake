@@ -1114,6 +1114,17 @@ function histByTool(){
 }
 
 function slipCount(slipNo,co){return S.movements.filter(m=>m.slipNo===slipNo&&m.company===co&&m.type==='ส่งซ่อม').length;}
+function reprintSlip(slipNo,co){
+  const s=S.slips.find(x=>x.slip_no===slipNo&&x.company===co);
+  if(!s){toast('ไม่พบใบส่งซ่อม');return;}
+  const sent=S.movements.filter(m=>m.slipNo===slipNo&&m.company===co&&m.type==='ส่งซ่อม');
+  if(!sent.length){toast('ใบนี้ไม่มีรายการเครื่อง');return;}
+  const items=sent.map(m=>{const t=m.tool_id?S.tools.find(x=>x.id===m.tool_id):null;
+    return {t:t||{name:m.label||'',cat:'',sn:'',no:'',loc:m.project||'',company:co},reason:m.reason||''};});
+  const prev=COMPANY; COMPANY=co;
+  $('#printArea').innerHTML=repairDocHtml(s.no,s.sent,s.vendor,s.sender,items);
+  COMPANY=prev; window.print();
+}
 function histSlips(){
   $('#hbody').innerHTML=`<div class="panel">
     <h3>📑 ใบส่งซ่อมทั้งหมด <span class="muted" style="font-weight:400">— คลิกที่ใบเพื่อดูรายการเครื่อง + รายละเอียดการส่ง / วันที่</span></h3>
@@ -1125,8 +1136,8 @@ function histSlips(){
     let list=S.slips.filter(s=>!FILTER||s.company===FILTER);
     if(q)list=list.filter(s=>((s.no||'')+' '+(s.vendor||'')+' '+(s.sender||'')).toLowerCase().includes(q));
     list=[...list].sort((a,b)=>a.company!==b.company?a.company.localeCompare(b.company):b.slip_no-a.slip_no);
-    $('#stbl').innerHTML=`<table><thead><tr><th>ใบ</th><th>บ.</th><th>วันส่ง</th><th>ช่าง</th><th>ผู้ส่ง</th><th class="center">จำนวน</th><th>สถานะ</th></tr></thead><tbody>${
-      list.map(s=>`<tr style="cursor:pointer" onclick="slipDetail(${s.slip_no},'${esc(s.company)}')"><td><b>${esc(s.no)}</b></td><td>${coBadge(s.company)}</td><td>${esc(s.sent)||'-'}</td><td>${esc(s.vendor)||'-'}</td><td>${esc(s.sender)||'-'}</td><td class="center">${slipCount(s.slip_no,s.company)}</td><td>${chip(s.status==='รับคืนครบ'?'ว่าง':s.status==='ส่งแล้ว'?'ส่งซ่อม':'รอส่งซ่อม')}</td></tr>`).join('')||'<tr><td colspan=7 class="empty">ไม่มีใบส่งซ่อม</td></tr>'
+    $('#stbl').innerHTML=`<table><thead><tr><th>ใบ</th><th>บ.</th><th>วันส่ง</th><th>ช่าง</th><th>ผู้ส่ง</th><th class="center">จำนวน</th><th>สถานะ</th><th></th></tr></thead><tbody>${
+      list.map(s=>`<tr style="cursor:pointer" onclick="slipDetail(${s.slip_no},'${esc(s.company)}')"><td><b>${esc(s.no)}</b></td><td>${coBadge(s.company)}</td><td>${esc(s.sent)||'-'}</td><td>${esc(s.vendor)||'-'}</td><td>${esc(s.sender)||'-'}</td><td class="center">${slipCount(s.slip_no,s.company)}</td><td>${chip(s.status==='รับคืนครบ'?'ว่าง':s.status==='ส่งแล้ว'?'ส่งซ่อม':'รอส่งซ่อม')}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 11px" onclick="event.stopPropagation();editSlipForm(${s.slip_no},'${esc(s.company)}')">✏️ แก้ไข</button> <button class="btn" style="background:var(--blue);color:#fff;padding:5px 11px" onclick="event.stopPropagation();reprintSlip(${s.slip_no},'${esc(s.company)}')">🖨️ พิมพ์</button></td></tr>`).join('')||'<tr><td colspan=8 class="empty">ไม่มีใบส่งซ่อม</td></tr>'
     }</tbody></table>`;
   };
   $('#sq').oninput=draw;draw();
