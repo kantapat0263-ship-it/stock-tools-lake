@@ -448,7 +448,7 @@ function renderTools(){
       <input class="search" id="tq" placeholder="🔎 ค้นหา: ชื่อ / NO / S/N / รหัส…">
       <select id="fcat"><option value="">ทุกหมวด</option>${cats.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
       <select id="fst"><option value="">ทุกสถานะ</option>${Object.keys(STC).map(s=>`<option>${s}</option>`).join('')}</select>
-      <select id="fsort"><option value="">เรียง: ปกติ</option><option value="new">🆕 เพิ่มล่าสุด</option><option value="old">เพิ่มเก่าสุด</option></select>
+      <select id="fsort"><option value="">เรียง: ปกติ</option><option value="new" selected>🆕 เพิ่มล่าสุด</option><option value="old">เพิ่มเก่าสุด</option></select>
       <button class="btn primary" onclick="addTool()">➕ เพิ่มเครื่องใหม่</button>
       <span class="muted" id="tcount"></span>
     </div>
@@ -592,10 +592,10 @@ function renderRepair(){
    <datalist id="dl_p">${S.lookups.people.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>`;
   const draw=()=>{
     const q=$('#rq').value.trim().toLowerCase();
-    const rows=eligible.filter(t=>!q||(t.name+t.no+t.code).toLowerCase().includes(q));
+    const rows=eligible.filter(t=>!q||(t.name+t.no+t.code+(t.model||'')+(t.sn||'')).toLowerCase().includes(q));
     const pg=pgSlice('repair',rows);
-    $('#rtbl').innerHTML=`<table><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th>สถานะ</th></tr></thead><tbody>${
-      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selRepair.has(t.i)?'checked':''} onchange="togRepair(${t.i},this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,40)}</td><td>${esc(t.no)}</td><td>${chip(t.status)}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่พบ</td></tr>'
+    $('#rtbl').innerHTML=`<table><thead><tr><th></th><th>บริษัท</th><th>ชื่อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th></tr></thead><tbody>${
+      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selRepair.has(t.i)?'checked':''} onchange="togRepair(${t.i},this.checked)"></td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td></tr>`).join('')||'<tr><td colspan=8 class="empty">ไม่พบ</td></tr>'
     }</tbody></table>${pg.html}`;
   };
   PG_REDRAW['repair']=draw;
@@ -794,18 +794,18 @@ function renderBorrow(){
 }
 function setBT(t){borrowTab=t;selBor=new Set();renderBorrow();}
 function drawBorrow(){
-  const mode=borrowTab; const out=mode==='out';
+  const mode=borrowTab;
   const list=S.tools.filter(t=>t.status===(out?'ว่าง':'ถูกยืม')&&inView(t));
-  let form,btn,title,lastcol;
+  let form,btn,title;
   if(mode==='out'){
     form=`<div class="flexrow"><div class="field"><label>วันที่ *</label><input id="b_date" type="date" value="${today()}"></div><div class="field"><label>ผู้เบิก *</label><input id="b_who" list="dl_p3"></div><div class="field"><label>โครงการ/ไซต์ *</label><input id="b_proj" list="dl_pr"></div></div>`;
-    btn='👁️ ดูใบส่งไซต์ (ยังไม่บันทึก)'; title='เลือกเครื่อง "ว่าง" ที่จะเบิกออกไซต์'; lastcol='หมวด';
+    btn='👁️ ดูใบส่งไซต์ (ยังไม่บันทึก)'; title='เลือกเครื่อง "ว่าง" ที่จะเบิกออกไซต์';
   } else if(mode==='move'){
     form=`<div class="flexrow"><div class="field"><label>วันที่ *</label><input id="b_date" type="date" value="${today()}"></div><div class="field"><label>ผู้ที่เอาไป</label><input id="b_who" list="dl_p3"></div><div class="field"><label>ไซต์ใหม่ *</label><input id="b_proj" list="dl_pr"></div></div>`;
-    btn='🔀 บันทึกย้ายไซต์'; title='เลือกเครื่องที่ "ถูกยืม" อยู่ → ย้ายไปไซต์ใหม่ (ไม่ต้องคืนก่อน)'; lastcol='อยู่ที่ตอนนี้';
+    btn='🔀 บันทึกย้ายไซต์'; title='เลือกเครื่องที่ "ถูกยืม" อยู่ → ย้ายไปไซต์ใหม่ (ไม่ต้องคืนก่อน)';
   } else {
     form=`<div class="field"><label>วันที่คืน *</label><input id="b_date" type="date" value="${today()}"></div>`;
-    btn='📥 บันทึกคืน'; title='เลือกเครื่องที่ "ถูกยืม" อยู่ → คืนกลับออฟฟิต'; lastcol='อยู่ที่';
+    btn='📥 บันทึกคืน'; title='เลือกเครื่องที่ "ถูกยืม" อยู่ → คืนกลับออฟฟิต';
   }
   $('#bbody').innerHTML=`
     <div class="panel" id="bform" style="display:none;position:sticky;top:10px;z-index:5;box-shadow:0 6px 16px rgba(0,0,0,.10)">${form}
@@ -817,10 +817,10 @@ function drawBorrow(){
     <div id="btbl"></div></div>
     <datalist id="dl_p3">${S.lookups.people.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>
     <datalist id="dl_pr">${S.lookups.projects.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>`;
-  const draw=()=>{const q=$('#bq').value.trim().toLowerCase();const rows=list.filter(t=>!q||(t.name+t.no+t.code).toLowerCase().includes(q));
+  const draw=()=>{const q=$('#bq').value.trim().toLowerCase();const rows=list.filter(t=>!q||(t.name+t.no+t.code+(t.model||'')+(t.sn||'')).toLowerCase().includes(q));
     const pg=pgSlice('borrow',rows);
-    $('#btbl').innerHTML=`<table><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th>${lastcol}</th></tr></thead><tbody>${
-      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selBor.has(t.i)?'checked':''} onchange="togBor(${t.i},this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,38)}</td><td>${esc(t.no)}</td><td>${esc(out?t.cat:t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">ไม่มี</td></tr>'
+    $('#btbl').innerHTML=`<table><thead><tr><th></th><th>บริษัท</th><th>ชื่อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th></tr></thead><tbody>${
+      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selBor.has(t.i)?'checked':''} onchange="togBor(${t.i},this.checked)"></td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td></tr>`).join('')||'<tr><td colspan=8 class="empty">ไม่มี</td></tr>'
     }</tbody></table>${pg.html}`;};
   PG_REDRAW['borrow']=draw;
   $('#bq').oninput=()=>{pgReset('borrow');draw();};draw();
