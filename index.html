@@ -196,6 +196,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
       <button data-v="dash" class="active"><span class="ic">📊</span> Dashboard</button>
       <button data-v="tools"><span class="ic">🧰</span> ทะเบียนเครื่องมือ</button>
       <button data-v="borrow"><span class="ic">🔄</span> เบิก / คืน</button>
+      <button data-v="bysite"><span class="ic">📍</span> ของตามไซต์</button>
       <button data-v="repair"><span class="ic">📤</span> ส่งซ่อม</button>
       <button data-v="receive"><span class="ic">📥</span> รับคืนจากซ่อม</button>
       <button data-v="history"><span class="ic">📜</span> ประวัติ</button>
@@ -352,14 +353,14 @@ async function doSignup(){const e=$('#li_email').value.trim(),p=$('#li_pass').va
 async function logout(){await sb.auth.signOut();location.reload();}
 
 /* ============ router ============ */
-const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],scan:['สแกน','สแกน QR → รับคืนเข้าระบบ (จากไซต์ / จากซ่อม)'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],labels:['ป้าย QR','สร้าง QR ไม่ซ้ำของแต่ละเครื่อง → พิมพ์เป็นป้าย'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
+const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],bysite:['ของตามไซต์','ดูเครื่องที่อยู่แต่ละไซต์งานตอนนี้'],scan:['สแกน','สแกน QR → รับคืนเข้าระบบ (จากไซต์ / จากซ่อม)'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],labels:['ป้าย QR','สร้าง QR ไม่ซ้ำของแต่ละเครื่อง → พิมพ์เป็นป้าย'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
 function go(v){
   if(v==='guide'){window.open('guide.html','_blank');return;}
   if(CUR==='scan'&&v!=='scan'&&window._scanner)stopScanner();
   CUR=v;
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
   $('#ttl').textContent=TITLES[v][0];$('#tsub').textContent=TITLES[v][1];
-  ({dash:renderDash,tools:renderTools,borrow:renderBorrow,scan:renderScan,repair:renderRepair,receive:renderReceive,history:renderHistory,report:renderReport,labels:renderLabels,trash:renderTrash,audit:renderAudit,users:renderUsers}[v])();
+  ({dash:renderDash,tools:renderTools,borrow:renderBorrow,bysite:renderBySite,scan:renderScan,repair:renderRepair,receive:renderReceive,history:renderHistory,report:renderReport,labels:renderLabels,trash:renderTrash,audit:renderAudit,users:renderUsers}[v])();
   window.scrollTo(0,0);
 }
 $('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b){go(b.dataset.v);closeNav();}});
@@ -444,12 +445,14 @@ function mkDonut(segs,total){
 /* ============ TOOLS (ทะเบียน) ============ */
 function renderTools(){
   const cats=S.lookups.categories;
+  const sites=[...new Set(S.tools.filter(t=>inView(t)).map(siteOf).filter(Boolean))].sort();
   $('#view').innerHTML=`
    <div class="panel">
     <div class="toolbar">
       <input class="search" id="tq" placeholder="🔎 ค้นหา: ชื่อ / NO / S/N / รหัส…">
       <select id="fcat"><option value="">ทุกหมวด</option>${cats.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
       <select id="fst"><option value="">ทุกสถานะ</option>${Object.keys(STC).map(s=>`<option>${s}</option>`).join('')}</select>
+      <select id="fsite"><option value="">ทุกไซต์</option>${sites.map(s=>`<option>${esc(s)}</option>`).join('')}</select>
       <select id="fsort"><option value="">เรียง: ปกติ</option><option value="new" selected>🆕 เพิ่มล่าสุด</option><option value="old">เพิ่มเก่าสุด</option></select>
       <button class="btn primary" onclick="addTool()">➕ เพิ่มเครื่องใหม่</button>
       <span class="muted" id="tcount"></span>
@@ -457,10 +460,10 @@ function renderTools(){
     <div id="ttbl"></div>
    </div>`;
   const draw=()=>{
-    const q=$('#tq').value.trim().toLowerCase(),fc=$('#fcat').value,fs=$('#fst').value,so=$('#fsort').value;
+    const q=$('#tq').value.trim().toLowerCase(),fc=$('#fcat').value,fs=$('#fst').value,so=$('#fsort').value,fsite=$('#fsite').value;
     let rows=S.tools.filter(t=>{
       if(!inView(t))return false;
-      if(fc&&t.cat!==fc)return false; if(fs&&t.status!==fs)return false;
+      if(fc&&t.cat!==fc)return false; if(fs&&t.status!==fs)return false; if(fsite&&siteOf(t)!==fsite)return false;
       if(q){const h=(t.code+' '+t.name+' '+t.no+' '+t.sn+' '+t.model).toLowerCase();if(!h.includes(q))return false;}
       return true;});
     if(so==='new')rows=[...rows].sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
@@ -473,7 +476,43 @@ function renderTools(){
   };
   PG_REDRAW['tools']=draw;
   const td=()=>{pgReset('tools');draw();};
-  $('#tq').oninput=td;$('#fcat').onchange=td;$('#fst').onchange=td;$('#fsort').onchange=td;draw();
+  $('#tq').oninput=td;$('#fcat').onchange=td;$('#fst').onchange=td;$('#fsite').onchange=td;$('#fsort').onchange=td;draw();
+}
+/* ============ ของตามไซต์ ============ */
+function siteOf(t){if(t.status!=='ถูกยืม')return '';const s=(t.pendingDest||(t.loc||'').split('/')[0]||'').trim();return (s&&s!=='ออฟฟิต')?s:'';}
+function holderOf(t){return (t.loc||'').split('/').slice(1).join('/').trim();}
+function daysOut(t){const b=t.dispatchedAt||t.updated;if(!b)return null;const d=Math.floor((Date.now()-new Date(b).getTime())/86400000);return (isNaN(d)||d<0)?null:d;}
+let siteSel=null,_siteMap={},_siteKeys=[],_bySiteDraw=null;
+function renderBySite(){
+  $('#view').innerHTML=`<div class="panel">
+    <h3>📍 ของตามไซต์ <span class="muted" style="font-weight:400">— เลือกไซต์เพื่อดูเครื่องที่อยู่ที่นั่นตอนนี้</span></h3>
+    <div id="siteChips" style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 2px"></div>
+    <div id="siteBody"></div>
+  </div>`;
+  _bySiteDraw=()=>{
+    _siteMap={};
+    S.tools.filter(t=>inView(t)).forEach(t=>{const s=siteOf(t);if(!s)return;(_siteMap[s]=_siteMap[s]||[]).push(t);});
+    _siteKeys=Object.keys(_siteMap).sort((a,b)=>_siteMap[b].length-_siteMap[a].length);
+    if(!_siteKeys.length){$('#siteChips').innerHTML='';$('#siteBody').innerHTML='<div class="empty" style="padding:24px">ยังไม่มีเครื่องถูกยืมออกไซต์ตอนนี้</div>';return;}
+    if(siteSel==null||!_siteMap[siteSel])siteSel=_siteKeys[0];
+    $('#siteChips').innerHTML=_siteKeys.map((s,i)=>`<button class="btn ${s===siteSel?'primary':''}" style="padding:6px 13px" onclick="pickSite(${i})">${esc(s)} · ${_siteMap[s].length}</button>`).join('');
+    drawSiteBody();
+  };
+  _bySiteDraw();
+}
+function pickSite(i){siteSel=_siteKeys[i];if(_bySiteDraw)_bySiteDraw();}
+function drawSiteBody(){
+  const tools=_siteMap[siteSel]||[];
+  $('#siteBody').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px"><b style="font-size:15px">${esc(siteSel)} <span class="muted" style="font-weight:400">· ${tools.length} เครื่อง</span></b></div>
+    <div class="toolbar" style="margin:0 0 8px"><input class="search" id="siteq" placeholder="🔎 ค้นหาในไซต์นี้ ชื่อ/รุ่น/NO/ผู้ถือ"></div>
+    <div id="sitetbl" class="listbox"></div>`;
+  const draw=()=>{const q=$('#siteq').value.trim().toLowerCase();
+    const rows=tools.filter(t=>!q||(t.name+' '+t.no+' '+t.code+' '+(t.model||'')+' '+holderOf(t)).toLowerCase().includes(q)).sort((a,b)=>(daysOut(b)||0)-(daysOut(a)||0));
+    $('#sitetbl').innerHTML=`<table class="locktbl"><thead><tr><th>ชื่อ / รุ่น</th><th>NO</th><th>หมวด</th><th>ผู้ถือ</th><th>ออกเมื่อ</th><th class="right">ค้าง</th></tr></thead><tbody>${
+      rows.map(t=>{const d=daysOut(t);const dc=(d!=null&&d>30)?'#dc2626':(d!=null&&d>7)?'#d97706':'var(--muted)';
+        return `<tr style="cursor:pointer" onclick="toolDetail(${t.i})"><td><b>${esc(t.name)}</b>${t.model?`<div class="muted" style="font-size:12px">${esc(t.model)}</div>`:''}</td><td>${esc(t.no)}</td><td>${esc(t.cat)}</td><td>${esc(holderOf(t))||'-'}</td><td>${esc(fmtDateTH(t.dispatchedAt))||'-'}</td><td class="right" style="color:${dc};white-space:nowrap">${d!=null?d+' วัน':'-'}</td></tr>`;}).join('')||'<tr><td colspan=6 class="empty">ไม่พบ</td></tr>'
+    }</tbody></table>`;};
+  $('#siteq').oninput=draw;draw();
 }
 function toolFormFields(t){t=t||{};return `
     <div class="field"><label>บริษัทเจ้าของ *</label><select id="ed_company">${['PAC','LOTUS'].map(c=>`<option value="${c}" ${(t.company||COMPANY)===c?'selected':''}>${c==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)'}</option>`).join('')}</select></div>
