@@ -266,11 +266,16 @@ function screenScanner(banner){
 async function startScan(){
   if(!window.Html5Qrcode){toast('ไลบรารีสแกนยังโหลดไม่เสร็จ ลองรีเฟรช');return;}
   stopScan();
+  const ctorCfg={verbose:false,experimentalFeatures:{useBarCodeDetectorIfSupported:true}};
+  if(window.Html5QrcodeSupportedFormats)ctorCfg.formatsToSupport=[Html5QrcodeSupportedFormats.QR_CODE];
+  const scanCfg={fps:12,qrbox:{width:250,height:250},aspectRatio:1.0};
+  const startWith=async(camCfg)=>{const h=new Html5Qrcode('qrbox',ctorCfg);_scanner=h;await h.start(camCfg,scanCfg,onScan,()=>{});$('#startc').style.display='none';$('#stopc').style.display='';};
   try{
-    const h=new Html5Qrcode('qrbox');_scanner=h;
-    await h.start({facingMode:'environment'},{fps:10,qrbox:{width:220,height:220}},onScan,()=>{});
-    $('#startc').style.display='none';$('#stopc').style.display='';
-  }catch(e){_scanner=null;toast('เปิดกล้องไม่ได้: '+(e.message||e)+' — สแกนด้วยกล้องมือถือก็ได้');}
+    await startWith({facingMode:'environment',width:{ideal:1920},height:{ideal:1080}});
+  }catch(e){
+    try{ await startWith({facingMode:'environment'}); }
+    catch(e2){_scanner=null;toast('เปิดกล้องไม่ได้: '+(e2.message||e2)+' — สแกนด้วยกล้องมือถือก็ได้');}
+  }
 }
 function onScan(text){
   const m=String(text).match(/[?&]t=([0-9a-fA-F-]{6,})/);
