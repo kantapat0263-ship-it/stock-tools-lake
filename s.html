@@ -253,6 +253,10 @@ function screenScanner(banner){
     <div class="bd">
       ${bn}
       <div id="qrbox" style="width:100%;max-width:320px;margin:0 auto;border-radius:14px;overflow:hidden;background:#0f172a;min-height:240px"></div>
+      <div id="zoomwrap" style="display:none;align-items:center;gap:10px;margin:12px auto 0;max-width:320px">
+        <span style="font-size:13px;color:#64748b;white-space:nowrap">🔍 ซูม</span>
+        <input type="range" id="zoomsl" style="flex:1">
+      </div>
       <div style="display:flex;gap:8px;margin:12px auto 0;max-width:320px">
         <button class="btn ghost" id="startc" style="flex:1">เปิดกล้องอีกครั้ง</button>
         <button class="btn ghost" id="stopc" style="flex:1;display:none">ปิดกล้อง</button>
@@ -269,13 +273,29 @@ async function startScan(){
   const ctorCfg={verbose:false,experimentalFeatures:{useBarCodeDetectorIfSupported:true}};
   if(window.Html5QrcodeSupportedFormats)ctorCfg.formatsToSupport=[Html5QrcodeSupportedFormats.QR_CODE];
   const scanCfg={fps:12,qrbox:{width:250,height:250},aspectRatio:1.0};
-  const startWith=async(camCfg)=>{const h=new Html5Qrcode('qrbox',ctorCfg);_scanner=h;await h.start(camCfg,scanCfg,onScan,()=>{});$('#startc').style.display='none';$('#stopc').style.display='';};
+  const startWith=async(camCfg)=>{const h=new Html5Qrcode('qrbox',ctorCfg);_scanner=h;await h.start(camCfg,scanCfg,onScan,()=>{});$('#startc').style.display='none';$('#stopc').style.display='';setTimeout(setupZoom,350);};
   try{
     await startWith({facingMode:'environment',width:{ideal:1920},height:{ideal:1080}});
   }catch(e){
     try{ await startWith({facingMode:'environment'}); }
     catch(e2){_scanner=null;toast('เปิดกล้องไม่ได้: '+(e2.message||e2)+' — สแกนด้วยกล้องมือถือก็ได้');}
   }
+}
+function setupZoom(){
+  try{
+    const v=document.querySelector('#qrbox video');
+    const track=v&&v.srcObject&&v.srcObject.getVideoTracks&&v.srcObject.getVideoTracks()[0];
+    const wrap=$('#zoomwrap');
+    if(!track||!track.getCapabilities){if(wrap)wrap.style.display='none';return;}
+    const caps=track.getCapabilities();
+    if(!caps||!caps.zoom||!(caps.zoom.max>caps.zoom.min)){if(wrap)wrap.style.display='none';return;}
+    const min=caps.zoom.min,max=caps.zoom.max,step=caps.zoom.step||0.1;
+    const def=Math.min(max,(min>0?min:1)*2);
+    track.applyConstraints({advanced:[{zoom:def}]}).catch(()=>{});
+    const sl=$('#zoomsl');
+    if(sl){sl.min=min;sl.max=max;sl.step=step;sl.value=def;sl.oninput=()=>{track.applyConstraints({advanced:[{zoom:Number(sl.value)}]}).catch(()=>{});}}
+    if(wrap)wrap.style.display='flex';
+  }catch(e){}
 }
 function onScan(text){
   const m=String(text).match(/[?&]t=([0-9a-fA-F-]{6,})/);
