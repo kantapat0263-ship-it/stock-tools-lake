@@ -1076,7 +1076,7 @@ function borrowDocHtml(items,who,proj,date,no){
   function copy(p){
     let rows='';
     for(let r=0;r<PER;r++){const gi=p*PER+r,it=items[gi];
-      rows+=`<tr><td class="c">${gi+1}</td><td>${it?esc(it.cat||it.name):''}</td><td>${it?esc(it.brand||''):''}</td><td>${it?esc(it.model||''):''}</td><td class="c">${it?esc(it.sn):''}</td><td class="c">${it?esc(it.no):''}</td><td class="c">${it?esc(it.company||''):''}</td></tr>`;}
+      rows+=`<tr><td class="c">${gi+1}</td><td>${it?esc(it.cat||it.name):''}</td><td>${it?esc(it.brand||''):''}</td><td>${it?esc(it.model||''):''}</td><td class="c">${it?esc(it.sn):''}</td><td class="c">${it?esc(it.no):''}</td><td>${it?esc(it.note||''):''}</td></tr>`;}
     return `<div class="bcopy">
       <div class="bhd">
         <div class="blogo">${LOGO[COMPANY]?`<img src="${LOGO[COMPANY]}" alt="${esc(COMPANY)}">`:esc(COMPANY)}</div>
@@ -1087,8 +1087,8 @@ function borrowDocHtml(items,who,proj,date,no){
         <div class="r"><span>โครงการ/ไซต์: <b>${esc(proj)||'.................'}</b></span><span>วันที่: <b>${esc(fmtDateTH(date))||'..../..../....'}</b></span></div>
         <div>ผู้เบิก: <b>${esc(who)||'.................'}</b></div>
       </div>
-      <table class="btbl"><colgroup><col style="width:6%"><col style="width:27%"><col style="width:13%"><col style="width:15%"><col style="width:13%"><col style="width:18%"><col style="width:8%"></colgroup>
-        <thead><tr><th>ลำดับ</th><th>รายการ</th><th>ยี่ห้อ</th><th>รุ่น</th><th>S/N</th><th>รหัส</th><th>บ.</th></tr></thead>
+      <table class="btbl"><colgroup><col style="width:6%"><col style="width:25%"><col style="width:12%"><col style="width:13%"><col style="width:12%"><col style="width:15%"><col style="width:17%"></colgroup>
+        <thead><tr><th>ลำดับ</th><th>รายการ</th><th>ยี่ห้อ</th><th>รุ่น</th><th>S/N</th><th>รหัส</th><th>หมายเหตุ</th></tr></thead>
         <tbody>${rows}</tbody></table>
       <div class="bsign">
         <div>ผู้เบิก<br><br><span class="bsline"></span><br>(${esc(who)})</div>
