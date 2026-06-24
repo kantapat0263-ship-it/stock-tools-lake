@@ -112,6 +112,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
 .scrim{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:40}
 .scrim.on{display:flex}
 .modal{background:#fff;border-radius:16px;max-width:560px;width:92%;max-height:88vh;overflow:auto;padding:22px}
+.modal.docwide{max-width:940px}
 .modal h3{margin:0 0 4px}
 .field{margin:12px 0}
 .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
@@ -841,7 +842,7 @@ function previewRepair(){
   const items=sel.map(t=>({t,reason:rsn[t.i]||''}));
   pendingRepair={slipN,slip,date,vendor,sender,items};
   openModal(`<h3>👁️ ตัวอย่างใบส่งซ่อม #${slip} (${COMPANY})</h3><p class="muted">ดูก่อน — <b>ยังไม่บันทึก</b> · จะบันทึกจริงตอนกด "พิมพ์ + บันทึก"</p>
-    <div style="border:1px solid var(--line);border-radius:8px;padding:10px;max-height:46vh;overflow:auto;margin:8px 0">${repairDocHtml(slip,date,vendor,sender,items)}</div>
+    ${docBox(repairDocHtml(slip,date,vendor,sender,items))}
     <div class="flexrow"><button class="btn primary" onclick="commitRepair()">🖨️ พิมพ์ + บันทึกส่งซ่อม</button><button class="btn ghost" onclick="closeModal()">ปิด (ยังไม่บันทึก)</button></div>`);
 }
 async function commitRepair(){
@@ -963,7 +964,7 @@ function previewReceive(){
     return {t,slipN,slip:slipN!=null?String(slipN).padStart(3,'0'):'',company:m?m.company:COMPANY};});
   pendingReceive={date,recv,items};
   openModal(`<h3>👁️ ตัวอย่างใบรับคืนจากซ่อม</h3><p class="muted">ดูก่อน — <b>ยังไม่บันทึก</b> · จะบันทึกจริงตอนกด "พิมพ์ + บันทึก"</p>
-    <div style="border:1px solid var(--line);border-radius:8px;padding:10px;max-height:46vh;overflow:auto;margin:8px 0">${receiveDocHtml(date,recv,items)}</div>
+    ${docBox(receiveDocHtml(date,recv,items))}
     <div class="flexrow"><button class="btn green" onclick="commitReceive()">🖨️ พิมพ์ + บันทึกรับคืน</button><button class="btn ghost" onclick="closeModal()">ปิด (ยังไม่บันทึก)</button></div>`);
 }
 async function commitReceive(){
@@ -1110,7 +1111,7 @@ function previewBorrow(){
   const items=[...selBor].map(ix=>S.tools[ix]);
   pendingBorrow={items,who,proj,date};
   openModal(`<h3>👁️ ตัวอย่างใบส่งเครื่องมือ</h3><p class="muted">ดูก่อน — <b>ยังไม่บันทึก</b> · 2 สำเนา (ตัดครึ่งเก็บฝั่งละ 1) · จะบันทึกจริงตอนกด "พิมพ์ + บันทึก"</p>
-    <div style="border:1px solid var(--line);border-radius:8px;padding:10px;max-height:46vh;overflow:auto;margin:8px 0">${borrowDocHtml(items,who,proj,date,(S.nextBorrowByCo&&S.nextBorrowByCo[COMPANY])||'')}</div>
+    ${docBox(borrowDocHtml(items,who,proj,date,(S.nextBorrowByCo&&S.nextBorrowByCo[COMPANY])||''))}
     <div class="flexrow"><button class="btn primary" onclick="commitBorrow()">🖨️ พิมพ์ + บันทึกเบิก</button><button class="btn ghost" onclick="closeModal()">ปิด (ยังไม่บันทึก)</button></div>`);
 }
 async function commitBorrow(){
@@ -1773,8 +1774,11 @@ async function delUser(id,email){
 }
 
 /* ============ modal ============ */
-function openModal(html){$('#modal').innerHTML=html;$('#scrim').classList.add('on');}
-function closeModal(){$('#scrim').classList.remove('on');}
+function fitDocPrev(){const w=document.getElementById('docprevwrap'),p=document.getElementById('docprevpaper');if(!w||!p)return;p.style.zoom='1';const avail=w.clientWidth-16,pw=p.offsetWidth;if(pw>0)p.style.zoom=String(Math.min(1,avail/pw));}
+function docBox(doc){return `<div id="docprevwrap" style="overflow:auto;background:#eef2f7;border-radius:8px;padding:8px;max-height:64vh"><div id="docprevpaper" style="width:297mm;margin:0 auto;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.18)">${doc}</div></div>`;}
+function openModal(html){$('#modal').innerHTML=html;const d=!!document.getElementById('docprevpaper');$('#modal').classList.toggle('docwide',d);$('#scrim').classList.add('on');if(d)requestAnimationFrame(()=>setTimeout(fitDocPrev,30));}
+function closeModal(){$('#scrim').classList.remove('on');$('#modal').classList.remove('docwide');}
+window.addEventListener('resize',function(){if(document.getElementById('docprevpaper'))fitDocPrev();});
 $('#scrim').addEventListener('click',e=>{if(e.target.id==='scrim')closeModal();});
 
 init();
