@@ -203,6 +203,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
       <button data-v="report"><span class="ic">📈</span> รายงาน</button>
       <button data-v="scan"><span class="ic">📷</span> สแกน (มือถือ)</button>
       <button data-v="labels"><span class="ic">🏷️</span> ป้าย QR</button>
+      <button data-v="sites"><span class="ic">🗂️</span> จัดการไซต์งาน</button>
       <button data-v="trash"><span class="ic">🗑️</span> ถังขยะ</button>
       <button data-v="guide"><span class="ic">📖</span> คู่มือ</button>
       <button data-v="audit" id="navAudit" style="display:none"><span class="ic">📝</span> ประวัติแก้ไข</button>
@@ -353,14 +354,14 @@ async function doSignup(){const e=$('#li_email').value.trim(),p=$('#li_pass').va
 async function logout(){await sb.auth.signOut();location.reload();}
 
 /* ============ router ============ */
-const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],bysite:['ของตามไซต์','ดูเครื่องที่อยู่แต่ละไซต์งานตอนนี้'],scan:['สแกน','สแกน QR → รับคืนเข้าระบบ (จากไซต์ / จากซ่อม)'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],labels:['ป้าย QR','สร้าง QR ไม่ซ้ำของแต่ละเครื่อง → พิมพ์เป็นป้าย'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
+const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],bysite:['ของตามไซต์','ดูเครื่องที่อยู่แต่ละไซต์งานตอนนี้'],scan:['สแกน','สแกน QR → รับคืนเข้าระบบ (จากไซต์ / จากซ่อม)'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],labels:['ป้าย QR','สร้าง QR ไม่ซ้ำของแต่ละเครื่อง → พิมพ์เป็นป้าย'],sites:['จัดการไซต์งาน','เพิ่ม / แก้ชื่อ / ลบ / รวมไซต์ซ้ำ — กันชื่อโครงการเพี้ยน'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
 function go(v){
   if(v==='guide'){window.open('guide.html','_blank');return;}
   if(CUR==='scan'&&v!=='scan'&&window._scanner)stopScanner();
   CUR=v;
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
   $('#ttl').textContent=TITLES[v][0];$('#tsub').textContent=TITLES[v][1];
-  ({dash:renderDash,tools:renderTools,borrow:renderBorrow,bysite:renderBySite,scan:renderScan,repair:renderRepair,receive:renderReceive,history:renderHistory,report:renderReport,labels:renderLabels,trash:renderTrash,audit:renderAudit,users:renderUsers}[v])();
+  ({dash:renderDash,tools:renderTools,borrow:renderBorrow,bysite:renderBySite,scan:renderScan,repair:renderRepair,receive:renderReceive,history:renderHistory,report:renderReport,labels:renderLabels,sites:renderSites,trash:renderTrash,audit:renderAudit,users:renderUsers}[v])();
   window.scrollTo(0,0);
 }
 $('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b){go(b.dataset.v);closeNav();}});
@@ -513,6 +514,78 @@ function drawSiteBody(){
         return `<tr style="cursor:pointer" onclick="toolDetail(${t.i})"><td><b>${esc(t.name)}</b>${t.model?`<div class="muted" style="font-size:12px">${esc(t.model)}</div>`:''}</td><td>${esc(t.no)}</td><td>${esc(t.cat)}</td><td>${esc(holderOf(t))||'-'}</td><td>${esc(fmtDateTH(t.dispatchedAt))||'-'}</td><td class="right" style="color:${dc};white-space:nowrap">${d!=null?d+' วัน':'-'}</td></tr>`;}).join('')||'<tr><td colspan=6 class="empty">ไม่พบ</td></tr>'
     }</tbody></table>`;};
   $('#siteq').oninput=draw;draw();
+}
+/* ============ จัดการไซต์งาน ============ */
+function jsq(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+let _sitesList=[];
+async function addSiteInline(){
+  const name=(prompt('ชื่อไซต์ใหม่:')||'').trim(); if(!name)return;
+  const sel=$('#b_proj');
+  if(S.lookups.projects.some(p=>p.toLowerCase()===name.toLowerCase())){if(sel)sel.value=name;toast('มีไซต์นี้อยู่แล้ว');return;}
+  const {error}=await sb.from('projects').insert({company:COMPANY,name}); if(error){toast('เพิ่มไม่ได้: '+error.message);return;}
+  S.lookups.projects.push(name);
+  if(sel){const o=document.createElement('option');o.textContent=name;sel.appendChild(o);sel.value=name;}
+  toast('➕ เพิ่มไซต์ '+name);
+}
+function renderSites(){
+  $('#view').innerHTML=`<div class="panel">
+    <h3>🗂️ จัดการไซต์งาน <span class="muted" style="font-weight:400">— เพิ่ม / แก้ชื่อ / ลบ / รวมไซต์ซ้ำ (กันชื่อโครงการเพี้ยน)</span></h3>
+    <div class="toolbar" style="margin:8px 0"><input class="search" id="newsite" placeholder="ชื่อไซต์ใหม่…" style="max-width:300px"><button class="btn primary" id="addsiteBtn" style="margin-left:8px">➕ เพิ่มไซต์</button></div>
+    <div id="sitembody"></div>
+  </div>`;
+  $('#addsiteBtn').onclick=addSite;
+  $('#newsite').addEventListener('keydown',e=>{if(e.key==='Enter')addSite();});
+  drawSites();
+}
+function drawSites(){
+  _sitesList=[...S.lookups.projects].sort((a,b)=>String(a).localeCompare(String(b),'th'));
+  const nowC=s=>S.tools.filter(t=>t.status==='ถูกยืม'&&siteOf(t)===s).length;
+  const histC=s=>S.movements.filter(m=>m.project===s).length;
+  $('#sitembody').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th>ไซต์งาน</th><th class="center">มีของอยู่</th><th class="center">ใช้ในประวัติ</th><th></th></tr></thead><tbody>${
+    _sitesList.map((s,i)=>`<tr><td><b>${esc(s)}</b></td><td class="center">${nowC(s)||'-'}</td><td class="center">${histC(s)||'-'}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:4px 9px" onclick="renameSite(${i})">✏️ แก้</button> <button class="btn" style="padding:4px 9px" onclick="mergeSite(${i})">🔀 รวม</button> <button class="btn" style="padding:4px 9px;background:#fee2e2;color:#b91c1c" onclick="deleteSite(${i})">🗑️</button></td></tr>`).join('')||'<tr><td colspan=4 class="empty">ยังไม่มีไซต์ในลิสต์</td></tr>'
+  }</tbody></table></div>`;
+}
+async function addSite(){
+  const name=($('#newsite').value||'').trim(); if(!name){toast('ใส่ชื่อไซต์ก่อน');return;}
+  if(S.lookups.projects.some(p=>p.toLowerCase()===name.toLowerCase())){toast('มีไซต์นี้อยู่แล้ว');return;}
+  const {error}=await sb.from('projects').insert({company:COMPANY,name}); if(error){toast('เพิ่มไม่ได้: '+error.message);return;}
+  toast('➕ เพิ่มไซต์ '+name);await loadAll();go('sites');
+}
+async function reassignSiteRefs(oldN,newN){
+  await sb.from('movements').update({project:newN}).eq('project',oldN);
+  const aff=S.tools.filter(t=>t.status==='ถูกยืม'&&siteOf(t)===oldN);
+  for(const t of aff){const person=holderOf(t);await sb.from('tools').update({pending_dest:newN,location:newN+(person?(' / '+person):''),updated_at:new Date().toISOString()}).eq('id',t.id);}
+}
+async function renameSite(i){
+  const oldN=_sitesList[i];const newN=(prompt('เปลี่ยนชื่อไซต์ "'+oldN+'" เป็น:',oldN)||'').trim();
+  if(!newN||newN===oldN)return;
+  const exists=S.lookups.projects.some(p=>p.toLowerCase()===newN.toLowerCase()&&p!==oldN);
+  if(exists&&!confirm('มีไซต์ "'+newN+'" อยู่แล้ว — รวม "'+oldN+'" เข้ากับมันแทนไหม?'))return;
+  toast('กำลังเปลี่ยนชื่อ + ย้ายประวัติ…');
+  await reassignSiteRefs(oldN,newN);
+  if(!S.lookups.projects.some(p=>p===newN))await sb.from('projects').insert({company:COMPANY,name:newN});
+  await sb.from('projects').delete().eq('name',oldN);
+  toast('✅ เปลี่ยนเป็น "'+newN+'" แล้ว');await loadAll();go('sites');
+}
+function mergeSite(i){
+  const src=_sitesList[i];const others=_sitesList.filter(s=>s!==src);
+  if(!others.length){toast('ไม่มีไซต์อื่นให้รวม');return;}
+  openModal(`<h3>🔀 รวมไซต์ซ้ำ</h3><p class="muted">ย้ายของ + ประวัติทั้งหมดของ "<b>${esc(src)}</b>" ไปไซต์ที่เลือก แล้วลบ "${esc(src)}" ทิ้ง</p>
+    <div class="field"><label>รวม "${esc(src)}" เข้ากับ</label><select id="mergeTo">${others.map(s=>`<option>${esc(s)}</option>`).join('')}</select></div>
+    <div class="flexrow" style="margin-top:16px"><button class="btn primary" onclick="doMergeSite('${jsq(src)}')">🔀 รวมเลย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
+}
+async function doMergeSite(src){
+  const dest=$('#mergeTo').value;if(!dest||dest===src){closeModal();return;}
+  closeModal();toast('กำลังรวม + ย้ายประวัติ…');
+  await reassignSiteRefs(src,dest);
+  await sb.from('projects').delete().eq('name',src);
+  toast('✅ รวม "'+src+'" → "'+dest+'" แล้ว');await loadAll();go('sites');
+}
+async function deleteSite(i){
+  const s=_sitesList[i];const now=S.tools.filter(t=>t.status==='ถูกยืม'&&siteOf(t)===s).length;
+  if(!confirm(now?('⚠️ ยังมี '+now+' เครื่องอยู่ที่ "'+s+'" ตอนนี้\nลบออกจากลิสต์? (เครื่อง+ประวัติยังอยู่ แค่หายจากตัวเลือก)'):('ลบไซต์ "'+s+'" ออกจากลิสต์?')))return;
+  const {error}=await sb.from('projects').delete().eq('name',s); if(error){toast('ลบไม่ได้: '+error.message);return;}
+  toast('ลบไซต์ '+s+' แล้ว');await loadAll();go('sites');
 }
 function toolFormFields(t){t=t||{};return `
     <div class="field"><label>บริษัทเจ้าของ *</label><select id="ed_company">${['PAC','LOTUS'].map(c=>`<option value="${c}" ${(t.company||COMPANY)===c?'selected':''}>${c==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)'}</option>`).join('')}</select></div>
@@ -877,10 +950,10 @@ function drawBorrow(){
   const list=S.tools.filter(t=>t.status===(out?'ว่าง':'ถูกยืม')&&inView(t));
   let form,btn,title;
   if(mode==='out'){
-    form=`<div class="flexrow"><div class="field"><label>วันที่ *</label><input id="b_date" type="date" value="${today()}"></div><div class="field"><label>ผู้เบิก *</label><input id="b_who" list="dl_p3"></div><div class="field"><label>โครงการ/ไซต์ *</label><input id="b_proj" list="dl_pr"></div></div>`;
+    form=`<div class="flexrow"><div class="field"><label>วันที่ *</label><input id="b_date" type="date" value="${today()}"></div><div class="field"><label>ผู้เบิก *</label><input id="b_who" list="dl_p3"></div><div class="field"><label>โครงการ/ไซต์ *</label><div style="display:flex;gap:6px"><select id="b_proj" style="flex:1"><option value="">— เลือกไซต์ —</option>${S.lookups.projects.map(p=>`<option>${esc(p)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addSiteInline()" title="เพิ่มไซต์ใหม่">➕</button></div></div></div>`;
     btn='👁️ ดูใบส่งไซต์ (ยังไม่บันทึก)'; title='เลือกเครื่อง "ว่าง" ที่จะเบิกออกไซต์';
   } else if(mode==='move'){
-    form=`<div class="flexrow"><div class="field"><label>วันที่ *</label><input id="b_date" type="date" value="${today()}"></div><div class="field"><label>ผู้ที่เอาไป</label><input id="b_who" list="dl_p3"></div><div class="field"><label>ไซต์ใหม่ *</label><input id="b_proj" list="dl_pr"></div></div>`;
+    form=`<div class="flexrow"><div class="field"><label>วันที่ *</label><input id="b_date" type="date" value="${today()}"></div><div class="field"><label>ผู้ที่เอาไป</label><input id="b_who" list="dl_p3"></div><div class="field"><label>ไซต์ใหม่ *</label><div style="display:flex;gap:6px"><select id="b_proj" style="flex:1"><option value="">— เลือกไซต์ —</option>${S.lookups.projects.map(p=>`<option>${esc(p)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addSiteInline()" title="เพิ่มไซต์ใหม่">➕</button></div></div></div>`;
     btn='🔀 บันทึกย้ายไซต์'; title='เลือกเครื่องที่ "ถูกยืม" อยู่ → ย้ายไปไซต์ใหม่ (ไม่ต้องคืนก่อน)';
   } else {
     form=`<div class="field"><label>วันที่คืน *</label><input id="b_date" type="date" value="${today()}"></div>`;
