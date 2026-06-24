@@ -169,8 +169,8 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
 .bno b{font-size:14px}
 .binfo{font-size:11px;margin-bottom:5px}
 .binfo .r{display:flex;justify-content:space-between;gap:6px}
-.btbl{width:100%;border-collapse:collapse;table-layout:fixed;font-size:10px;margin-bottom:2px}
-.btbl th,.btbl td{border:1px solid #000;padding:3px;word-wrap:break-word}
+.btbl{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px;margin-bottom:2px}
+.btbl th,.btbl td{border:1px solid #000;padding:2px 3px;word-wrap:break-word;font-size:9px}
 .btbl th{background:#f0f0f0;text-align:center;font-weight:bold}
 .btbl td{height:22px;vertical-align:middle}
 .btbl td.c{text-align:center}
@@ -1010,9 +1010,9 @@ async function restoreSlip(no,co){
   toast('กู้คืนใบ #'+no+' จากถังขยะแล้ว');await loadAll();go('trash');}
 
 /* ============ BORROW (เบิก-คืน) ============ */
-let borrowTab='out',selBor=new Set(),borPR={};
+let borrowTab='out',selBor=new Set(),borPR={},borNote={};
 function renderBorrow(){
-  selBor=new Set();borPR={};
+  selBor=new Set();borPR={};borNote={};
   $('#view').innerHTML=`<div class="tabs"><button class="${borrowTab==='out'?'on':''}" onclick="setBT('out')">📤 เบิก (เอาออกไซต์)</button><button class="${borrowTab==='move'?'on':''}" onclick="setBT('move')">🔀 ย้ายไซต์</button><button class="${borrowTab==='in'?'on':''}" onclick="setBT('in')">📥 คืน (กลับออฟฟิต)</button></div><div id="bbody"></div>`;
   drawBorrow();
 }
@@ -1043,8 +1043,8 @@ function drawBorrow(){
     <datalist id="dl_pr">${S.lookups.projects.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>`;
   const draw=()=>{const q=$('#bq').value.trim().toLowerCase();const rows=list.filter(t=>!q||(t.name+t.no+t.code+(t.model||'')+(t.sn||'')).toLowerCase().includes(q));
     const pg=pgSlice('borrow',rows);
-    $('#btbl').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th></th><th>บริษัท</th><th>ชื่อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th>${out?'<th>เลขที่ PR</th>':''}</tr></thead><tbody>${
-      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selBor.has(t.i)?'checked':''} onchange="togBor(${t.i},this.checked)"></td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td>${out?`<td><input value="${esc(borPR[t.i]||'')}" oninput="borPR[${t.i}]=this.value" placeholder="PR..." style="width:100%;min-width:90px;padding:3px 5px"></td>`:''}</tr>`).join('')||`<tr><td colspan=${out?9:8} class="empty">ไม่มี</td></tr>`
+    $('#btbl').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th></th><th>บริษัท</th><th>ชื่อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th>${out?'<th>เลขที่ PR</th><th>หมายเหตุ</th>':''}</tr></thead><tbody>${
+      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selBor.has(t.i)?'checked':''} onchange="togBor(${t.i},this.checked)"></td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td>${out?`<td><input value="${esc(borPR[t.i]||'')}" oninput="borPR[${t.i}]=this.value" placeholder="PR..." style="width:100%;min-width:90px;padding:3px 5px"></td><td><input value="${esc(borNote[t.i]||'')}" oninput="borNote[${t.i}]=this.value" placeholder="หมายเหตุ" style="width:100%;min-width:100px;padding:3px 5px"></td>`:''}</tr>`).join('')||`<tr><td colspan=${out?10:8} class="empty">ไม่มี</td></tr>`
     }</tbody></table></div>${pg.html}`;};
   PG_REDRAW['borrow']=draw;
   $('#bq').oninput=()=>{pgReset('borrow');draw();};draw();
@@ -1108,7 +1108,7 @@ function previewBorrow(){
   if(!selBor.size){toast('ยังไม่ได้เลือกเครื่อง');return;}
   const date=$('#b_date').value, who=$('#b_who').value.trim(), proj=$('#b_proj').value.trim();
   if(!who||!proj){toast('กรุณากรอก ผู้เบิก + โครงการ/ไซต์ ให้ครบ');return;}
-  const items=[...selBor].map(ix=>Object.assign({},S.tools[ix],{pr:(borPR[ix]||'').trim()}));
+  const items=[...selBor].map(ix=>Object.assign({},S.tools[ix],{pr:(borPR[ix]||'').trim(),note:(borNote[ix]||'').trim()}));
   pendingBorrow={items,who,proj,date};
   openModal(`<h3>👁️ ตัวอย่างใบส่งเครื่องมือ</h3><p class="muted">ดูก่อน — <b>ยังไม่บันทึก</b> · 2 สำเนา (ตัดครึ่งเก็บฝั่งละ 1) · จะบันทึกจริงตอนกด "พิมพ์ + บันทึก"</p>
     ${docBox(borrowDocHtml(items,who,proj,date,(S.nextBorrowByCo&&S.nextBorrowByCo[COMPANY])||''))}
@@ -1122,7 +1122,7 @@ async function commitBorrow(){
   const bn=bnData;
   for(const t of items){
     await sb.from('tools').update({status:'ถูกยืม',location:(proj||'')+(who?' / '+who:''),receipt_pending:true,pending_dest:proj,dispatched_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',t.id);
-    await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'เบิก',project:proj,actor:who,borrow_no:bn,pr_no:t.pr||null});
+    await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'เบิก',project:proj,actor:who,borrow_no:bn,pr_no:t.pr||null,note:t.note||null});
   }
   await ensureLookup('people',who);await ensureLookup('projects',proj);
   pendingBorrow=null;closeModal();
@@ -1194,7 +1194,7 @@ function borrowBatches(){
     const date=mv?mv.date:'',proj=mv?mv.project:'',who=mv?mv.actor:'';
     const key=date+'|'+proj+'|'+who+'|'+t.company;
     const g=groups[key]=groups[key]||{date,project:proj,who,company:t.company,no:(mv?mv.borrowNo:null),tools:[],movIds:[]};
-    g.tools.push(Object.assign({},t,{pr:mv?mv.prNo:''})); g.movIds.push(mv?mv.id:null);
+    g.tools.push(Object.assign({},t,{pr:mv?mv.prNo:'',note:mv?(mv.note||''):''})); g.movIds.push(mv?mv.id:null);
   });
   return Object.values(groups).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||(b.no||0)-(a.no||0));
 }
