@@ -603,7 +603,8 @@ async function saveTool(i){const t=S.tools[i];
   const cat=$('#ed_cat').value.trim(),no=$('#ed_no').value.trim(),company=$('#ed_company').value;
   if(!cat||!no){toast('ต้องมี หมวด + NO');return;}
   const code=(cat+' '+no).trim();
-  const dupT=S.tools.find((x,ix)=>ix!==i&&x.company===company&&(x.no||'').trim().toUpperCase()===no.toUpperCase());
+  const keyChanged=(t.company!==company)||((t.no||'').trim().toUpperCase()!==no.toUpperCase());
+  const dupT=keyChanged?S.tools.find((x,ix)=>ix!==i&&x.company===company&&(x.no||'').trim().toUpperCase()===no.toUpperCase()):null;
   if(dupT){toast('❌ NO นี้มีอยู่แล้วใน '+company+': '+no+' — '+(dupT.cat||dupT.code));return;}
   const nv={company,cat,no,name:$('#ed_name').value.trim(),brand:$('#ed_brand').value.trim(),model:$('#ed_model').value.trim(),sn:$('#ed_sn').value.trim(),status:$('#ed_st').value,loc:$('#ed_loc').value.trim(),note:$('#ed_note').value.trim(),purchaseDate:$('#ed_pdate').value,price:$('#ed_price').value,warranty:$('#ed_warranty').value.trim()};
   const L={company:'บริษัท',cat:'หมวด',no:'NO',name:'ชื่อ',brand:'ยี่ห้อ',model:'รุ่น',sn:'S/N',status:'สถานะ',loc:'อยู่ที่',note:'หมายเหตุ',purchaseDate:'วันที่ซื้อ',price:'ราคา',warranty:'ประกัน'};
