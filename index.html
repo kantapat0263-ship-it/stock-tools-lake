@@ -655,6 +655,8 @@ async function deleteCat(i){
   const {error}=await sb.from('categories').delete().eq('name',c); if(error){toast('ลบไม่ได้: '+error.message);return;}
   toast('ลบหมวด '+c+' แล้ว');await loadAll();go('cats');
 }
+function commaFmt(v){v=String(v==null?'':v).replace(/[^\d.]/g,'');if(v==='')return '';const p=v.split('.');let i=(p[0]||'').replace(/\B(?=(\d{3})+(?!\d))/g,',');return p.length>1?i+'.'+p.slice(1).join('').slice(0,2):i;}
+function parsePrice(v){v=String(v==null?'':v).replace(/,/g,'').trim();return v===''?null:Number(v);}
 function toolFormFields(t){t=t||{};const _cl=S.lookups.categories||[];const _sl=S.lookups.projects||[];const _cs=((t.loc||'').split('/')[0]||'').trim();return `
     <div class="field"><label>บริษัทเจ้าของ *</label><select id="ed_company">${['PAC','LOTUS'].map(c=>`<option value="${c}" ${(t.company||COMPANY)===c?'selected':''}>${c==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)'}</option>`).join('')}</select></div>
     <div class="flexrow">
@@ -673,7 +675,7 @@ function toolFormFields(t){t=t||{};const _cl=S.lookups.categories||[];const _sl=
     </div>
     <div class="flexrow">
       <div class="field"><label>วันที่ซื้อ</label><input id="ed_pdate" type="date" value="${esc(t.purchaseDate)}"></div>
-      <div class="field"><label>ราคา (บาท)</label><input id="ed_price" type="number" step="0.01" value="${esc(t.price)}"></div>
+      <div class="field"><label>ราคา (บาท)</label><input id="ed_price" type="text" inputmode="decimal" value="${esc(commaFmt(t.price))}" oninput="this.value=commaFmt(this.value)"></div>
       <div class="field"><label>ประกัน</label><input id="ed_warranty" value="${esc(t.warranty)}" placeholder="เช่น ถึง 2027 / 1 ปี"></div>
     </div>
     <div class="field"><label>หมายเหตุ</label><input id="ed_note" value="${esc(t.note)}"></div>
@@ -751,7 +753,7 @@ async function saveTool(i){const t=S.tools[i];
   const nv={company,cat,no,name:$('#ed_name').value.trim(),brand:$('#ed_brand').value.trim(),model:$('#ed_model').value.trim(),sn:$('#ed_sn').value.trim(),status:$('#ed_st').value,loc:(_ss&&_ss!=='ออฟฟิต')?(_ss+(_pp?(' / '+_pp):'')):'ออฟฟิต',note:$('#ed_note').value.trim(),purchaseDate:$('#ed_pdate').value,price:$('#ed_price').value,warranty:$('#ed_warranty').value.trim()};
   const L={company:'บริษัท',cat:'หมวด',no:'NO',name:'ชื่อ',brand:'ยี่ห้อ',model:'รุ่น',sn:'S/N',status:'สถานะ',loc:'อยู่ที่',note:'หมายเหตุ',purchaseDate:'วันที่ซื้อ',price:'ราคา',warranty:'ประกัน'};
   const ch=Object.keys(L).filter(k=>String(t[k]||'')!==String(nv[k]||'')).map(k=>`${L[k]}: ${t[k]||'-'}→${nv[k]||'-'}`);
-  const {error}=await sb.from('tools').update({company:company,category:cat,no:no,name:nv.name,brand:nv.brand,model:nv.model,serial:nv.sn,status:nv.status,location:nv.loc,note:nv.note,purchase_date:nv.purchaseDate||null,price:(nv.price!==''?Number(nv.price):null),warranty:nv.warranty,updated_at:new Date().toISOString()}).eq('id',t.id);
+  const {error}=await sb.from('tools').update({company:company,category:cat,no:no,name:nv.name,brand:nv.brand,model:nv.model,serial:nv.sn,status:nv.status,location:nv.loc,note:nv.note,purchase_date:nv.purchaseDate||null,price:parsePrice(nv.price),warranty:nv.warranty,updated_at:new Date().toISOString()}).eq('id',t.id);
   if(error){toast('บันทึกไม่ได้: '+error.message);return;}
   await ensureLookup('categories',cat,company);
   await logAudit('แก้ไข',company,code,ch.length?ch.join(' · '):'แก้ไข (ไม่มีอะไรเปลี่ยน)');
@@ -781,7 +783,7 @@ async function saveNewTool(){
   const code=(cat+' '+no).trim();
   const dupN=S.tools.find(t=>t.company===company&&(t.no||'').trim().toUpperCase()===no.toUpperCase());
   if(dupN){toast('❌ NO นี้มีอยู่แล้วใน '+company+': '+no+' — '+(dupN.cat||dupN.code));return;}
-  const {error}=await sb.from('tools').insert({company:company,category:cat,no:no,name:$('#ed_name').value.trim(),brand:$('#ed_brand').value.trim(),model:$('#ed_model').value.trim(),serial:$('#ed_sn').value.trim(),status:$('#ed_st').value,location:($('#ed_loc').value.trim()||'ออฟฟิต'),note:$('#ed_note').value.trim(),purchase_date:$('#ed_pdate').value||null,price:($('#ed_price').value!==''?Number($('#ed_price').value):null),warranty:$('#ed_warranty').value.trim()});
+  const {error}=await sb.from('tools').insert({company:company,category:cat,no:no,name:$('#ed_name').value.trim(),brand:$('#ed_brand').value.trim(),model:$('#ed_model').value.trim(),serial:$('#ed_sn').value.trim(),status:$('#ed_st').value,location:($('#ed_loc').value.trim()||'ออฟฟิต'),note:$('#ed_note').value.trim(),purchase_date:$('#ed_pdate').value||null,price:parsePrice($('#ed_price').value),warranty:$('#ed_warranty').value.trim()});
   if(error){toast('เพิ่มไม่ได้: '+error.message);return;}
   await ensureLookup('categories',cat,company);
   await logAudit('เพิ่ม',company,code,'เพิ่มเข้าทะเบียน');
