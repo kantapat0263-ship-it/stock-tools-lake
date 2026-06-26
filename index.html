@@ -1109,7 +1109,7 @@ function borrowDocHtml(items,who,proj,date,no,issueCo){
   }
   return out;
 }
-function nextBorrowLocal(co){return Math.max(0,...S.movements.filter(m=>m.type==='เบิก'&&m.company===co&&!m.isDraft&&m.borrowNo).map(m=>m.borrowNo))+1;}
+function nextBorrowLocal(co){return (S.nextBorrowByCo&&S.nextBorrowByCo[co])||1;}
 function previewBorrow(){
   if(!selBor.size){toast('ยังไม่ได้เลือกเครื่อง');return;}
   const co=($('#b_co')?$('#b_co').value:COMPANY)||COMPANY;
