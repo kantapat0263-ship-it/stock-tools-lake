@@ -948,10 +948,10 @@ function renderReceive(){
    <div class="panel" id="rvform" style="display:none;position:sticky;top:10px;z-index:5;box-shadow:0 6px 16px rgba(0,0,0,.10)">
      <div class="flexrow">
        <div class="field"><label>วันที่รับคืน</label><input id="v_date" type="date" value="${today()}"></div>
-       <div class="field"><label>ผู้เซ็นรับคืน</label><input id="v_recv" list="dl_p2" placeholder="ผู้รับเครื่องกลับ"></div>
+       <div class="field"><label>ผู้กดรับเข้า</label><input id="v_recv" list="dl_p2" placeholder="ชื่อผู้รับเข้า"></div>
      </div>
      <div class="selbar"><b id="rvcount">เลือก 0</b><div class="spacer"></div>
-       <button class="btn green" id="rvgo">👁️ ดูใบรับคืน (ยังไม่บันทึก)</button></div>
+       <button class="btn green" id="rvgo">✅ รับเข้า STOCK</button></div>
    </div>
    <div class="panel">
      <h3>ใบส่งซ่อมที่ยังไม่ปิด <span class="muted" style="font-weight:400">— ออกผิดยกเลิกได้ คืนสถานะเครื่องอัตโนมัติ</span></h3>
@@ -970,38 +970,21 @@ function renderReceive(){
       pg.rows.map(t=>`<tr><td><input type="checkbox" ${selRecv.has(t.i)?'checked':''} onchange="togRecv(${t.i},this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,36)}</td><td>${esc(t.no)}</td><td>${esc(slipOf(t.code))}</td><td>${esc(t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=7 class="empty">ไม่มีเครื่องอยู่ร้านซ่อม</td></tr>'
     }</tbody></table></div>${pg.html}`;};
   PG_REDRAW['receive']=drawRv; drawRv();
-  $('#rvgo').onclick=previewReceive;
+  $('#rvgo').onclick=doReceiveStock;
 }
 function togRecv(i,on){on?selRecv.add(i):selRecv.delete(i);$('#rvform').style.display=selRecv.size?'block':'none';$('#rvcount').textContent=`เลือก ${selRecv.size}`;}
-let pendingReceive=null;
-function receiveDocHtml(date,recv,items){
-  return `<div class="doc"><h1>รายการเครื่องมือที่ซ่อมเสร็จ — PAC</h1><div class="dsub">วันที่รับคืน ${esc(fmtDateTH(date))}</div>
-    <table><thead><tr><th>ลำดับ</th><th>รายการ</th><th>S/N</th><th>NO</th><th>ใบส่งซ่อม</th><th>ผู้เซ็นรับคืน</th></tr></thead><tbody>${
-    items.map((it,n)=>`<tr><td style="text-align:center">${n+1}</td><td>${esc(itemDesc(it.t))}</td><td>${esc(it.t.sn)}</td><td style="text-align:center">${esc(it.t.no)}</td><td style="text-align:center">${esc(it.slip)}</td><td>${esc(recv)}</td></tr>`).join('')
-    }</tbody></table></div>`;
-}
-function previewReceive(){
-  if(!selRecv.size)return;
-  const date=$('#v_date').value,recv=$('#v_recv').value;
+async function doReceiveStock(){
+  if(!selRecv.size){toast('ยังไม่ได้เลือกเครื่อง');return;}
+  const date=$('#v_date').value,recv=$('#v_recv').value.trim();
   const items=[...selRecv].map(ix=>{const t=S.tools[ix];
-    const m=[...S.movements].reverse().find(m=>m.tool_id===t.id&&m.type==='ส่งซ่อม');const slipN=m?m.slipNo:null;
-    return {t,slipN,slip:slipN!=null?String(slipN).padStart(3,'0'):'',company:m?m.company:COMPANY};});
-  pendingReceive={date,recv,items};
-  openModal(`<h3>👁️ ตัวอย่างใบรับคืนจากซ่อม</h3><p class="muted">ดูก่อน — <b>ยังไม่บันทึก</b> · จะบันทึกจริงตอนกด "พิมพ์ + บันทึก"</p>
-    ${docBox(receiveDocHtml(date,recv,items))}
-    <div class="flexrow"><button class="btn green" onclick="commitReceive()">🖨️ พิมพ์ + บันทึกรับคืน</button><button class="btn ghost" onclick="closeModal()">ปิด (ยังไม่บันทึก)</button></div>`);
-}
-async function commitReceive(){
-  if(!pendingReceive)return;
-  const {date,recv,items}=pendingReceive;
+    const m=[...S.movements].reverse().find(m=>m.tool_id===t.id&&m.type==='ส่งซ่อม');
+    return {t,slipN:m?m.slipNo:null,company:m?m.company:COMPANY};});
   for(const it of items){const t=it.t,slipN=it.slipN;
     await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',t.id);
     await sb.from('movements').insert({company:it.company,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'รับคืนจากซ่อม',slip_no:slipN,actor:recv});
     if(slipN!=null)await sb.from('repair_slips').update({status:'รับคืนครบ',received_date:date||null,receiver:recv}).eq('company',it.company).eq('slip_no',slipN);}
-  await ensureLookup('people',recv);
-  pendingReceive=null;closeModal();
-  $('#printArea').innerHTML=receiveDocHtml(date,recv,items);window.print();
-  toast(`รับคืน ${items.length} เครื่อง → พร้อมเบิก`);await loadAll();setTimeout(()=>go('receive'),400);
+  if(recv)await ensureLookup('people',recv);
+  toast(`✅ รับเข้า STOCK ${items.length} เครื่อง → สถานะว่าง พร้อมเบิก`);await loadAll();go('receive');
 }
 function cancelSlip(no,co){
   openModal(`<h3>🚫 ยกเลิกใบส่งซ่อม #${esc(no)} ${coBadge(co)}</h3>
