@@ -794,9 +794,9 @@ async function saveNewTool(){
   closeModal();toast('เพิ่มเครื่อง '+company+' แล้ว: '+code);await loadAll();go('tools');}
 
 /* ============ REPAIR (ส่งซ่อม) ============ */
-let selRepair=new Set();
+let selRepair=new Set(),rRsn={},rPj={};
 function renderRepair(){
-  selRepair=new Set();
+  selRepair=new Set();rRsn={};rPj={};
   const dCo=rDraft?rDraft.company:COMPANY;
   const eligible=S.tools.filter(t=>['ว่าง','ชำรุด','รอส่งซ่อม'].includes(t.status)&&inView(t));
   $('#view').innerHTML=`
@@ -821,7 +821,8 @@ function renderRepair(){
     <div id="rtbl"></div>
    </div>
    <datalist id="dl_v">${S.lookups.vendors.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>
-   <datalist id="dl_p">${S.lookups.people.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>`;
+   <datalist id="dl_p">${S.lookups.people.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>
+   <datalist id="dl_rpj">${S.lookups.projects.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>`;
   const draw=()=>{
     const q=$('#rq').value.trim().toLowerCase();
     const rows=eligible.filter(t=>!q||(t.name+t.no+t.code+(t.model||'')+(t.sn||'')).toLowerCase().includes(q));
@@ -840,17 +841,16 @@ function rcoChanged(){const co=$('#r_co')&&$('#r_co').value;const el=$('#rnohint
 function togRepair(i,on){on?selRepair.add(i):selRepair.delete(i);
   $('#rform').style.display=selRepair.size?'block':'none';
   $('#rcount').textContent=`เลือก ${selRepair.size} เครื่อง`;
-  $('#rsel').innerHTML='<table><thead><tr><th>เครื่อง</th><th>NO</th><th>อาการ/สาเหตุ</th></tr></thead><tbody>'+
-    [...selRepair].map(ix=>{const t=S.tools[ix];return `<tr><td>${esc(t.name).slice(0,30)}</td><td>${esc(t.no)}</td><td><input data-rsn="${ix}" placeholder="เช่น ลูกปืนแตก" style="width:100%"></td></tr>`;}).join('')+'</tbody></table>';
+  $('#rsel').innerHTML='<table><thead><tr><th>เครื่อง</th><th>NO</th><th>โครงการ (มาจากไซต์ไหน)</th><th>อาการ/สาเหตุ</th></tr></thead><tbody>'+
+    [...selRepair].map(ix=>{const t=S.tools[ix];return `<tr><td>${esc(t.name).slice(0,26)}</td><td>${esc(t.no)}</td><td><input data-rpj="${ix}" list="dl_rpj" value="${esc(rPj[ix]||'')}" oninput="rPj[${ix}]=this.value" placeholder="ไซต์/โครงการ" style="width:100%;min-width:110px"></td><td><input data-rsn="${ix}" value="${esc(rRsn[ix]||'')}" oninput="rRsn[${ix}]=this.value" placeholder="เช่น ลูกปืนแตก" style="width:100%;min-width:110px"></td></tr>`;}).join('')+'</tbody></table>';
 }
 function previewRepair(){
   if(!selRepair.size)return;
   const co=($('#r_co')?$('#r_co').value:COMPANY)||COMPANY;
   const date=$('#r_date').value,vendor=$('#r_vendor').value.trim(),sender=$('#r_sender').value.trim();
-  const rsn={};document.querySelectorAll('[data-rsn]').forEach(el=>rsn[el.dataset.rsn]=el.value);
   const sel=[...selRepair].map(ix=>S.tools[ix]);
   const slipN=(S.nextSlipByCo&&S.nextSlipByCo[co])||1, slip=String(slipN).padStart(3,'0');
-  const items=sel.map(t=>({t,reason:rsn[t.i]||''}));
+  const items=sel.map(t=>({t,reason:(rRsn[t.i]||'').trim(),project:(rPj[t.i]||'').trim()}));
   pendingRepair={slipN,slip,date,vendor,sender,items,co};
   openModal(`<h3>👁️ ตัวอย่างใบส่งซ่อม #${slip} ${coBadge(co)}</h3><p class="muted">ดูก่อน — <b>ยังไม่บันทึก</b> · จะบันทึกจริงตอนกด "พิมพ์ + บันทึก"</p>
     ${docBox(repairDocHtml(slip,date,vendor,sender,items,co))}
@@ -862,7 +862,7 @@ async function commitRepair(){
   const sres=await sb.from('repair_slips').insert({company:ISS,slip_no:slipN,sent_date:date||null,vendor,project:'',sender,status:'ส่งแล้ว'});
   if(sres.error){toast('บันทึกไม่ได้: '+sres.error.message);return;}
   for(const it of items){await sb.from('tools').update({status:'ส่งซ่อม',location:vendor||'ร้านซ่อม',updated_at:new Date().toISOString()}).eq('id',it.t.id);}
-  await sb.from('movements').insert(items.map(it=>({company:ISS,owner_company:it.t.company,recorded_by:(ME&&ME.email)||'',tool_id:it.t.id,occurred_on:date||null,type:'ส่งซ่อม',slip_no:slipN,actor:sender,counterparty:vendor,reason:it.reason})));
+  await sb.from('movements').insert(items.map(it=>({company:ISS,owner_company:it.t.company,recorded_by:(ME&&ME.email)||'',tool_id:it.t.id,occurred_on:date||null,type:'ส่งซ่อม',slip_no:slipN,actor:sender,counterparty:vendor,reason:it.reason,project:it.project||null})));
   await ensureLookup('vendors',vendor);await ensureLookup('people',sender);
   pendingRepair=null;closeModal();
   $('#printArea').innerHTML=repairDocHtml(slip,date,vendor,sender,items,ISS);window.print();
@@ -873,10 +873,9 @@ async function saveRepairDraft(){
   if(!selRepair.size){toast('ยังไม่ได้เลือกเครื่อง');return;}
   const co=($('#r_co')?$('#r_co').value:COMPANY)||COMPANY;
   const date=$('#r_date').value,vendor=$('#r_vendor').value.trim(),sender=$('#r_sender').value.trim();
-  const rsn={};document.querySelectorAll('[data-rsn]').forEach(el=>rsn[el.dataset.rsn]=el.value);
   const sel=[...selRepair].map(ix=>S.tools[ix]);
   for(const t of sel){await sb.from('tools').update({status:'ส่งซ่อม',location:vendor||'ร้านซ่อม',updated_at:new Date().toISOString()}).eq('id',t.id);}
-  await sb.from('movements').insert(sel.map(t=>({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'ส่งซ่อม',actor:sender,counterparty:vendor,reason:rsn[t.i]||'',is_draft:true})));
+  await sb.from('movements').insert(sel.map(t=>({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'ส่งซ่อม',actor:sender,counterparty:vendor,reason:(rRsn[t.i]||'').trim(),project:(rPj[t.i]||'').trim()||null,is_draft:true})));
   await ensureLookup('vendors',vendor);await ensureLookup('people',sender);
   rDraft={company:co,vendor,sender,date};
   toast(`เก็บเข้าใบร่างซ่อมแล้ว ${sel.length} เครื่อง · ออกใบจริงได้ที่ ประวัติ → ใบร่าง`);await loadAll();renderRepair();
@@ -912,7 +911,7 @@ function repairDocHtml(slip,date,vendor,sender,items,issueCo){
         <td>${it?esc(itemDesc(it.t)):''}</td>
         <td class="c">${it?esc(it.t.sn):''}</td>
         <td class="c">${it?esc(it.t.no):''}</td>
-        <td></td>
+        <td>${it?esc(it.project||''):''}</td>
         <td>${it?esc(it.reason||''):''}</td>
         <td class="c">${it?esc(fmtDateTH(date)):''}</td>
         <td></td>
@@ -1290,7 +1289,7 @@ function repairDrafts(){
     const co=mv.company,date=mv.date,vendor=mv.vendor,sender=mv.actor;
     const key=co+'|'+date+'|'+vendor+'|'+sender;
     const g=groups[key]=groups[key]||{company:co,date,vendor,sender,tools:[],movIds:[]};
-    g.tools.push(Object.assign({},t,{reason:mv.reason||''})); g.movIds.push(mv.id);
+    g.tools.push(Object.assign({},t,{reason:mv.reason||'',project:mv.project||''})); g.movIds.push(mv.id);
   });
   return Object.values(groups).filter(g=>!FILTER||g.company===FILTER).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
 }
@@ -1308,7 +1307,7 @@ async function issueRepairDraft(i){
   if(sres.error){toast('ออกใบไม่ได้: '+sres.error.message);return;}
   for(const mid of b.movIds){if(mid)await sb.from('movements').update({slip_no:slipN,is_draft:false}).eq('id',mid);}
   rDraft=null;
-  const items=b.tools.map(t=>({t,reason:t.reason||''}));
+  const items=b.tools.map(t=>({t,reason:t.reason||'',project:t.project||''}));
   $('#printArea').innerHTML=repairDocHtml(String(slipN).padStart(3,'0'),b.date,b.vendor,b.sender,items,b.company);window.print();
   toast(`ออกใบส่งซ่อม ${b.company} #${String(slipN).padStart(3,'0')} แล้ว`);await loadAll();go('history');
 }
@@ -1320,10 +1319,11 @@ function editRepairDraftForm(i){
       <div class="field"><label>ร้าน/ช่างซ่อม</label><input id="er_vendor" value="${esc(b.vendor)}"></div>
       <div class="field"><label>ผู้ส่ง</label><input id="er_sender" value="${esc(b.sender)}"></div>
     </div>
-    <p class="muted" style="font-size:12px;margin:6px 0 2px">เครื่องในร่าง ${b.tools.length} เครื่อง — แก้อาการ หรือติ๊ก "เอาออก" (จะกลับเป็น "ว่าง")</p>
-    <div style="max-height:34vh;overflow:auto"><table><thead><tr><th>เครื่อง / NO</th><th>อาการ/สาเหตุ</th><th class="center">เอาออก</th></tr></thead><tbody>${
-      b.tools.map((t,j)=>`<tr><td>${esc(t.name||t.code||'-')} ${esc(t.no)||''}</td><td><input data-rrs="${j}" value="${esc(t.reason||'')}" style="width:100%;min-width:120px"></td><td class="center"><input type="checkbox" data-rrm="${j}"></td></tr>`).join('')||'<tr><td colspan=3 class="empty">ไม่มีเครื่อง</td></tr>'
+    <p class="muted" style="font-size:12px;margin:6px 0 2px">เครื่องในร่าง ${b.tools.length} เครื่อง — แก้โครงการ/อาการ หรือติ๊ก "เอาออก" (จะกลับเป็น "ว่าง")</p>
+    <div style="max-height:34vh;overflow:auto"><table><thead><tr><th>เครื่อง / NO</th><th>โครงการ (มาจากไซต์ไหน)</th><th>อาการ/สาเหตุ</th><th class="center">เอาออก</th></tr></thead><tbody>${
+      b.tools.map((t,j)=>`<tr><td>${esc(t.name||t.code||'-')} ${esc(t.no)||''}</td><td><input data-rrp="${j}" list="dl_rpj" value="${esc(t.project||'')}" placeholder="ไซต์/โครงการ" style="width:100%;min-width:110px"></td><td><input data-rrs="${j}" value="${esc(t.reason||'')}" style="width:100%;min-width:110px"></td><td class="center"><input type="checkbox" data-rrm="${j}"></td></tr>`).join('')||'<tr><td colspan=4 class="empty">ไม่มีเครื่อง</td></tr>'
     }</tbody></table></div>
+    <datalist id="dl_rpj">${S.lookups.projects.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>
     <div class="flexrow" style="margin-top:10px"><button class="btn primary" onclick="saveRepairDraftEdit(${i})">💾 บันทึก</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
 }
 async function saveRepairDraftEdit(i){
@@ -1336,8 +1336,8 @@ async function saveRepairDraftEdit(i){
       if(mid)await sb.from('movements').update({deleted:true}).eq('id',mid);
       if(t.status==='ส่งซ่อม')await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',t.id);
       continue;}
-    const rs=document.querySelector(`[data-rrs="${j}"]`);
-    if(mid)await sb.from('movements').update({occurred_on:date||null,counterparty:vendor,actor:sender,reason:(rs?rs.value.trim():'')||''}).eq('id',mid);
+    const rs=document.querySelector(`[data-rrs="${j}"]`),rp=document.querySelector(`[data-rrp="${j}"]`);
+    if(mid)await sb.from('movements').update({occurred_on:date||null,counterparty:vendor,actor:sender,reason:(rs?rs.value.trim():'')||'',project:(rp?rp.value.trim():'')||null}).eq('id',mid);
     if(t.status==='ส่งซ่อม')await sb.from('tools').update({location:vendor||'ร้านซ่อม',updated_at:new Date().toISOString()}).eq('id',t.id);
   }
   closeModal();toast('แก้ไขใบร่างซ่อมแล้ว');await loadAll();go('history');
@@ -1502,7 +1502,7 @@ function slipDetail(slipNo,co){
   const rows=sent.map((m,i)=>{
     const r=m.tool_id?recvByTool[m.tool_id]:null;
     const back=r?`<span style="color:#16a34a">✅ ${esc(r.date)||'รับแล้ว'}</span>`:(s.status==='รับคืนครบ'?'<span style="color:#16a34a">✅ รับแล้ว</span>':'<span style="color:#d97706">⏳ อยู่ร้าน</span>');
-    return `<tr><td class="center">${i+1}</td><td><b>${esc(m.code)||esc(m.label)||'-'}</b></td><td class="center">${esc(m.no)||'-'}</td><td>${esc(m.reason)||'-'}</td><td>${back}</td></tr>`;
+    return `<tr><td class="center">${i+1}</td><td><b>${esc(m.code)||esc(m.label)||'-'}</b></td><td class="center">${esc(m.no)||'-'}</td><td>${esc(m.project)||'-'}</td><td>${esc(m.reason)||'-'}</td><td>${back}</td></tr>`;
   }).join('');
   const kv=(k,v)=>`<div><span class="muted">${k}:</span> <b>${v}</b></div>`;
   openModal(`<h3>📑 ใบส่งซ่อม #${esc(s.no)} ${coBadge(s.company)}</h3>
@@ -1517,7 +1517,7 @@ function slipDetail(slipNo,co){
       ${kv('รับคืนแล้ว',backN+'/'+sent.length)}
       ${s.note?`<div style="grid-column:1/3"><span class="muted">หมายเหตุ:</span> ${esc(s.note)}</div>`:''}
     </div>
-    <div style="max-height:42vh;overflow:auto"><table><thead><tr><th>#</th><th>รายการ / รหัส</th><th>NO</th><th>อาการ/สาเหตุ</th><th>รับคืน</th></tr></thead><tbody>${rows||'<tr><td colspan=5 class="empty">ไม่มีรายการ</td></tr>'}</tbody></table></div>
+    <div style="max-height:42vh;overflow:auto"><table><thead><tr><th>#</th><th>รายการ / รหัส</th><th>NO</th><th>โครงการ</th><th>อาการ/สาเหตุ</th><th>รับคืน</th></tr></thead><tbody>${rows||'<tr><td colspan=6 class="empty">ไม่มีรายการ</td></tr>'}</tbody></table></div>
     <div class="flexrow" style="margin-top:12px"><button class="btn primary" onclick="editSlipForm(${slipNo},'${esc(co)}')">✏️ แก้ไขใบ</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
 }
 function editSlipForm(slipNo,co){
@@ -1532,16 +1532,17 @@ function editSlipForm(slipNo,co){
       <div class="field"><label>ผู้ส่ง</label><input id="es_sender" value="${esc(s.sender)}"></div>
     </div>
     <div class="field"><label>หมายเหตุ</label><input id="es_note" value="${esc(s.note)}"></div>
-    <div class="muted" style="font-size:13px;margin:8px 0 2px">อาการ/สาเหตุ รายเครื่อง</div>
-    <div style="max-height:34vh;overflow:auto"><table><thead><tr><th>เครื่อง / NO</th><th>อาการ/สาเหตุ</th><th class="center">เอาออก</th></tr></thead><tbody>${
-      sent.map((m,i)=>`<tr><td>${esc(m.code||m.label)||'-'} ${esc(m.no)||''}</td><td><input data-er="${i}" value="${esc(m.reason)}" style="width:100%"></td><td class="center"><input type="checkbox" data-rm="${i}" title="เอาเครื่องนี้ออกจากใบ"></td></tr>`).join('')||'<tr><td colspan=3 class="empty">ไม่มีเครื่อง</td></tr>'
+    <div class="muted" style="font-size:13px;margin:8px 0 2px">โครงการ (มาจากไซต์ไหน) + อาการ/สาเหตุ รายเครื่อง</div>
+    <div style="max-height:34vh;overflow:auto"><table><thead><tr><th>เครื่อง / NO</th><th>โครงการ</th><th>อาการ/สาเหตุ</th><th class="center">เอาออก</th></tr></thead><tbody>${
+      sent.map((m,i)=>`<tr><td>${esc(m.code||m.label)||'-'} ${esc(m.no)||''}</td><td><input data-ep="${i}" list="dl_rpj" value="${esc(m.project||'')}" placeholder="ไซต์/โครงการ" style="width:100%;min-width:100px"></td><td><input data-er="${i}" value="${esc(m.reason)}" style="width:100%;min-width:100px"></td><td class="center"><input type="checkbox" data-rm="${i}" title="เอาเครื่องนี้ออกจากใบ"></td></tr>`).join('')||'<tr><td colspan=4 class="empty">ไม่มีเครื่อง</td></tr>'
     }</tbody></table></div>
+    <datalist id="dl_rpj">${S.lookups.projects.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>
     <div class="muted" style="font-size:11px;margin-top:3px">ติ๊ก "เอาออก" เครื่องที่ไม่ต้องการในใบ แล้วกดบันทึก (เครื่องจะกลับเป็น "ว่าง")</div>
     <div style="margin-top:10px"><button class="btn" onclick="_togglePick('es_addbox')">➕ เพิ่มเครื่องเข้าใบนี้</button></div>
     <div id="es_addbox" style="display:none;margin-top:8px;border-top:1px dashed var(--line);padding-top:8px">
       <input class="search" id="es_addq" oninput="_filterPick('es_addlist','es_addq')" placeholder="🔎 ค้นหาเครื่อง…" style="margin-bottom:6px;width:100%">
-      <div id="es_addlist" style="max-height:26vh;overflow:auto"><table><thead><tr><th></th><th>เครื่อง</th><th>อาการ/สาเหตุ</th></tr></thead><tbody>${
-        elig.map(t=>`<tr data-pickrow><td><input type="checkbox" data-radd="${t.id}"></td><td><b>${esc(t.code)}</b> ${coBadge(t.company)}</td><td><input data-rar="${t.id}" placeholder="เช่น ลูกปืนแตก" style="width:100%"></td></tr>`).join('')||'<tr><td colspan=3 class="empty">ไม่มีเครื่อง</td></tr>'
+      <div id="es_addlist" style="max-height:26vh;overflow:auto"><table><thead><tr><th></th><th>เครื่อง</th><th>โครงการ</th><th>อาการ/สาเหตุ</th></tr></thead><tbody>${
+        elig.map(t=>`<tr data-pickrow><td><input type="checkbox" data-radd="${t.id}"></td><td><b>${esc(t.code)}</b> ${coBadge(t.company)}</td><td><input data-rapj="${t.id}" list="dl_rpj" placeholder="ไซต์" style="width:100%;min-width:90px"></td><td><input data-rar="${t.id}" placeholder="เช่น ลูกปืนแตก" style="width:100%;min-width:90px"></td></tr>`).join('')||'<tr><td colspan=4 class="empty">ไม่มีเครื่อง</td></tr>'
       }</tbody></table></div>
     </div>
     <div class="flexrow" style="margin-top:10px"><button class="btn primary" onclick="saveSlip()">💾 บันทึก</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
@@ -1556,13 +1557,14 @@ async function saveSlip(){
       if(m.id)await sb.from('movements').update({deleted:true}).eq('id',m.id);
       if(m.tool_id){const t=S.tools.find(x=>x.id===m.tool_id);if(t&&t.status==='ส่งซ่อม')await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',m.tool_id);}
       continue;}
-    const r=document.querySelector(`[data-er="${i}"]`);
-    if(m.id&&r&&r.value!==(m.reason||''))await sb.from('movements').update({reason:r.value}).eq('id',m.id);}
+    const r=document.querySelector(`[data-er="${i}"]`),p=document.querySelector(`[data-ep="${i}"]`);
+    if(m.id)await sb.from('movements').update({reason:r?r.value:(m.reason||''),project:(p?p.value.trim():'')||null}).eq('id',m.id);}
   const adds=[...document.querySelectorAll('[data-radd]:checked')].map(c=>c.getAttribute('data-radd'));
   for(const tid of adds){const t=S.tools.find(x=>x.id===tid); if(!t)continue;
     const rs=document.querySelector(`[data-rar="${tid}"]`); const reason=rs?rs.value.trim():'';
+    const pj=document.querySelector(`[data-rapj="${tid}"]`); const project=pj?pj.value.trim():'';
     await sb.from('tools').update({status:'ส่งซ่อม',location:vendor||'ร้านซ่อม',updated_at:new Date().toISOString()}).eq('id',tid);
-    await sb.from('movements').insert({company:e.co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:tid,occurred_on:sent||null,type:'ส่งซ่อม',slip_no:e.slipNo,actor:sender,counterparty:vendor,reason});
+    await sb.from('movements').insert({company:e.co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:tid,occurred_on:sent||null,type:'ส่งซ่อม',slip_no:e.slipNo,actor:sender,counterparty:vendor,reason,project:project||null});
   }
   await ensureLookup('vendors',vendor);await ensureLookup('people',sender);
   closeModal();toast(adds.length?`แก้ไขใบส่งซ่อม #${String(e.slipNo).padStart(3,'0')} + เพิ่ม ${adds.length} เครื่องแล้ว`:'แก้ไขใบส่งซ่อม #'+String(e.slipNo).padStart(3,'0')+' แล้ว');await loadAll();go('history');
