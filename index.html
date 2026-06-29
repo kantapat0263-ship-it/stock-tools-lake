@@ -1469,10 +1469,9 @@ function reprintSlip(slipNo,co){
   const sent=S.movements.filter(m=>m.slipNo===slipNo&&m.company===co&&m.type==='ส่งซ่อม');
   if(!sent.length){toast('ใบนี้ไม่มีรายการเครื่อง');return;}
   const items=sent.map(m=>{const t=m.tool_id?S.tools.find(x=>x.id===m.tool_id):null;
-    return {t:t||{name:m.label||'',cat:'',sn:'',no:'',loc:m.project||'',company:co},reason:m.reason||''};});
-  const prev=COMPANY; COMPANY=co;
-  $('#printArea').innerHTML=repairDocHtml(s.no,s.sent,s.vendor,s.sender,items);
-  COMPANY=prev; window.print();
+    return {t:t||{name:m.label||'',cat:'',sn:'',no:'',loc:'',company:co},reason:m.reason||'',project:m.project||''};});
+  $('#printArea').innerHTML=repairDocHtml(s.no,s.sent,s.vendor,s.sender,items,co);
+  window.print();
 }
 function histSlips(){
   $('#hbody').innerHTML=`<div class="panel">
