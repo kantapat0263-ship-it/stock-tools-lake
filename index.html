@@ -806,7 +806,7 @@ function renderRepair(){
     <div class="flexrow">
       <div class="field"><label>บริษัทที่ออกใบ (หัวกระดาษ) *</label><select id="r_co" onchange="rcoChanged()">${['PAC','LOTUS'].map(c=>`<option value="${c}" ${dCo===c?'selected':''}>${c==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)'}</option>`).join('')}</select></div>
       <div class="field"><label>วันที่ส่ง</label><input id="r_date" type="date" value="${rDraft?esc(rDraft.date):today()}"></div>
-      <div class="field"><label>ร้าน/ช่างซ่อม</label><input id="r_vendor" list="dl_v" placeholder="เช่น สุเทพ" value="${rDraft?esc(rDraft.vendor):''}"></div>
+      <div class="field"><label>ร้าน/ช่างซ่อม</label><input id="r_vendor" list="dl_v" placeholder="เช่น สุเทพ" value="${rDraft?esc(rDraft.vendor):'ช่างสุเทพ'}"></div>
       <div class="field"><label>ผู้ส่ง</label><input id="r_sender" list="dl_p" value="${rDraft?esc(rDraft.sender):''}"></div>
     </div>
     <div class="muted" style="font-size:12px;margin:-2px 0 6px">เลขที่จะออกอัตโนมัติ <b style="color:var(--blue)" id="rnohint">#${String((S.nextSlipByCo&&S.nextSlipByCo[dCo])||1).padStart(3,'0')}</b></div>
