@@ -73,12 +73,12 @@ const sb=window.supabase.createClient(SB_URL,SB_KEY);
 const $=s=>document.querySelector(s);
 const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const today=()=>new Date().toISOString().slice(0,10);
-let TOOL=null, ME=null, TID=null;
+let TOOL=null, ME=null, TID=null, SITES=[];
 
 let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tmo);tmo=setTimeout(()=>t.classList.remove('on'),2400);}
 
 const STC={'ว่าง':['#16a34a','#dcfce7'],'ถูกยืม':['#2563eb','#dbeafe'],'ส่งซ่อม':['#d97706','#fef3c7'],'รอส่งซ่อม':['#d97706','#fef3c7'],'ชำรุด':['#dc2626','#fee2e2'],'สูญหาย':['#dc2626','#fee2e2']};
-const TYC={'เบิก':['#2563eb','📤'],'คืน':['#16a34a','📥'],'ส่งซ่อม':['#d97706','🔧'],'รับคืนจากซ่อม':['#0d9488','✅'],'แจ้งชำรุด':['#dc2626','⚠️']};
+const TYC={'เบิก':['#2563eb','📤'],'คืน':['#16a34a','📥'],'ส่งซ่อม':['#d97706','🔧'],'รับคืนจากซ่อม':['#0d9488','✅'],'แจ้งชำรุด':['#dc2626','⚠️'],'ย้ายไซต์':['#7c3aed','🔀']};
 
 function applyTheme(co){const r=document.documentElement.style;
   if(co==='LOTUS'){r.setProperty('--navy','#3f4a22');r.setProperty('--navydark','#2a3217');r.setProperty('--blue','#5c7a29');}
@@ -89,20 +89,22 @@ function fmtDate(d){if(!d)return '';const M=['ม.ค.','ก.พ.','มี.ค.'
 
 async function boot(){
   TID=new URLSearchParams(location.search).get('t');
-  if(!TID){return screenMsg('🔍','ไม่พบรหัสเครื่อง','ลิงก์นี้ไม่มีรหัสเครื่อง (?t=) — สแกน QR บนเครื่องอีกครั้ง');}
   const {data:{session}}=await sb.auth.getSession();
   if(!session)return screenLogin();
   ME={email:session.user.email};
   const {data:pr}=await sb.from('profiles').select('role,company').eq('id',session.user.id).maybeSingle();
   ME.role=pr?pr.role:'staff'; ME.company=pr?pr.company:null;
+  if(!TID)return screenScanner();
   await load();
 }
 
 async function load(){
-  const [{data:t,error:te},{data:mv}]=await Promise.all([
+  const [{data:t,error:te},{data:mv},{data:pj}]=await Promise.all([
     sb.from('tools').select('*').eq('id',TID).maybeSingle(),
-    sb.from('movements').select('*').eq('tool_id',TID).order('occurred_on',{ascending:false}).order('created_at',{ascending:false})
+    sb.from('movements').select('*').eq('tool_id',TID).order('occurred_on',{ascending:false}).order('created_at',{ascending:false}),
+    sb.from('projects').select('name')
   ]);
+  SITES=(pj||[]).map(x=>x.name).filter(Boolean).sort((a,b)=>String(a).localeCompare(String(b),'th'));
   if(te||!t)return screenMsg('❓','ไม่พบเครื่องนี้','อาจถูกลบ หรือบัญชีของคุณไม่มีสิทธิ์ดูเครื่องของบริษัทนี้');
   TOOL=t; applyTheme(t.company); render(t,mv||[]);
 }
@@ -113,7 +115,15 @@ function render(t,mv){
   const canEdit=!!ME;
 
   let actions='';
-  if(canEdit){
+  if(ME&&ME.role==='site'){
+    if(t.status==='ถูกยืม'){
+      actions=`<div class="muted" style="font-size:13px;margin-bottom:7px">🔀 ย้ายเครื่องนี้ไปไซต์ใหม่ — ตอนนี้อยู่ที่ <b>${esc(t.location)||'-'}</b></div>
+        <select id="movesite" class="inp" style="margin-bottom:9px"><option value="">— เลือกไซต์ปลายทาง —</option>${SITES.map(s=>`<option>${esc(s)}</option>`).join('')}</select>
+        <button class="btn primary" style="background:var(--blue)" onclick="actMoveSite()">🔀 ย้ายไปไซต์นี้</button>`;
+    }else{
+      actions=`<div class="muted" style="font-size:13px;text-align:center;padding:6px">— เครื่องนี้สถานะ ${esc(t.status)} · ย้ายได้เฉพาะเครื่องที่ "ถูกยืม" ออกไซต์อยู่ (เครื่องในออฟฟิศ ต้องเบิกที่ออฟฟิศ)</div>`;
+    }
+  }else if(canEdit){
     if(t.status==='ถูกยืม'||t.status==='ส่งซ่อม'){
       actions+=`<input id="rnote" class="inp" placeholder="โน้ตสภาพ (ไม่บังคับ)" style="margin-bottom:9px">`;
       actions+=`<button class="btn primary" onclick="${t.status==='ถูกยืม'?'actReceiveSite()':'actReceiveRepair()'}">📥 ${t.status==='ถูกยืม'?'รับคืนเข้าออฟฟิต':'รับคืนจากซ่อม'}</button>`;
@@ -199,6 +209,16 @@ async function actReceiveRepair(){
   if(slipN!=null)await sb.from('repair_slips').update({status:'รับคืนครบ',received_date:today(),receiver:ME.email}).eq('company',m.company).eq('slip_no',slipN);
   LAST={label:'รับคืนจากซ่อม',toolId:TOOL.id,name:(TOOL.no||TOOL.name||''),prevTool:prev,movId:ins&&ins.id,slip:slipPrev};
   afterAction('📥 รับคืนจากซ่อมแล้ว');
+}
+async function actMoveSite(){
+  const sel=$('#movesite'),site=sel?sel.value.trim():'';
+  if(!site){toast('เลือกไซต์ปลายทางก่อน');return;}
+  if(site===(TOOL.location||'')){toast('เครื่องอยู่ไซต์นี้อยู่แล้ว');return;}
+  const prev=snapTool(TOOL),co=TOOL.company;
+  await sb.from('tools').update({location:site,pending_dest:site,dispatched_at:now(),updated_at:now()}).eq('id',TOOL.id);
+  const {data:ins}=await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'ย้ายไซต์',project:site,actor:ME.email}).select('id').maybeSingle();
+  LAST={label:'ย้ายไซต์',toolId:TOOL.id,name:(TOOL.no||TOOL.name||''),prevTool:prev,movId:ins&&ins.id,slip:null};
+  afterAction('🔀 ย้ายไป '+site+' แล้ว');
 }
 async function undoLast(){
   if(!LAST){toast('ไม่มีรายการให้ยกเลิก');return;}
