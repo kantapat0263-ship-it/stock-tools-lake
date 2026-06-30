@@ -331,6 +331,15 @@ async function init(){
   const u=session.user;
   const {data:pr}=await sb.from('profiles').select('*').eq('id',u.id).maybeSingle();
   ME={id:u.id,email:u.email,role:pr?pr.role:'staff',company:pr?pr.company:null};
+  if(ME.role==='site'){
+    document.body.innerHTML=`<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:inherit;background:#0f172a;color:#fff">
+      <div style="font-size:46px">📷</div>
+      <div style="font-size:20px;font-weight:700;margin-top:10px">ผู้ดูแลหน้างาน</div>
+      <div style="margin-top:8px;max-width:330px;color:#cbd5e1;line-height:1.6">สแกน QR บนเครื่องมือ เพื่อ <b>ย้ายเครื่องไปไซต์</b><br>(เมนูออฟฟิศสงวนไว้สำหรับทีมออฟฟิศ)</div>
+      <a href="/s.html" style="margin-top:20px;background:#2563eb;color:#fff;padding:12px 22px;border-radius:11px;text-decoration:none;font-weight:600">📷 เปิดกล้องสแกน</a>
+    </div>`;
+    return;
+  }
   $('#loginScrim').style.display='none';
   document.querySelector('.app').style.display='flex';
   $('#uemail').textContent=ME.email; $('#urole').textContent=(ME.role==='admin'?'ผู้ดูแลระบบ':'พนักงาน '+(ME.company||''));
@@ -1877,7 +1886,7 @@ async function renderUsers(){
     <table><thead><tr><th>อีเมล</th><th>บทบาท</th><th>เห็นบริษัท</th><th></th></tr></thead><tbody>${
       profs.map(p=>`<tr>
         <td><b>${esc(p.email||p.id.slice(0,8))}</b></td>
-        <td><select id="ur_${p.id}"><option value="staff" ${p.role==='staff'?'selected':''}>พนักงาน (staff)</option><option value="admin" ${p.role==='admin'?'selected':''}>ผู้ดูแล (admin — เห็นทุกบริษัท)</option></select></td>
+        <td><select id="ur_${p.id}"><option value="staff" ${p.role==='staff'?'selected':''}>พนักงาน (staff)</option><option value="site" ${p.role==='site'?'selected':''}>ผู้ดูแลหน้างาน (สแกนย้ายไซต์อย่างเดียว)</option><option value="admin" ${p.role==='admin'?'selected':''}>ผู้ดูแล (admin — เห็นทุกบริษัท)</option></select></td>
         <td><select id="uc_${p.id}"><option value="" ${!p.company?'selected':''}>— ยังไม่กำหนด (ยังเข้าไม่ได้)</option><option value="PAC" ${p.company==='PAC'?'selected':''}>PAC</option><option value="LOTUS" ${p.company==='LOTUS'?'selected':''}>LOTUS</option></select></td>
         <td><button class="btn primary" style="padding:6px 14px" onclick="saveUser('${p.id}')">บันทึก</button> ${p.id!==ME.id?`<button class="btn" style="background:#fee2e2;color:#b91c1c;padding:6px 12px" onclick="delUser('${p.id}','${esc(p.email||'')}')">ลบ</button>`:`<span class="muted" style="font-size:12px">(คุณ)</span>`}</td>
       </tr>`).join('')
