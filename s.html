@@ -93,7 +93,8 @@ async function boot(){
   if(!session)return screenLogin();
   ME={email:session.user.email};
   const {data:pr}=await sb.from('profiles').select('role,company').eq('id',session.user.id).maybeSingle();
-  ME.role=pr?pr.role:'staff'; ME.company=pr?pr.company:null;
+  ME.role=pr?pr.role:'pending'; ME.company=pr?pr.company:null;
+  if(ME.role!=='admin' && !ME.company)return screenMsg('⏳','รออนุมัติ','บัญชีนี้เพิ่งสมัคร ยังไม่ได้รับสิทธิ์ — แจ้งผู้ดูแลให้กำหนดบริษัท/บทบาทก่อน');
   if(!TID)return screenScanner();
   await load();
 }
