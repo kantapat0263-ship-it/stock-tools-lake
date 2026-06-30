@@ -425,8 +425,16 @@ function renderDash(){
     <h3 style="margin:0 0 6px">📍 เครื่องค้างที่ไซต์เกิน 30 วัน — ยังไม่คืน (${_late.length})</h3>
     <table><thead><tr><th>รหัส</th><th>บ.</th><th>อยู่ที่</th><th class="center">ค้างมา</th></tr></thead><tbody>${_late.slice(0,8).map(t=>{const d=Math.floor((Date.now()-new Date(t.dispatchedAt||t.updated))/86400000);return `<tr><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.loc)||'-'}</td><td class="center"><b>${d} วัน</b></td></tr>`;}).join('')}</tbody></table>
   </div>`:'';
+  const _mvcut=new Date(Date.now()-7*86400000).toISOString().slice(0,10);
+  const _moves=S.movements.filter(m=>m.type==='ย้ายไซต์'&&inViewMov(m)&&(m.date||'')>=_mvcut).reverse().slice(0,10);
+  const moveAlert=_moves.length?`<div class="panel" style="border-left:4px solid #7c3aed;background:#faf5ff">
+    <h3 style="margin:0 0 6px">🔀 การโยกเครื่องล่าสุด (7 วันล่าสุด) — ${_moves.length} รายการ <span class="muted" style="font-weight:400;font-size:12px">· รวมที่หน้างานสแกนย้ายเอง</span></h3>
+    <table><thead><tr><th>เครื่อง</th><th>บ.</th><th>ย้ายไป</th><th>โดย</th><th>เมื่อ</th></tr></thead><tbody>${
+      _moves.map(m=>`<tr><td><b>${esc(m.code||m.no||'-')}</b></td><td>${coBadge(m.company)}</td><td><b>${esc(m.project)||'-'}</b></td><td>${esc(m.actor||m.recordedBy||'-')}</td><td>${esc(fmtDateTH(m.date))||'-'}</td></tr>`).join('')}</tbody></table>
+  </div>`:'';
   $('#view').innerHTML=`
     ${pendAlert}
+    ${moveAlert}
     ${notif}
     <div class="cards">${cards}</div>
     <div class="life">${strip}</div>
