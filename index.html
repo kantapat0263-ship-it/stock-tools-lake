@@ -1282,12 +1282,12 @@ function histDrafts(){
    <div class="panel">
     <h3>📝 ใบร่างเบิก / ส่งไซต์ <span class="muted" style="font-weight:400">— เครื่องในร่างถือว่า "ถูกยืม" แล้ว · กด "ออกใบ" เพื่อออกเลขที่ + พิมพ์</span></h3>
     <div id="hdtbl" style="max-height:40vh;overflow:auto"><table class="locktbl"><thead><tr><th>บ.</th><th>โครงการ / ไซต์</th><th>ผู้เบิก</th><th>วันที่</th><th class="center">จำนวน</th><th></th></tr></thead><tbody>${
-      bb.map((b,i)=>`<tr><td>${coBadge(b.company)}</td><td><b>${esc(b.project)||'-'}</b></td><td>${esc(b.who)||'-'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 10px" onclick="addToDraft(${i})">➕ เพิ่มเครื่อง</button> <button class="btn" style="padding:5px 10px" onclick="editBorrowBatchForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:#16a34a;color:#fff;padding:5px 11px" onclick="issueDraft(${i})">🖨️ ออกใบ</button></td></tr>`).join('')||`<tr><td colspan=6 class="empty">ยังไม่มีใบร่างเบิก — สร้างที่เมนู เบิก/คืน → เลือกเครื่อง → "เก็บเข้าร่าง"</td></tr>`
+      bb.map((b,i)=>`<tr><td>${coBadge(b.company)}</td><td><b>${esc(b.project)||'-'}</b></td><td>${esc(b.who)||'-'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 10px" onclick="addToDraft(${i})">➕ เพิ่มเครื่อง</button> <button class="btn" style="padding:5px 10px" onclick="editBorrowBatchForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:#16a34a;color:#fff;padding:5px 11px" onclick="issueDraft(${i})">🖨️ ออกใบ</button> <button class="btn" style="background:#fee2e2;color:#b91c1c;padding:5px 10px" onclick="cancelDraft(${i})">🗑️ ยกเลิก</button></td></tr>`).join('')||`<tr><td colspan=6 class="empty">ยังไม่มีใบร่างเบิก — สร้างที่เมนู เบิก/คืน → เลือกเครื่อง → "เก็บเข้าร่าง"</td></tr>`
     }</tbody></table></div></div>
    <div class="panel">
     <h3>🔧 ใบร่างส่งซ่อม <span class="muted" style="font-weight:400">— เครื่องในร่างถือว่า "ส่งซ่อม" แล้ว · กด "ออกใบ" เพื่อออกเลขที่ + พิมพ์</span></h3>
     <div id="hrdtbl" style="max-height:40vh;overflow:auto"><table class="locktbl"><thead><tr><th>บ.</th><th>ร้าน/ช่างซ่อม</th><th>ผู้ส่ง</th><th>วันที่</th><th class="center">จำนวน</th><th></th></tr></thead><tbody>${
-      rr.map((b,i)=>`<tr><td>${coBadge(b.company)}</td><td><b>${esc(b.vendor)||'-'}</b></td><td>${esc(b.sender)||'-'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 10px" onclick="addToRepairDraft(${i})">➕ เพิ่มเครื่อง</button> <button class="btn" style="padding:5px 10px" onclick="editRepairDraftForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:#16a34a;color:#fff;padding:5px 11px" onclick="issueRepairDraft(${i})">🖨️ ออกใบ</button></td></tr>`).join('')||`<tr><td colspan=6 class="empty">ยังไม่มีใบร่างซ่อม — สร้างที่เมนู ส่งซ่อม → เลือกเครื่อง → "เก็บเข้าร่าง"</td></tr>`
+      rr.map((b,i)=>`<tr><td>${coBadge(b.company)}</td><td><b>${esc(b.vendor)||'-'}</b></td><td>${esc(b.sender)||'-'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 10px" onclick="addToRepairDraft(${i})">➕ เพิ่มเครื่อง</button> <button class="btn" style="padding:5px 10px" onclick="editRepairDraftForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:#16a34a;color:#fff;padding:5px 11px" onclick="issueRepairDraft(${i})">🖨️ ออกใบ</button> <button class="btn" style="background:#fee2e2;color:#b91c1c;padding:5px 10px" onclick="cancelRepairDraft(${i})">🗑️ ยกเลิก</button></td></tr>`).join('')||`<tr><td colspan=6 class="empty">ยังไม่มีใบร่างซ่อม — สร้างที่เมนู ส่งซ่อม → เลือกเครื่อง → "เก็บเข้าร่าง"</td></tr>`
     }</tbody></table></div></div>`;
 }
 function addToDraft(i){
@@ -1306,6 +1306,14 @@ async function issueDraft(i){
   borDraft=null;
   $('#printArea').innerHTML=borrowDocHtml(b.tools,b.who,b.project,b.date,bn,b.company);window.print();
   toast(`ออกใบส่งไซต์ ${b.company} #${String(bn).padStart(3,'0')} แล้ว`);await loadAll();go('history');
+}
+async function cancelDraft(i){
+  const b=(window._bb||[])[i]; if(!b){toast('ไม่พบใบร่าง');return;}
+  if(!confirm(`ยกเลิกใบร่างเบิก ${b.company} ของ "${b.project||'-'}" (${b.tools.length} เครื่อง)?\nเครื่องทั้งหมดจะกลับเป็น "ว่าง"`))return;
+  for(let j=0;j<b.tools.length;j++){const t=b.tools[j],mid=b.movIds[j];
+    if(mid)await sb.from('movements').update({deleted:true}).eq('id',mid);
+    if(t.status==='ถูกยืม')await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:new Date().toISOString()}).eq('id',t.id);}
+  toast(`ยกเลิกใบร่างแล้ว — ${b.tools.length} เครื่องกลับเป็นว่าง`);await loadAll();go('history');
 }
 function repairDrafts(){
   const groups={};
@@ -1337,6 +1345,14 @@ async function issueRepairDraft(i){
   const items=b.tools.map(t=>({t,reason:t.reason||'',project:t.project||''}));
   $('#printArea').innerHTML=repairDocHtml(String(slipN).padStart(3,'0'),b.date,b.vendor,b.sender,items,b.company);window.print();
   toast(`ออกใบส่งซ่อม ${b.company} #${String(slipN).padStart(3,'0')} แล้ว`);await loadAll();go('history');
+}
+async function cancelRepairDraft(i){
+  const b=(window._rd||[])[i]; if(!b){toast('ไม่พบใบร่าง');return;}
+  if(!confirm(`ยกเลิกใบร่างซ่อม ${b.company} ร้าน ${b.vendor||'-'} (${b.tools.length} เครื่อง)?\nเครื่องทั้งหมดจะกลับเป็น "ว่าง"`))return;
+  for(let j=0;j<b.tools.length;j++){const t=b.tools[j],mid=b.movIds[j];
+    if(mid)await sb.from('movements').update({deleted:true}).eq('id',mid);
+    if(t.status==='ส่งซ่อม')await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',t.id);}
+  toast(`ยกเลิกใบร่างซ่อมแล้ว — ${b.tools.length} เครื่องกลับเป็นว่าง`);await loadAll();go('history');
 }
 function editRepairDraftForm(i){
   const b=(window._rd||[])[i]; if(!b){toast('ไม่พบใบร่าง');return;}
