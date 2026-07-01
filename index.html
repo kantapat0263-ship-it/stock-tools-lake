@@ -125,6 +125,10 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
 .tabs button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:13px 22px;border-radius:11px;z-index:60;opacity:0;transition:.25s;box-shadow:0 10px 30px rgba(0,0,0,.25)}
 .toast.on{opacity:1}
+#rtbar{position:fixed;top:66px;left:50%;transform:translateX(-50%) translateY(-14px);background:#2563eb;color:#fff;padding:9px 18px;border-radius:999px;font-size:13.5px;font-weight:600;box-shadow:0 8px 24px rgba(37,99,235,.4);cursor:pointer;z-index:30;display:none;opacity:0;transition:opacity .22s,transform .22s;white-space:nowrap;user-select:none}
+#rtbar.on{display:block;opacity:1;transform:translateX(-50%) translateY(0)}
+#rtbar:hover{background:#1d4ed8}
+@media(max-width:768px){#rtbar{top:54px;font-size:12.5px;padding:8px 15px}}
 .tl{list-style:none;padding:0;margin:0}
 .tl li{display:flex;gap:14px;padding:10px 0;border-bottom:1px dashed var(--line)}
 .tl .ti{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#eef2f7}
@@ -230,6 +234,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
 </div>
 <div class="scrim" id="scrim"><div class="modal" id="modal"></div></div>
 <div class="toast" id="toast"></div>
+<div id="rtbar" onclick="applyRT()">🔄 มีข้อมูลใหม่ · แตะเพื่ออัปเดต</div>
 <div id="printArea"></div>
 <div id="loginScrim" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#0f2744,#16365c);align-items:center;justify-content:center;z-index:100">
   <div style="background:#fff;border-radius:16px;padding:30px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.35)">
@@ -323,7 +328,22 @@ async function loadAll(){
   S.nextBorrowByCo={};['PAC','LOTUS'].forEach(co=>{const r=(cntRows||[]).find(x=>x.company===co);let v=((r&&r.value)||0)+1;if(v>999)v=1;S.nextBorrowByCo[co]=v;});
 }
 async function ensureLookup(tbl,name,co){name=(name||'').trim();if(!name)return;if((S.lookups[tbl]||[]).includes(name))return;try{await sb.from(tbl).insert({company:co||COMPANY,name});}catch(e){}}
-async function reload(view){await loadAll();go(view||CUR);}
+async function reload(view){_rtReloadAt=Date.now();hideRT();await loadAll();go(view||CUR);}
+/* ---- realtime: แจ้งเตือนเมื่อผู้ใช้อื่นแก้ข้อมูล (แบบ A: แบนเนอร์ ไม่รีเฟรชเอง กันฟอร์มที่กำลังกรอกหาย) ---- */
+let _rtReloadAt=0;
+function showRT(){const b=$('#rtbar');if(b)b.classList.add('on');}
+function hideRT(){const b=$('#rtbar');if(b)b.classList.remove('on');}
+async function applyRT(){hideRT();await reload(CUR);}
+async function subscribeRealtime(){
+  if(window._rtCh)return;                 // กัน subscribe ซ้ำ (init ถูกเรียกได้หลายครั้ง)
+  try{const {data:{session}}=await sb.auth.getSession(); if(session)sb.realtime.setAuth(session.access_token);}catch(e){}
+  const onChg=()=>{ if(Date.now()-_rtReloadAt<3000)return; showRT(); };  // ข้ามการแก้ของตัวเอง (เพิ่ง reload ไป)
+  window._rtCh=sb.channel('rt-stock')
+    .on('postgres_changes',{event:'*',schema:'public',table:'tools'},onChg)
+    .on('postgres_changes',{event:'*',schema:'public',table:'movements'},onChg)
+    .on('postgres_changes',{event:'*',schema:'public',table:'repair_slips'},onChg)
+    .subscribe();
+}
 /* ---- auth ---- */
 async function init(){
   const {data:{session}}=await sb.auth.getSession();
@@ -357,6 +377,7 @@ async function init(){
   if(ME.role!=='admin'&&ME.company){COMPANY=ME.company;FILTER=ME.company;document.querySelectorAll('#coswitch button').forEach(b=>b.classList.toggle('on',(b.dataset.co||'')===FILTER));}
   applyTheme(ME.company);
   await loadAll();
+  subscribeRealtime();
   if(!S.tools.length && ME.role!=='admin'){toast('บัญชีนี้ยังไม่ถูกตั้งสิทธิ์ — แจ้งแอดมินตั้งบริษัท/admin ให้');}
   const _q=new URLSearchParams(location.search);
   const _tp=_q.get('t');
