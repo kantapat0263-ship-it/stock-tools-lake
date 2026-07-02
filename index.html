@@ -213,6 +213,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
       <button data-v="labels"><span class="ic">🏷️</span> ป้าย QR</button>
       <button data-v="sites"><span class="ic">🗂️</span> จัดการไซต์งาน</button>
       <button data-v="cats"><span class="ic">📂</span> จัดการหมวด</button>
+      <button data-v="contacts"><span class="ic">👤</span> จัดการผู้เบิก/ช่าง</button>
       <button data-v="disposed"><span class="ic">🗄️</span> ตัดจำหน่าย/ขายซาก</button>
       <button data-v="trash"><span class="ic">🗑️</span> ถังขยะ</button>
       <button data-v="guide"><span class="ic">📖</span> คู่มือ</button>
@@ -403,14 +404,14 @@ async function doSignup(){const e=$('#li_email').value.trim(),p=$('#li_pass').va
 async function logout(){await sb.auth.signOut();location.reload();}
 
 /* ============ router ============ */
-const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],bysite:['ของตามไซต์','ดูเครื่องที่อยู่แต่ละไซต์งานตอนนี้'],scan:['สแกน','สแกน QR → รับคืนเข้าระบบ (จากไซต์ / จากซ่อม)'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],labels:['ป้าย QR','สร้าง QR ไม่ซ้ำของแต่ละเครื่อง → พิมพ์เป็นป้าย'],sites:['จัดการไซต์งาน','เพิ่ม / แก้ชื่อ / ลบ / รวมไซต์ซ้ำ — กันชื่อโครงการเพี้ยน'],cats:['จัดการหมวด','เพิ่ม / แก้ / ลบ / รวมหมวดซ้ำ — หมวด = ประเภทกว้างๆ'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],disposed:['ตัดจำหน่าย / ขายซาก','เครื่องที่ตัดออกจากทรัพย์สินแล้ว — บัญชีดู/ดาวน์โหลดได้ · กู้คืนได้ถ้าตัดผิด'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
+const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],bysite:['ของตามไซต์','ดูเครื่องที่อยู่แต่ละไซต์งานตอนนี้'],scan:['สแกน','สแกน QR → รับคืนเข้าระบบ (จากไซต์ / จากซ่อม)'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],labels:['ป้าย QR','สร้าง QR ไม่ซ้ำของแต่ละเครื่อง → พิมพ์เป็นป้าย'],sites:['จัดการไซต์งาน','เพิ่ม / แก้ชื่อ / ลบ / รวมไซต์ซ้ำ — กันชื่อโครงการเพี้ยน'],cats:['จัดการหมวด','เพิ่ม / แก้ / ลบ / รวมหมวดซ้ำ — หมวด = ประเภทกว้างๆ'],contacts:['จัดการผู้เบิก / ช่าง','แก้ชื่อ / รวมชื่อซ้ำ / ลบ ผู้เบิก·ผู้ส่ง·ช่าง — แก้แล้วอัปเดตใบเก่าให้ด้วย'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],disposed:['ตัดจำหน่าย / ขายซาก','เครื่องที่ตัดออกจากทรัพย์สินแล้ว — บัญชีดู/ดาวน์โหลดได้ · กู้คืนได้ถ้าตัดผิด'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
 function go(v){
   if(v==='guide'){window.open('guide.html','_blank');return;}
   if(CUR==='scan'&&v!=='scan'&&window._scanner)stopScanner();
   CUR=v; borDraft=null; rDraft=null;
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
   $('#ttl').textContent=TITLES[v][0];$('#tsub').textContent=TITLES[v][1];
-  ({dash:renderDash,tools:renderTools,borrow:renderBorrow,bysite:renderBySite,scan:renderScan,repair:renderRepair,receive:renderReceive,history:renderHistory,report:renderReport,labels:renderLabels,sites:renderSites,cats:renderCats,trash:renderTrash,disposed:renderDisposed,audit:renderAudit,users:renderUsers}[v])();
+  ({dash:renderDash,tools:renderTools,borrow:renderBorrow,bysite:renderBySite,scan:renderScan,repair:renderRepair,receive:renderReceive,history:renderHistory,report:renderReport,labels:renderLabels,sites:renderSites,cats:renderCats,contacts:renderContacts,trash:renderTrash,disposed:renderDisposed,audit:renderAudit,users:renderUsers}[v])();
   window.scrollTo(0,0);
 }
 $('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b){go(b.dataset.v);closeNav();}});
@@ -665,6 +666,123 @@ async function deleteSite(i){
   const {error}=await sb.from('projects').delete().eq('name',s); if(error){toast('ลบไม่ได้: '+error.message);return;}
   toast('ลบไซต์ '+s+' แล้ว');await loadAll();go('sites');
 }
+/* ============ จัดการผู้เบิก / ช่าง (people + vendors) ============ */
+let _peopleList=[], _vendorsList=[];
+function renderContacts(){
+  $('#view').innerHTML=`
+  <div class="panel">
+    <h3>👤 จัดการผู้เบิก / ผู้ส่ง <span class="muted" style="font-weight:400">— แก้ชื่อ / รวมชื่อซ้ำ / ลบ · แก้ชื่อแล้วอัปเดตใบเก่าให้ด้วย</span></h3>
+    <div class="toolbar" style="margin:8px 0"><input class="search" id="newperson" placeholder="ชื่อผู้เบิก/ผู้ส่งใหม่…" style="max-width:300px"><button class="btn primary" id="addpersonBtn" style="margin-left:8px">➕ เพิ่มชื่อ</button></div>
+    <div id="peoplebody"></div>
+  </div>
+  <div class="panel">
+    <h3>🔧 จัดการช่าง / ร้านซ่อม <span class="muted" style="font-weight:400">— แก้ชื่อ / รวม / ลบ · อัปเดตใบส่งซ่อมเก่าให้ด้วย</span></h3>
+    <div class="toolbar" style="margin:8px 0"><input class="search" id="newvendor" placeholder="ชื่อช่าง/ร้านใหม่…" style="max-width:300px"><button class="btn primary" id="addvendorBtn" style="margin-left:8px">➕ เพิ่มช่าง</button></div>
+    <div id="vendorbody"></div>
+  </div>`;
+  $('#addpersonBtn').onclick=addPerson;
+  $('#newperson').addEventListener('keydown',e=>{if(e.key==='Enter')addPerson();});
+  $('#addvendorBtn').onclick=addVendor;
+  $('#newvendor').addEventListener('keydown',e=>{if(e.key==='Enter')addVendor();});
+  drawPeople(); drawVendors();
+}
+function drawPeople(){
+  _peopleList=[...S.lookups.people].sort((a,b)=>String(a).localeCompare(String(b),'th'));
+  const useC=n=>S.movements.filter(m=>m.actor===n).length;
+  $('#peoplebody').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th>ชื่อ (ผู้เบิก/ผู้ส่ง/ผู้รับ)</th><th class="center">ใช้ในประวัติ</th><th></th></tr></thead><tbody>${
+    _peopleList.map((n,i)=>`<tr><td><b>${esc(n)}</b></td><td class="center">${useC(n)||'-'}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:4px 9px" onclick="renamePerson(${i})">✏️ แก้</button> <button class="btn" style="padding:4px 9px" onclick="mergePerson(${i})">🔀 รวม</button> <button class="btn" style="padding:4px 9px;background:#fee2e2;color:#b91c1c" onclick="deletePerson(${i})">🗑️</button></td></tr>`).join('')||'<tr><td colspan=3 class="empty">ยังไม่มีชื่อในลิสต์</td></tr>'
+  }</tbody></table></div>`;
+}
+function drawVendors(){
+  _vendorsList=[...S.lookups.vendors].sort((a,b)=>String(a).localeCompare(String(b),'th'));
+  const useC=n=>(S.slips||[]).filter(s=>s.vendor===n).length;
+  $('#vendorbody').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th>ช่าง / ร้านซ่อม</th><th class="center">ใช้ในใบซ่อม</th><th></th></tr></thead><tbody>${
+    _vendorsList.map((n,i)=>`<tr><td><b>${esc(n)}</b></td><td class="center">${useC(n)||'-'}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:4px 9px" onclick="renameVendor(${i})">✏️ แก้</button> <button class="btn" style="padding:4px 9px" onclick="mergeVendor(${i})">🔀 รวม</button> <button class="btn" style="padding:4px 9px;background:#fee2e2;color:#b91c1c" onclick="deleteVendor(${i})">🗑️</button></td></tr>`).join('')||'<tr><td colspan=3 class="empty">ยังไม่มีช่างในลิสต์</td></tr>'
+  }</tbody></table></div>`;
+}
+async function addPerson(){
+  const name=($('#newperson').value||'').trim(); if(!name){toast('ใส่ชื่อก่อน');return;}
+  if(S.lookups.people.some(p=>p.toLowerCase()===name.toLowerCase())){toast('มีชื่อนี้อยู่แล้ว');return;}
+  const {error}=await sb.from('people').insert({company:COMPANY,name}); if(error){toast('เพิ่มไม่ได้: '+error.message);return;}
+  toast('➕ เพิ่ม '+name);await loadAll();go('contacts');
+}
+async function addVendor(){
+  const name=($('#newvendor').value||'').trim(); if(!name){toast('ใส่ชื่อก่อน');return;}
+  if(S.lookups.vendors.some(v=>v.toLowerCase()===name.toLowerCase())){toast('มีช่างนี้อยู่แล้ว');return;}
+  const {error}=await sb.from('vendors').insert({company:COMPANY,name}); if(error){toast('เพิ่มไม่ได้: '+error.message);return;}
+  toast('➕ เพิ่ม '+name);await loadAll();go('contacts');
+}
+async function reassignPersonRefs(oldN,newN){
+  await sb.from('movements').update({actor:newN}).eq('actor',oldN);
+  await sb.from('repair_slips').update({sender:newN}).eq('sender',oldN);
+  await sb.from('repair_slips').update({receiver:newN}).eq('receiver',oldN);
+}
+async function reassignVendorRefs(oldN,newN){
+  await sb.from('repair_slips').update({vendor:newN}).eq('vendor',oldN);
+}
+async function renamePerson(i){
+  const oldN=_peopleList[i];const newN=(prompt('เปลี่ยนชื่อ "'+oldN+'" เป็น:',oldN)||'').trim();
+  if(!newN||newN===oldN)return;
+  const exists=S.lookups.people.some(p=>p.toLowerCase()===newN.toLowerCase()&&p!==oldN);
+  if(exists&&!confirm('มีชื่อ "'+newN+'" อยู่แล้ว — รวม "'+oldN+'" เข้ากับมันแทนไหม?'))return;
+  toast('กำลังเปลี่ยนชื่อ + แก้ใบเก่า…');
+  await reassignPersonRefs(oldN,newN);
+  if(!S.lookups.people.some(p=>p===newN))await sb.from('people').insert({company:COMPANY,name:newN});
+  await sb.from('people').delete().eq('name',oldN);
+  toast('✅ เปลี่ยนเป็น "'+newN+'" แล้ว');await loadAll();go('contacts');
+}
+async function renameVendor(i){
+  const oldN=_vendorsList[i];const newN=(prompt('เปลี่ยนชื่อช่าง "'+oldN+'" เป็น:',oldN)||'').trim();
+  if(!newN||newN===oldN)return;
+  const exists=S.lookups.vendors.some(v=>v.toLowerCase()===newN.toLowerCase()&&v!==oldN);
+  if(exists&&!confirm('มีช่าง "'+newN+'" อยู่แล้ว — รวม "'+oldN+'" เข้ากับมันแทนไหม?'))return;
+  toast('กำลังเปลี่ยนชื่อ + แก้ใบเก่า…');
+  await reassignVendorRefs(oldN,newN);
+  if(!S.lookups.vendors.some(v=>v===newN))await sb.from('vendors').insert({company:COMPANY,name:newN});
+  await sb.from('vendors').delete().eq('name',oldN);
+  toast('✅ เปลี่ยนเป็น "'+newN+'" แล้ว');await loadAll();go('contacts');
+}
+function mergePerson(i){
+  const src=_peopleList[i];const others=_peopleList.filter(s=>s!==src);
+  if(!others.length){toast('ไม่มีชื่ออื่นให้รวม');return;}
+  openModal(`<h3>🔀 รวมชื่อซ้ำ</h3><p class="muted">ย้ายประวัติทั้งหมดของ "<b>${esc(src)}</b>" ไปชื่อที่เลือก แล้วลบ "${esc(src)}" ทิ้ง</p>
+    <div class="field"><label>รวม "${esc(src)}" เข้ากับ</label><select id="mergeTo">${others.map(s=>`<option>${esc(s)}</option>`).join('')}</select></div>
+    <div class="flexrow" style="margin-top:16px"><button class="btn primary" onclick="doMergePerson('${jsq(src)}')">🔀 รวมเลย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
+}
+async function doMergePerson(src){
+  const dest=$('#mergeTo').value;if(!dest||dest===src){closeModal();return;}
+  closeModal();toast('กำลังรวม + แก้ใบเก่า…');
+  await reassignPersonRefs(src,dest);
+  await sb.from('people').delete().eq('name',src);
+  toast('✅ รวม "'+src+'" → "'+dest+'" แล้ว');await loadAll();go('contacts');
+}
+function mergeVendor(i){
+  const src=_vendorsList[i];const others=_vendorsList.filter(s=>s!==src);
+  if(!others.length){toast('ไม่มีช่างอื่นให้รวม');return;}
+  openModal(`<h3>🔀 รวมช่างซ้ำ</h3><p class="muted">ย้ายใบส่งซ่อมทั้งหมดของ "<b>${esc(src)}</b>" ไปช่างที่เลือก แล้วลบ "${esc(src)}" ทิ้ง</p>
+    <div class="field"><label>รวม "${esc(src)}" เข้ากับ</label><select id="mergeTo">${others.map(s=>`<option>${esc(s)}</option>`).join('')}</select></div>
+    <div class="flexrow" style="margin-top:16px"><button class="btn primary" onclick="doMergeVendor('${jsq(src)}')">🔀 รวมเลย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
+}
+async function doMergeVendor(src){
+  const dest=$('#mergeTo').value;if(!dest||dest===src){closeModal();return;}
+  closeModal();toast('กำลังรวม + แก้ใบเก่า…');
+  await reassignVendorRefs(src,dest);
+  await sb.from('vendors').delete().eq('name',src);
+  toast('✅ รวม "'+src+'" → "'+dest+'" แล้ว');await loadAll();go('contacts');
+}
+async function deletePerson(i){
+  const n=_peopleList[i];const use=S.movements.filter(m=>m.actor===n).length;
+  if(!confirm(use?('⚠️ ชื่อ "'+n+'" ใช้ในประวัติ '+use+' รายการ\nลบออกจากลิสต์? (ประวัติยังอยู่ แค่หายจากตัวเลือก)'):('ลบชื่อ "'+n+'" ออกจากลิสต์?')))return;
+  const {error}=await sb.from('people').delete().eq('name',n); if(error){toast('ลบไม่ได้: '+error.message);return;}
+  toast('ลบ '+n+' แล้ว');await loadAll();go('contacts');
+}
+async function deleteVendor(i){
+  const n=_vendorsList[i];const use=(S.slips||[]).filter(s=>s.vendor===n).length;
+  if(!confirm(use?('⚠️ ช่าง "'+n+'" ใช้ในใบซ่อม '+use+' ใบ\nลบออกจากลิสต์? (ใบยังอยู่ แค่หายจากตัวเลือก)'):('ลบช่าง "'+n+'" ออกจากลิสต์?')))return;
+  const {error}=await sb.from('vendors').delete().eq('name',n); if(error){toast('ลบไม่ได้: '+error.message);return;}
+  toast('ลบ '+n+' แล้ว');await loadAll();go('contacts');
+}
+
 /* ============ จัดการหมวด (ประเภท) ============ */
 let _catsList=[];
 async function addCatInline(){
