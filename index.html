@@ -587,13 +587,23 @@ async function addSiteInline(selId){
 }
 async function addPersonInline(selId){
   selId=selId||'eb_who';
-  const name=(prompt('ชื่อผู้เบิกใหม่:')||'').trim(); if(!name)return;
+  const name=(prompt('ชื่อบุคคลใหม่:')||'').trim(); if(!name)return;
   const sel=$('#'+selId);
   if(S.lookups.people.some(p=>p.toLowerCase()===name.toLowerCase())){if(sel)sel.value=name;toast('มีชื่อนี้อยู่แล้ว');return;}
   const {error}=await sb.from('people').insert({company:COMPANY,name}); if(error){toast('เพิ่มไม่ได้: '+error.message);return;}
   S.lookups.people.push(name);
   if(sel){const o=document.createElement('option');o.textContent=name;sel.appendChild(o);sel.value=name;}
-  toast('➕ เพิ่มผู้เบิก '+name);
+  toast('➕ เพิ่ม '+name);
+}
+async function addVendorInline(selId){
+  selId=selId||'er_vendor';
+  const name=(prompt('ชื่อร้าน/ช่างซ่อมใหม่:')||'').trim(); if(!name)return;
+  const sel=$('#'+selId);
+  if(S.lookups.vendors.some(v=>v.toLowerCase()===name.toLowerCase())){if(sel)sel.value=name;toast('มีชื่อนี้อยู่แล้ว');return;}
+  const {error}=await sb.from('vendors').insert({company:COMPANY,name}); if(error){toast('เพิ่มไม่ได้: '+error.message);return;}
+  S.lookups.vendors.push(name);
+  if(sel){const o=document.createElement('option');o.textContent=name;sel.appendChild(o);sel.value=name;}
+  toast('➕ เพิ่มร้าน/ช่าง '+name);
 }
 function renderSites(){
   $('#view').innerHTML=`<div class="panel">
@@ -1416,11 +1426,13 @@ async function cancelRepairDraft(i){
 }
 function editRepairDraftForm(i){
   const b=(window._rd||[])[i]; if(!b){toast('ไม่พบใบร่าง');return;}
+  const ven=S.lookups.vendors.slice(); if(b.vendor&&!ven.includes(b.vendor))ven.unshift(b.vendor);
+  const peo=S.lookups.people.slice(); if(b.sender&&!peo.includes(b.sender))peo.unshift(b.sender);
   openModal(`<h3>✏️ แก้ไขใบร่างซ่อม ${coBadge(b.company)}</h3>
     <div class="flexrow">
       <div class="field"><label>วันที่ส่ง</label><input id="er_date" type="date" value="${esc(b.date)}"></div>
-      <div class="field"><label>ร้าน/ช่างซ่อม</label><input id="er_vendor" value="${esc(b.vendor)}"></div>
-      <div class="field"><label>ผู้ส่ง</label><input id="er_sender" value="${esc(b.sender)}"></div>
+      <div class="field"><label>ร้าน/ช่างซ่อม</label><div style="display:flex;gap:6px"><select id="er_vendor" style="flex:1"><option value="">— เลือกร้าน/ช่าง —</option>${ven.map(v=>`<option ${v===b.vendor?'selected':''}>${esc(v)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addVendorInline('er_vendor')" title="เพิ่มร้าน/ช่าง">➕</button></div></div>
+      <div class="field"><label>ผู้ส่ง</label><div style="display:flex;gap:6px"><select id="er_sender" style="flex:1"><option value="">— เลือกผู้ส่ง —</option>${peo.map(p=>`<option ${p===b.sender?'selected':''}>${esc(p)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addPersonInline('er_sender')" title="เพิ่มผู้ส่ง">➕</button></div></div>
     </div>
     <p class="muted" style="font-size:12px;margin:6px 0 2px">เครื่องในร่าง ${b.tools.length} เครื่อง — แก้โครงการ/อาการ หรือติ๊ก "เอาออก" (จะกลับเป็น "ว่าง")</p>
     <div style="max-height:34vh;overflow:auto"><table><thead><tr><th>เครื่อง / NO</th><th>โครงการ (มาจากไซต์ไหน)</th><th>อาการ/สาเหตุ</th><th class="center">เอาออก</th></tr></thead><tbody>${
@@ -1629,11 +1641,13 @@ function editSlipForm(slipNo,co){
   const sent=S.movements.filter(m=>m.slipNo===slipNo&&m.company===co&&m.type==='ส่งซ่อม');
   const elig=S.tools.filter(t=>['ว่าง','ชำรุด','รอส่งซ่อม'].includes(t.status)&&inView(t));
   window._es={slipNo,co,movs:sent};
+  const ven=S.lookups.vendors.slice(); if(s.vendor&&!ven.includes(s.vendor))ven.unshift(s.vendor);
+  const peo=S.lookups.people.slice(); if(s.sender&&!peo.includes(s.sender))peo.unshift(s.sender);
   openModal(`<h3>✏️ แก้ไขใบส่งซ่อม #${esc(s.no)} ${coBadge(co)}</h3>
     <div class="flexrow">
       <div class="field"><label>วันที่ส่งซ่อม</label><input id="es_date" type="date" value="${esc(s.sent)}"></div>
-      <div class="field"><label>ร้าน/ช่างซ่อม</label><input id="es_vendor" value="${esc(s.vendor)}"></div>
-      <div class="field"><label>ผู้ส่ง</label><input id="es_sender" value="${esc(s.sender)}"></div>
+      <div class="field"><label>ร้าน/ช่างซ่อม</label><div style="display:flex;gap:6px"><select id="es_vendor" style="flex:1"><option value="">— เลือกร้าน/ช่าง —</option>${ven.map(v=>`<option ${v===s.vendor?'selected':''}>${esc(v)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addVendorInline('es_vendor')" title="เพิ่มร้าน/ช่าง">➕</button></div></div>
+      <div class="field"><label>ผู้ส่ง</label><div style="display:flex;gap:6px"><select id="es_sender" style="flex:1"><option value="">— เลือกผู้ส่ง —</option>${peo.map(p=>`<option ${p===s.sender?'selected':''}>${esc(p)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addPersonInline('es_sender')" title="เพิ่มผู้ส่ง">➕</button></div></div>
     </div>
     <div class="field"><label>หมายเหตุ</label><input id="es_note" value="${esc(s.note)}"></div>
     <div class="muted" style="font-size:13px;margin:8px 0 2px">โครงการ (มาจากไซต์ไหน) + อาการ/สาเหตุ รายเครื่อง</div>
