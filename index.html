@@ -213,6 +213,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
       <button data-v="labels"><span class="ic">🏷️</span> ป้าย QR</button>
       <button data-v="sites"><span class="ic">🗂️</span> จัดการไซต์งาน</button>
       <button data-v="cats"><span class="ic">📂</span> จัดการหมวด</button>
+      <button data-v="disposed"><span class="ic">🗄️</span> ตัดจำหน่าย/ขายซาก</button>
       <button data-v="trash"><span class="ic">🗑️</span> ถังขยะ</button>
       <button data-v="guide"><span class="ic">📖</span> คู่มือ</button>
       <button data-v="audit" id="navAudit" style="display:none"><span class="ic">📝</span> ประวัติแก้ไข</button>
@@ -281,7 +282,7 @@ function count(st){return S.tools.filter(t=>t.status===st&&inView(t)).length;}
 /* ============ toast ============ */
 let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tmo);tmo=setTimeout(()=>t.classList.remove('on'),2200);}
 /* ---- data layer (Supabase) ---- */
-function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||''),createdAt:(r.created_at||''),tagged:!!r.tagged,taggedAt:(r.tagged_at||''),model:r.model||'',imageUrl:r.image_url||''};}
+function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||''),createdAt:(r.created_at||''),tagged:!!r.tagged,taggedAt:(r.tagged_at||''),model:r.model||'',imageUrl:r.image_url||'',disposed:!!r.disposed,disposedAt:(r.disposed_at||''),disposalNote:r.disposal_note||''};}
 function modelKey(t){return (t&&t.brand&&t.model)?((t.brand+' '+t.model).toUpperCase().replace(/[^A-Z0-9]+/g,'')):'';}
 function toolImgHtml(t){const url=t.imageUrl||(modelKey(t)?('/m/'+modelKey(t)+'.png'):'');if(!url)return '';
   return `<div style="text-align:center;margin:2px 0 12px"><img src="${esc(url)}" alt="" style="max-width:100%;max-height:150px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;padding:4px" onerror="this.parentNode.style.display='none'"></div>`;}
@@ -299,15 +300,17 @@ async function fetchAllMov(){
   return all;
 }
 async function loadAll(){
+  _rtReloadAt=Date.now();   // กันแบนเนอร์ realtime เด้งใส่ตัวเอง — ครอบทุก write path ที่เรียก loadAll (ไม่ใช่แค่ reload)
   const mvP=fetchAllMov();
-  const [t,s,c,p,pe,v,au,tr,st]=await Promise.all([
-    sb.from('tools').select('*').eq('deleted',false),
+  const [t,s,c,p,pe,v,au,tr,st,di]=await Promise.all([
+    sb.from('tools').select('*').eq('deleted',false).eq('disposed',false),
     sb.from('repair_slips').select('*').eq('deleted',false).order('slip_no'),
     sb.from('categories').select('name'),sb.from('projects').select('name'),
     sb.from('people').select('name'),sb.from('vendors').select('name'),
     sb.from('audit_log').select('*').order('occurred_at',{ascending:false}).limit(1000),
     sb.from('tools').select('*').eq('deleted',true),
-    sb.from('repair_slips').select('*').eq('deleted',true).order('slip_no')]);
+    sb.from('repair_slips').select('*').eq('deleted',true).order('slip_no'),
+    sb.from('tools').select('*').eq('disposed',true).eq('deleted',false)]);
   const mv={data:await mvP};
   if(t.error){toast('โหลดข้อมูลไม่ได้: '+t.error.message);}
   const byId={};
@@ -322,6 +325,7 @@ async function loadAll(){
   S.lookups={categories:nm(c),projects:nm(p),people:nm(pe),vendors:nm(v)};
   S.audit=(au.data||[]);
   S.trash=(tr.data||[]).map(rowToTool);
+  S.disposed=(di.data||[]).map(rowToTool);
   S.slipTrash=(st.data||[]).map(rowToSlip);
   S.nextSlipByCo={};['PAC','LOTUS'].forEach(co=>S.nextSlipByCo[co]=(S.slips.filter(x=>x.company===co).reduce((m,x)=>Math.max(m,x.slip_no||0),0))+1);
   const {data:cntRows}=await sb.from('app_counters').select('company,value').eq('name','borrow');
@@ -399,14 +403,14 @@ async function doSignup(){const e=$('#li_email').value.trim(),p=$('#li_pass').va
 async function logout(){await sb.auth.signOut();location.reload();}
 
 /* ============ router ============ */
-const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],bysite:['ของตามไซต์','ดูเครื่องที่อยู่แต่ละไซต์งานตอนนี้'],scan:['สแกน','สแกน QR → รับคืนเข้าระบบ (จากไซต์ / จากซ่อม)'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],labels:['ป้าย QR','สร้าง QR ไม่ซ้ำของแต่ละเครื่อง → พิมพ์เป็นป้าย'],sites:['จัดการไซต์งาน','เพิ่ม / แก้ชื่อ / ลบ / รวมไซต์ซ้ำ — กันชื่อโครงการเพี้ยน'],cats:['จัดการหมวด','เพิ่ม / แก้ / ลบ / รวมหมวดซ้ำ — หมวด = ประเภทกว้างๆ'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
+const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],bysite:['ของตามไซต์','ดูเครื่องที่อยู่แต่ละไซต์งานตอนนี้'],scan:['สแกน','สแกน QR → รับคืนเข้าระบบ (จากไซต์ / จากซ่อม)'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],labels:['ป้าย QR','สร้าง QR ไม่ซ้ำของแต่ละเครื่อง → พิมพ์เป็นป้าย'],sites:['จัดการไซต์งาน','เพิ่ม / แก้ชื่อ / ลบ / รวมไซต์ซ้ำ — กันชื่อโครงการเพี้ยน'],cats:['จัดการหมวด','เพิ่ม / แก้ / ลบ / รวมหมวดซ้ำ — หมวด = ประเภทกว้างๆ'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],disposed:['ตัดจำหน่าย / ขายซาก','เครื่องที่ตัดออกจากทรัพย์สินแล้ว — บัญชีดู/ดาวน์โหลดได้ · กู้คืนได้ถ้าตัดผิด'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
 function go(v){
   if(v==='guide'){window.open('guide.html','_blank');return;}
   if(CUR==='scan'&&v!=='scan'&&window._scanner)stopScanner();
   CUR=v; borDraft=null; rDraft=null;
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
   $('#ttl').textContent=TITLES[v][0];$('#tsub').textContent=TITLES[v][1];
-  ({dash:renderDash,tools:renderTools,borrow:renderBorrow,bysite:renderBySite,scan:renderScan,repair:renderRepair,receive:renderReceive,history:renderHistory,report:renderReport,labels:renderLabels,sites:renderSites,cats:renderCats,trash:renderTrash,audit:renderAudit,users:renderUsers}[v])();
+  ({dash:renderDash,tools:renderTools,borrow:renderBorrow,bysite:renderBySite,scan:renderScan,repair:renderRepair,receive:renderReceive,history:renderHistory,report:renderReport,labels:renderLabels,sites:renderSites,cats:renderCats,trash:renderTrash,disposed:renderDisposed,audit:renderAudit,users:renderUsers}[v])();
   window.scrollTo(0,0);
 }
 $('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b){go(b.dataset.v);closeNav();}});
@@ -571,14 +575,25 @@ function drawSiteBody(){
 /* ============ จัดการไซต์งาน ============ */
 function jsq(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 let _sitesList=[];
-async function addSiteInline(){
+async function addSiteInline(selId){
+  selId=selId||'b_proj';
   const name=(prompt('ชื่อไซต์ใหม่:')||'').trim(); if(!name)return;
-  const sel=$('#b_proj');
+  const sel=$('#'+selId);
   if(S.lookups.projects.some(p=>p.toLowerCase()===name.toLowerCase())){if(sel)sel.value=name;toast('มีไซต์นี้อยู่แล้ว');return;}
   const {error}=await sb.from('projects').insert({company:COMPANY,name}); if(error){toast('เพิ่มไม่ได้: '+error.message);return;}
   S.lookups.projects.push(name);
   if(sel){const o=document.createElement('option');o.textContent=name;sel.appendChild(o);sel.value=name;}
   toast('➕ เพิ่มไซต์ '+name);
+}
+async function addPersonInline(selId){
+  selId=selId||'eb_who';
+  const name=(prompt('ชื่อผู้เบิกใหม่:')||'').trim(); if(!name)return;
+  const sel=$('#'+selId);
+  if(S.lookups.people.some(p=>p.toLowerCase()===name.toLowerCase())){if(sel)sel.value=name;toast('มีชื่อนี้อยู่แล้ว');return;}
+  const {error}=await sb.from('people').insert({company:COMPANY,name}); if(error){toast('เพิ่มไม่ได้: '+error.message);return;}
+  S.lookups.people.push(name);
+  if(sel){const o=document.createElement('option');o.textContent=name;sel.appendChild(o);sel.value=name;}
+  toast('➕ เพิ่มผู้เบิก '+name);
 }
 function renderSites(){
   $('#view').innerHTML=`<div class="panel">
@@ -780,7 +795,7 @@ function toolDetail(i){
   if(editable){
     openModal(`<h3>แก้ไขเครื่องมือ</h3><p class="muted">${esc(t.code)} · ${coBadge(t.company)} · ส่งซ่อมมาแล้ว ${esc(t.repairs)||0} ครั้ง</p>
       ${toolImgHtml(t)}${toolFormFields(t)}${histHtml}
-      <div class="flexrow" style="margin-top:18px"><button class="btn primary" onclick="saveTool(${i})">💾 บันทึก</button><button class="btn" style="background:#fee2e2;color:#b91c1c" onclick="delTool(${i})">🗑️ ลบ</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+      <div class="flexrow" style="margin-top:18px"><button class="btn primary" onclick="saveTool(${i})">💾 บันทึก</button><button class="btn" style="background:#fef3c7;color:#92400e" onclick="disposeTool(${i})">🗄️ ตัดจำหน่าย/ขายซาก</button><button class="btn" style="background:#fee2e2;color:#b91c1c" onclick="delTool(${i})">🗑️ ลบ</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
   }else{
     openModal(`<h3>${esc(t.name)}</h3><p class="muted">${esc(t.code)} · ${coBadge(t.company)}</p>
       ${toolImgHtml(t)}
@@ -823,6 +838,30 @@ async function restoreTool(ti){const t=(S.trash||[])[ti];if(!t)return;
   if(error){toast('กู้คืนไม่ได้: '+error.message);return;}
   await logAudit('กู้คืน',t.company,t.code,'กู้คืนจากถังขยะ');
   toast('กู้คืนแล้ว: '+t.code);await loadAll();go('trash');}
+function disposeTool(i){const t=S.tools[i];
+  if(!canEditCo(t.company)){toast('ทำได้เฉพาะบริษัทตัวเอง');return;}
+  const today=new Date().toISOString().slice(0,10);
+  openModal(`<h3>🗄️ ตัดจำหน่าย / ขายซาก</h3>
+    <p class="muted">${esc(t.code)} · ${coBadge(t.company)} · ${esc(t.name)}</p>
+    <div style="background:#fef3c7;color:#92400e;padding:9px 12px;border-radius:8px;font-size:13px;margin:8px 0">เครื่องจะถูก<b>ตัดออกจากทะเบียนใช้งาน</b> (เบิก/ไซต์/รายงาน จะไม่เห็น) แต่ยังเก็บบันทึกไว้ในหน้า "ตัดจำหน่าย/ขายซาก" · กู้คืนได้ถ้าตัดผิด</div>
+    <div class="flexrow"><div class="field"><label>วันที่ตัดจำหน่าย</label><input type="date" id="dp_date" value="${today}"></div></div>
+    <div class="field"><label>เหตุผล (เช่น เก่า / เสียซ่อมไม่คุ้ม / สูญหาย)</label><input id="dp_note" placeholder="ระบุเหตุผล"></div>
+    <div class="flexrow" style="margin-top:16px"><button class="btn" style="background:#f59e0b;color:#fff" onclick="doDispose(${i})">🗄️ ยืนยันตัดจำหน่าย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
+}
+async function doDispose(i){const t=S.tools[i];
+  if(!canEditCo(t.company)){toast('ทำได้เฉพาะบริษัทตัวเอง');return;}
+  const d=$('#dp_date').value||new Date().toISOString().slice(0,10);
+  const note=$('#dp_note').value.trim();
+  const {error}=await sb.from('tools').update({disposed:true,disposed_at:d,disposal_note:note,updated_at:new Date().toISOString()}).eq('id',t.id);
+  if(error){toast('ตัดจำหน่ายไม่ได้: '+error.message);return;}
+  await logAudit('ตัดจำหน่าย',t.company,t.code,(note?note+' ':'')+'('+d+')');
+  closeModal();toast('ตัดจำหน่ายแล้ว: '+t.code);await loadAll();go('tools');}
+async function undisposeTool(di){const t=(S.disposed||[])[di];if(!t)return;
+  if(!canEditCo(t.company)){toast('กู้คืนได้เฉพาะบริษัทตัวเอง');return;}
+  const {error}=await sb.from('tools').update({disposed:false,disposed_at:null,disposal_note:null,updated_at:new Date().toISOString()}).eq('id',t.id);
+  if(error){toast('กู้คืนไม่ได้: '+error.message);return;}
+  await logAudit('กู้คืน (ตัดจำหน่าย)',t.company,t.code,'กู้คืนจากตัดจำหน่าย');
+  toast('กู้คืนแล้ว: '+t.code);await loadAll();go('disposed');}
 function addTool(){
   openModal(`<h3>➕ เพิ่มเครื่องมือใหม่</h3><p class="muted">รหัสจะตั้งจาก หมวด + NO อัตโนมัติ</p>
     ${toolFormFields({status:'ว่าง',loc:'ออฟฟิต'})}
@@ -1411,11 +1450,13 @@ function _filterPick(listId,inputId){const q=$('#'+inputId).value.trim().toLower
 function editBorrowBatchForm(i){
   const b=(window._bb||[])[i]; if(!b){toast('ไม่พบรายการ');return;}
   const elig=S.tools.filter(t=>t.status==='ว่าง'&&inView(t));
+  const peo=S.lookups.people.slice(); if(b.who&&!peo.includes(b.who))peo.unshift(b.who);
+  const prj=S.lookups.projects.slice(); if(b.project&&!prj.includes(b.project))prj.unshift(b.project);
   openModal(`<h3>✏️ แก้ไขใบส่งไซต์ ${coBadge(b.company)}</h3>
     <div class="flexrow">
       <div class="field"><label>วันที่</label><input id="eb_date" type="date" value="${esc(b.date)}"></div>
-      <div class="field"><label>ผู้เบิก</label><input id="eb_who" value="${esc(b.who)}"></div>
-      <div class="field"><label>โครงการ / ไซต์</label><input id="eb_proj" value="${esc(b.project)}"></div>
+      <div class="field"><label>ผู้เบิก</label><div style="display:flex;gap:6px"><select id="eb_who" style="flex:1"><option value="">— เลือกผู้เบิก —</option>${peo.map(p=>`<option ${p===b.who?'selected':''}>${esc(p)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addPersonInline('eb_who')" title="เพิ่มผู้เบิก">➕</button></div></div>
+      <div class="field"><label>โครงการ / ไซต์</label><div style="display:flex;gap:6px"><select id="eb_proj" style="flex:1"><option value="">— เลือกไซต์ —</option>${prj.map(p=>`<option ${p===b.project?'selected':''}>${esc(p)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addSiteInline('eb_proj')" title="เพิ่มไซต์">➕</button></div></div>
     </div>
     <p class="muted" style="font-size:12px;margin:6px 0 2px">เครื่องในใบ ${b.tools.length} เครื่อง — ติ๊ก "เอาออก" เครื่องที่ไม่ต้องการ (จะกลับเป็น "ว่าง" · อัปเดตที่อยู่เครื่องที่เหลือให้ด้วย)</p>
     <div style="max-height:30vh;overflow:auto"><table><thead><tr><th>เครื่อง / NO</th><th>เลขที่ PR</th><th>หมายเหตุ</th><th class="center">เอาออก</th></tr></thead><tbody>${
@@ -1916,6 +1957,28 @@ function renderTrash(){
       items.map((t,i)=>`<tr><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.no)}</td><td class="muted">${esc(t.updated)}</td><td class="right">${canEditCo(t.company)?`<button class="btn" style="background:#dcfce7;color:#15803d;padding:6px 14px" onclick="restoreTool(${i})">♻️ กู้คืน</button>`:'<span class="muted" style="font-size:12px">—</span>'}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">ถังขยะว่าง</td></tr>'
     }</tbody></table>
   </div>`;
+}
+
+/* ============ ตัดจำหน่าย / ขายซาก ============ */
+function renderDisposed(){
+  const items=(S.disposed||[]).filter(inView);
+  const totalPrice=items.reduce((s,x)=>s+(x.price?Number(x.price)||0:0),0);
+  $('#view').innerHTML=`<div class="panel">
+    <div class="toolbar"><input class="search" id="dpq" placeholder="🔎 ค้นหา: รหัส / ชื่อ / NO / เหตุผล…"><div class="spacer"></div><button class="btn" onclick="exportDisposed()">⬇️ ดาวน์โหลด CSV (บัญชี)</button></div>
+    <h3>🗄️ เครื่องที่ตัดจำหน่าย / ขายซาก (${items.length}) <span class="muted" style="font-weight:400">— ตัดออกจากทรัพย์สินแล้ว · มูลค่าซื้อรวม ${totalPrice.toLocaleString('th-TH')} บาท · กู้คืนได้ถ้าตัดผิด</span></h3>
+    <div id="dptbl"></div>
+  </div>`;
+  const draw=()=>{const q=$('#dpq').value.trim().toLowerCase();
+    let a=items; if(q)a=items.filter(t=>((t.code||'')+' '+(t.name||'')+' '+(t.no||'')+' '+(t.disposalNote||'')).toLowerCase().includes(q));
+    const pg=pgSlice('disposed',a);
+    $('#dptbl').innerHTML=pg.rows.length?`<div class="listbox"><table class="locktbl"><thead><tr><th>บริษัท</th><th>ชื่อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>วันที่ตัด</th><th>เหตุผล</th><th>ราคาซื้อ</th><th></th></tr></thead><tbody>${pg.rows.map(t=>{const di=(S.disposed||[]).indexOf(t);return `<tr><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td class="muted" style="white-space:nowrap">${esc(t.disposedAt)||'-'}</td><td style="font-size:12px">${esc(t.disposalNote)||'-'}</td><td>${esc(t.price)||'-'}</td><td class="right">${canEditCo(t.company)?`<button class="btn" style="background:#dcfce7;color:#15803d;padding:6px 14px" onclick="undisposeTool(${di})">♻️ กู้คืน</button>`:'<span class="muted" style="font-size:12px">—</span>'}</td></tr>`;}).join('')}</tbody></table></div>${pg.html}`:'<div class="empty">ยังไม่มีเครื่องที่ตัดจำหน่าย</div>';};
+  PG_REDRAW['disposed']=draw;
+  $('#dpq').oninput=()=>{pgReset('disposed');draw();};draw();
+}
+function exportDisposed(){
+  const rows=[['รหัส','บริษัท','หมวด','NO','ชื่อ','ยี่ห้อ','รุ่น','S/N','วันที่ตัดจำหน่าย','เหตุผล','ราคาซื้อ']];
+  (S.disposed||[]).filter(inView).forEach(t=>rows.push([t.code,t.company,t.cat,t.no,t.name,t.brand,t.model,t.sn,t.disposedAt,t.disposalNote,t.price]));
+  csvDownload('เครื่องตัดจำหน่าย.csv',rows);toast('ดาวน์โหลด '+(rows.length-1)+' รายการ');
 }
 
 /* ============ AUDIT (ประวัติแก้ไขทั้งระบบ — admin) ============ */
