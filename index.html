@@ -1591,7 +1591,7 @@ function editBorrowBatchForm(i){
     </div>
     <p class="muted" style="font-size:12px;margin:6px 0 2px">เครื่องในใบ ${b.tools.length} เครื่อง — ติ๊ก "เอาออก" เครื่องที่ไม่ต้องการ (จะกลับเป็น "ว่าง" · อัปเดตที่อยู่เครื่องที่เหลือให้ด้วย)</p>
     <div style="max-height:30vh;overflow:auto"><table><thead><tr><th>เครื่อง / NO</th><th>เลขที่ PR</th><th>หมายเหตุ</th><th class="center">เอาออก</th></tr></thead><tbody>${
-      b.tools.map((t,j)=>`<tr><td>${esc(t.code)||esc(t.name)||'-'} ${esc(t.no)||''}</td><td><input data-bpr="${j}" value="${esc(t.pr||'')}" placeholder="PR" style="width:100%;min-width:80px"></td><td><input data-bnt="${j}" value="${esc(t.note||'')}" placeholder="หมายเหตุ" style="width:100%;min-width:90px"></td><td class="center"><input type="checkbox" data-brm="${j}"></td></tr>`).join('')||'<tr><td colspan=4 class="empty">ไม่มีเครื่อง</td></tr>'
+      b.tools.map((t,j)=>`<tr><td>${esc(t.cat)||esc(t.name)||'-'} ${esc(t.no)||''}</td><td><input data-bpr="${j}" value="${esc(t.pr||'')}" placeholder="PR" style="width:100%;min-width:80px"></td><td><input data-bnt="${j}" value="${esc(t.note||'')}" placeholder="หมายเหตุ" style="width:100%;min-width:90px"></td><td class="center"><input type="checkbox" data-brm="${j}"></td></tr>`).join('')||'<tr><td colspan=4 class="empty">ไม่มีเครื่อง</td></tr>'
     }</tbody></table></div>
     <div style="margin-top:10px"><button class="btn" onclick="_togglePick('eb_addbox')">➕ เพิ่มเครื่องเข้าใบนี้</button></div>
     <div id="eb_addbox" style="display:none;margin-top:8px;border-top:1px dashed var(--line);padding-top:8px">
