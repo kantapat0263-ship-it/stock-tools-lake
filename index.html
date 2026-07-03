@@ -530,7 +530,7 @@ function renderTools(){
     $('#tcount').textContent=`${rows.length} เครื่อง`;
     const pg=pgSlice('tools',rows);
     $('#ttbl').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th>บริษัท</th><th>ชื่อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th><th>ที่อยู่</th></tr></thead><tbody>${
-      pg.rows.map(t=>`<tr style="cursor:pointer" onclick="toolDetail(${t.i})"><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td><td>${esc(t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=8 class="empty">ไม่พบ</td></tr>'
+      pg.rows.map(t=>`<tr style="cursor:pointer" onclick="toolDetail(${t.i})"><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td><td>${esc((t.loc||'').split(' / ')[0])||'-'}</td></tr>`).join('')||'<tr><td colspan=8 class="empty">ไม่พบ</td></tr>'
     }</tbody></table></div>${pg.html}`;
   };
   PG_REDRAW['tools']=draw;
