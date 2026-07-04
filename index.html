@@ -524,14 +524,14 @@ function renderTools(){
     let rows=S.tools.filter(t=>{
       if(!inView(t))return false;
       if(fc&&t.cat!==fc)return false; if(fs&&t.status!==fs)return false; if(fsite&&siteOf(t)!==fsite)return false;
-      if(q){const h=(t.code+' '+t.name+' '+t.no+' '+t.sn+' '+t.model).toLowerCase();if(!h.includes(q))return false;}
+      if(q){const h=(t.code+' '+t.name+' '+t.no+' '+t.sn+' '+t.model+' '+t.brand).toLowerCase();if(!h.includes(q))return false;}
       return true;});
     if(so==='new')rows=[...rows].sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
     else if(so==='old')rows=[...rows].sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt)));
     $('#tcount').textContent=`${rows.length} เครื่อง`;
     const pg=pgSlice('tools',rows);
-    $('#ttbl').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th>บริษัท</th><th>ชื่อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th><th>ที่อยู่</th></tr></thead><tbody>${
-      pg.rows.map(t=>`<tr style="cursor:pointer" onclick="toolDetail(${t.i})"><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td><td>${esc((t.loc||'').split(' / ')[0])||'-'}</td></tr>`).join('')||'<tr><td colspan=8 class="empty">ไม่พบ</td></tr>'
+    $('#ttbl').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th>บริษัท</th><th>ชื่อ</th><th>ยี่ห้อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th><th>ที่อยู่</th></tr></thead><tbody>${
+      pg.rows.map(t=>`<tr style="cursor:pointer" onclick="toolDetail(${t.i})"><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.brand)||'-'}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td><td>${esc((t.loc||'').split(' / ')[0])||'-'}</td></tr>`).join('')||'<tr><td colspan=9 class="empty">ไม่พบ</td></tr>'
     }</tbody></table></div>${pg.html}`;
   };
   PG_REDRAW['tools']=draw;
