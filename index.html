@@ -170,6 +170,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
 .bhd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1.5px solid #000;padding-bottom:4px;margin-bottom:4px}
 .blogo{width:20mm;height:14mm;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;color:#777;flex-shrink:0}
 .blogo img{max-width:100%;max-height:100%;object-fit:contain}
+.bstamp{align-self:center;border:2.5px solid #d00;color:#000;font-weight:bold;font-size:15px;letter-spacing:1px;padding:3px 10px;white-space:nowrap;flex-shrink:0;margin:0 2mm}
 .bttl{text-align:center;flex:1;padding:0 2mm}
 .bt1{font-size:16px;font-weight:bold}
 .bt2{font-size:10px}
@@ -1300,13 +1301,14 @@ function borrowDocHtml(items,who,proj,date,no,issueCo){
   const co=CO==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)';
   const noTxt=(no!=null&&no!=='')?String(no).padStart(3,'0'):'..........';
   const PER=13, pages=Math.max(1,Math.ceil(items.length/PER));
-  function copy(p){
+  function copy(p,stamp){
     let rows='';
     for(let r=0;r<PER;r++){const gi=p*PER+r,it=items[gi];
       rows+=`<tr><td class="c">${gi+1}</td><td>${it?esc(it.cat||it.name):''}</td><td>${it?esc(it.brand||''):''}</td><td>${it?esc(it.model||''):''}</td><td class="c">${it?esc(it.sn):''}</td><td class="c">${it?esc(it.no):''}</td><td class="c">${it?esc(it.pr||''):''}</td><td>${it?esc(it.note||''):''}</td></tr>`;}
     return `<div class="bcopy">
       <div class="bhd">
         <div class="blogo">${LOGO[CO]?`<img src="${LOGO[CO]}" alt="${esc(CO)}">`:esc(CO)}</div>
+        <div class="bstamp">${stamp}</div>
         <div class="bttl"><div class="bt1">ใบส่งเครื่องมือ</div><div class="bt2">บริษัท ${co}</div></div>
         <div class="bno">เลขที่<br><b>${noTxt}</b>${pages>1?`<br><span style="font-weight:400">หน้า ${p+1}/${pages}</span>`:''}</div>
       </div>
@@ -1327,7 +1329,7 @@ function borrowDocHtml(items,who,proj,date,no,issueCo){
   }
   let out='';
   for(let p=0;p<pages;p++){
-    out+=`<div class="doc land rspage"><div class="bpair">${copy(p)}<div class="bcut"></div>${copy(p)}</div></div>`;
+    out+=`<div class="doc land rspage"><div class="bpair">${copy(p,'ORIGINAL')}<div class="bcut"></div>${copy(p,'COPY')}</div></div>`;
   }
   return out;
 }
