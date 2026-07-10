@@ -982,7 +982,9 @@ async function saveTool(i){const t=S.tools[i];
   if(error){toast('บันทึกไม่ได้: '+error.message);return;}
   await ensureLookup('categories',cat,company);
   await logAudit('แก้ไข',company,code,ch.length?ch.join(' · '):'แก้ไข (ไม่มีอะไรเปลี่ยน)');
-  closeModal();toast('บันทึกแล้ว');await loadAll();go('tools');}
+  closeModal();toast('บันทึกแล้ว');await loadAll();
+  if(CUR==='tools'&&PG_REDRAW['tools']){const box=document.querySelector('#ttbl .listbox');const y=box?box.scrollTop:0;PG_REDRAW['tools']();requestAnimationFrame(()=>{const box2=document.querySelector('#ttbl .listbox');if(box2)box2.scrollTop=y;});}
+  else go('tools');}
 async function delTool(i){const t=S.tools[i];
   if(!canEditCo(t.company)){toast('ลบได้เฉพาะบริษัทตัวเอง');return;}
   if(!confirm(`ลบเครื่อง "${t.name}" (${t.code})?\nจะไปอยู่ "ถังขยะ" กู้คืนได้ภายหลัง`))return;
