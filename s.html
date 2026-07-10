@@ -125,9 +125,13 @@ function render(t,mv){
       actions=`<div class="muted" style="font-size:13px;text-align:center;padding:6px">— เครื่องนี้สถานะ ${esc(t.status)} · ย้ายได้เฉพาะเครื่องที่ "ถูกยืม" ออกไซต์อยู่ (เครื่องในออฟฟิศ ต้องเบิกที่ออฟฟิศ)</div>`;
     }
   }else if(canEdit){
-    if(t.status==='ถูกยืม'||t.status==='ส่งซ่อม'){
+    if(t.status==='ถูกยืม'){
+      actions+=`<input id="rnote" class="inp" placeholder="โน้ตสภาพ / อาการเสีย (ไม่บังคับ)" style="margin-bottom:9px">`;
+      actions+=`<button class="btn primary" onclick="actReceiveSite()">📥 เครื่องดี → รับคืนเข้าออฟฟิต</button>`;
+      actions+=`<button class="btn" style="background:#fef3c7;color:#92400e" onclick="actReceiveBroken()">🔧 เครื่องเสีย → เก็บเข้าร่างใบซ่อม</button>`;
+    }else if(t.status==='ส่งซ่อม'){
       actions+=`<input id="rnote" class="inp" placeholder="โน้ตสภาพ (ไม่บังคับ)" style="margin-bottom:9px">`;
-      actions+=`<button class="btn primary" onclick="${t.status==='ถูกยืม'?'actReceiveSite()':'actReceiveRepair()'}">📥 ${t.status==='ถูกยืม'?'รับคืนเข้าออฟฟิต':'รับคืนจากซ่อม'}</button>`;
+      actions+=`<button class="btn primary" onclick="actReceiveRepair()">📥 รับคืนจากซ่อม</button>`;
     }else if(t.status==='ว่าง'){
       const dco=(ME.company||t.company);
       actions=`<div class="muted" style="font-size:13px;margin-bottom:7px">📝 เก็บเครื่องนี้เข้า <b>ใบร่างส่งไซต์</b> — ไปเช็ค + พิมพ์ที่ออฟฟิศ (ผู้เบิกใส่ทีหลัง)</div>
@@ -206,6 +210,14 @@ async function actReceiveSite(){
   const {data:ins}=await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'คืน',project:'ออฟฟิต',actor:ME.email,note}).select('id').maybeSingle();
   LAST={label:'รับคืนเข้าออฟฟิต',toolId:TOOL.id,name:(TOOL.no||TOOL.name||''),prevTool:prev,movId:ins&&ins.id,slip:null};
   afterAction('📥 รับคืนเข้าออฟฟิตแล้ว');
+}
+async function actReceiveBroken(){
+  const reason=noteVal()||'',prev=snapTool(TOOL),co=(ME.role==='admin')?TOOL.company:ME.company;
+  const site=((TOOL.location||'').split('/')[0]||'').trim();
+  await sb.from('tools').update({status:'ส่งซ่อม',location:'ร้านซ่อม',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:now()}).eq('id',TOOL.id);
+  const {data:ins}=await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'ส่งซ่อม',actor:'',counterparty:'',reason,project:(site&&site!=='ออฟฟิต')?site:null,is_draft:true}).select('id').maybeSingle();
+  LAST={label:'เก็บเข้าร่างใบซ่อม',toolId:TOOL.id,name:(TOOL.no||TOOL.name||''),prevTool:prev,movId:ins&&ins.id,slip:null};
+  afterAction('🔧 เก็บเข้าร่างใบซ่อมแล้ว — ออกใบจริงที่ออฟฟิศ (ประวัติ → ใบร่าง)');
 }
 async function actReceiveRepair(){
   const note=noteVal(),prev=snapTool(TOOL),co=(ME.role==='admin')?TOOL.company:ME.company;
