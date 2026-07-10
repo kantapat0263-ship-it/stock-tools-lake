@@ -313,9 +313,11 @@ let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('o
 /* ---- data layer (Supabase) ---- */
 function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||''),createdAt:(r.created_at||''),tagged:!!r.tagged,taggedAt:(r.tagged_at||''),model:r.model||'',imageUrl:r.image_url||'',disposed:!!r.disposed,disposedAt:(r.disposed_at||''),disposalNote:r.disposal_note||''};}
 function modelKey(t){return (t&&t.brand&&t.model)?((t.brand+' '+t.model).toUpperCase().replace(/[^A-Z0-9]+/g,'')):'';}
-function toolThumb(t){const url=t.imageUrl||(modelKey(t)?('/m/'+modelKey(t)+'.png'):'');
+let MODELIMG={};
+function toolImgUrl(t){return t.imageUrl||MODELIMG[modelKey(t)]||(modelKey(t)?('/m/'+modelKey(t)+'.png'):'');}
+function toolThumb(t){const url=toolImgUrl(t);
   return url?`<img class="rowthumb" src="${esc(url)}" loading="lazy" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'"><span class="rowthumb rowthumb-fb" style="display:none">🧰</span>`:`<span class="rowthumb rowthumb-fb">🧰</span>`;}
-function toolImgHtml(t){const url=t.imageUrl||(modelKey(t)?('/m/'+modelKey(t)+'.png'):'');if(!url)return '';
+function toolImgHtml(t){const url=toolImgUrl(t);if(!url)return '';
   return `<div style="text-align:center;margin:2px 0 12px"><img src="${esc(url)}" alt="" style="max-width:100%;max-height:150px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;padding:4px" onerror="this.parentNode.style.display='none'"></div>`;}
 function rowToSlip(s){return {id:s.id,slip_no:s.slip_no,no:String(s.slip_no).padStart(3,'0'),sent:(s.sent_date||''),vendor:s.vendor||'',project:s.project||'',sender:s.sender||'',status:s.status||'ส่งแล้ว',received:(s.received_date||''),receiver:s.receiver||'',note:s.note||'',count:'0',company:s.company};}
 function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||'',borrowNo:(m.borrow_no!=null?m.borrow_no:null),prNo:(m.pr_no||''),isDraft:!!m.is_draft};}
@@ -346,6 +348,7 @@ async function loadAll(){
   if(t.error){toast('โหลดข้อมูลไม่ได้: '+t.error.message);}
   const byId={};
   S.tools=(t.data||[]).map(rowToTool); S.tools.forEach((x,i)=>{x.i=i;byId[x.id]=x;});
+  MODELIMG={};S.tools.forEach(x=>{const mk=modelKey(x);if(mk&&x.imageUrl&&!MODELIMG[mk])MODELIMG[mk]=x.imageUrl;});
   S.slips=(s.data||[]).map(rowToSlip);
   S.movements=(mv.data||[]).map(m=>rowToMov(m,byId));
   const rc={},slc={};
@@ -1321,7 +1324,7 @@ function borCardsHtml(rows){
   if(!groups.length)return '<div class="empty" style="padding:34px">ไม่มีเครื่องว่าง</div>';
   return `<div class="cardgrid">${groups.map(g=>{
     const pk=g.units.filter(u=>selBor.has(u.i)).length,rep=g.units[0];
-    const url=rep.imageUrl||(modelKey(rep)?('/m/'+modelKey(rep)+'.png'):'');
+    const url=toolImgUrl(rep);
     const photo=url?`<img src="${esc(url)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="tcph-fb" style="display:none">🧰</span>`:`<span class="tcph-fb">🧰</span>`;
     return `<div class="tcard ${pk?'on':''}" onclick="openUnitPicker(${g.gi})">
       <div class="tcphoto">${photo}<span class="tcavail">ว่าง ${g.units.length}</span>${pk?`<span class="tcpick">เลือก ${pk}</span>`:''}</div>
