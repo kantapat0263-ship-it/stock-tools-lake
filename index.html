@@ -1336,14 +1336,25 @@ function pickerHtml(gi){const g=window._borGroups[gi],pk=g.units.filter(u=>selBo
       <a onclick="pickAllUnits(${gi})" style="margin-left:auto;color:var(--blue);font-size:12.5px;font-weight:600;cursor:pointer">เลือกทั้งหมด</a>
       <a onclick="pickNoneUnits(${gi})" style="color:var(--blue);font-size:12.5px;font-weight:600;cursor:pointer">ล้าง</a></div>
     <div id="pkunits" class="pkgrid">${pickerUnitsHtml(gi)}</div>
+    <div id="pksel">${pickerSelHtml(gi)}</div>
     <div style="display:flex;align-items:center;gap:10px;margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
       <b id="pkn">เลือกในหมวดนี้ ${pk}/${g.units.length}</b><div style="flex:1"></div>
       <button class="btn primary" onclick="closeModal()">เสร็จ</button></div>`;
 }
+function pickerSelHtml(gi){const g=window._borGroups[gi],ss=g.units.filter(u=>selBor.has(u.i));
+  if(!ss.length)return '';
+  return `<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+    <div class="muted" style="font-size:12.5px;margin-bottom:8px">ใส่เลขที่ PR / หมายเหตุ (ถ้ามี):</div>
+    ${ss.map(u=>`<div style="display:flex;gap:8px;align-items:center;margin-bottom:7px">
+      <span style="min-width:66px;text-align:center;background:#eff6ff;color:var(--blue-d);font-weight:600;font-size:12px;padding:5px 8px;border-radius:7px">${esc(u.no)||'-'}</span>
+      <input value="${esc(borPR[u.i]||'')}" oninput="borPR[${u.i}]=this.value" placeholder="เลขที่ PR" style="flex:1;min-width:0;padding:6px 9px">
+      <input value="${esc(borNote[u.i]||'')}" oninput="borNote[${u.i}]=this.value" placeholder="หมายเหตุ" style="flex:1.3;min-width:0;padding:6px 9px">
+    </div>`).join('')}</div>`;
+}
 function pickerUnitsHtml(gi){const g=window._borGroups[gi];
   return g.units.map(u=>`<div class="pkunit ${selBor.has(u.i)?'on':''}" onclick="pickUnit(${u.i},${gi})">${esc(u.no)||'(ไม่มี NO)'}<small>${selBor.has(u.i)?'✓ เลือกแล้ว':(u.sn?esc(u.sn):'ว่าง')}</small></div>`).join('');
 }
-function refreshPicker(gi){const g=window._borGroups[gi];if($('#pkunits'))$('#pkunits').innerHTML=pickerUnitsHtml(gi);const pk=g.units.filter(u=>selBor.has(u.i)).length;if($('#pkn'))$('#pkn').textContent=`เลือกในหมวดนี้ ${pk}/${g.units.length}`;updateBorBar();if(PG_REDRAW['borrow'])PG_REDRAW['borrow']();}
+function refreshPicker(gi){const g=window._borGroups[gi];if($('#pkunits'))$('#pkunits').innerHTML=pickerUnitsHtml(gi);if($('#pksel'))$('#pksel').innerHTML=pickerSelHtml(gi);const pk=g.units.filter(u=>selBor.has(u.i)).length;if($('#pkn'))$('#pkn').textContent=`เลือกในหมวดนี้ ${pk}/${g.units.length}`;updateBorBar();if(PG_REDRAW['borrow'])PG_REDRAW['borrow']();}
 function pickUnit(i,gi){selBor.has(i)?selBor.delete(i):selBor.add(i);refreshPicker(gi);}
 function pickAllUnits(gi){window._borGroups[gi].units.forEach(u=>selBor.add(u.i));refreshPicker(gi);}
 function pickNoneUnits(gi){window._borGroups[gi].units.forEach(u=>selBor.delete(u.i));refreshPicker(gi);}
