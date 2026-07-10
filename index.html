@@ -91,6 +91,32 @@ th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);font
 th{color:var(--muted);font-weight:600;font-size:12px;background:#f8fafc}
 .locktbl thead th{position:sticky;top:0;z-index:1}
 .listbox{max-height:62vh;overflow:auto}
+/* ---- borrow: 2-level cards ---- */
+.vswitch{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px;flex-shrink:0}
+.vswitch button{border:0;background:none;padding:7px 13px;border-radius:7px;cursor:pointer;font:inherit;color:var(--muted);font-weight:600;font-size:13px}
+.vswitch button.on{background:#fff;color:var(--blue);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.cardgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:13px;max-height:64vh;overflow:auto;padding:2px}
+.tcard{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden;cursor:pointer;transition:transform .12s,box-shadow .12s,border-color .12s;position:relative}
+.tcard:hover{transform:translateY(-3px);box-shadow:0 10px 22px rgba(15,39,68,.12);border-color:#cbd5e1}
+.tcard.on{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue)}
+.tcphoto{height:112px;display:flex;align-items:center;justify-content:center;background:#f8fafc;position:relative}
+.tcphoto img{max-width:100%;max-height:112px;object-fit:contain}
+.tcph-fb{font-size:40px;color:#cbd5e1}
+.tcavail{position:absolute;top:8px;left:8px;background:#dcfce7;color:#15803d;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
+.tcpick{position:absolute;top:8px;right:8px;background:var(--blue);color:#fff;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:20px}
+.tcbody{padding:10px 12px 12px}
+.tcnm{font-size:13.5px;font-weight:600;line-height:1.3;min-height:35px}
+.tcsub{color:var(--muted);font-size:11.5px;margin-top:3px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.tccat{color:var(--blue);font-size:11.5px;margin-top:7px}
+.pkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.pkunit{border:1px solid var(--line);border-radius:9px;padding:9px 8px;cursor:pointer;text-align:center;font-weight:600;font-size:13px}
+.pkunit:hover{border-color:#cbd5e1}
+.pkunit.on{border-color:var(--blue);background:#eff6ff;color:var(--blue-d);box-shadow:0 0 0 1px var(--blue)}
+.pkunit small{display:block;color:var(--muted);font-weight:400;font-size:10.5px;margin-top:2px}
+.pkunit.on small{color:var(--blue-d)}
+.thumbcell{width:48px;padding:5px 8px !important}
+.rowthumb{width:38px;height:38px;border-radius:8px;object-fit:cover;background:#f1f5f9;border:1px solid var(--line);vertical-align:middle}
+span.rowthumb-fb{display:inline-flex;align-items:center;justify-content:center;font-size:17px}
 tbody tr:hover{background:#f8fafc}
 .chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
 .chip .dot{width:8px;height:8px}
@@ -287,6 +313,8 @@ let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('o
 /* ---- data layer (Supabase) ---- */
 function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||''),createdAt:(r.created_at||''),tagged:!!r.tagged,taggedAt:(r.tagged_at||''),model:r.model||'',imageUrl:r.image_url||'',disposed:!!r.disposed,disposedAt:(r.disposed_at||''),disposalNote:r.disposal_note||''};}
 function modelKey(t){return (t&&t.brand&&t.model)?((t.brand+' '+t.model).toUpperCase().replace(/[^A-Z0-9]+/g,'')):'';}
+function toolThumb(t){const url=t.imageUrl||(modelKey(t)?('/m/'+modelKey(t)+'.png'):'');
+  return url?`<img class="rowthumb" src="${esc(url)}" loading="lazy" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'"><span class="rowthumb rowthumb-fb" style="display:none">🧰</span>`:`<span class="rowthumb rowthumb-fb">🧰</span>`;}
 function toolImgHtml(t){const url=t.imageUrl||(modelKey(t)?('/m/'+modelKey(t)+'.png'):'');if(!url)return '';
   return `<div style="text-align:center;margin:2px 0 12px"><img src="${esc(url)}" alt="" style="max-width:100%;max-height:150px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;padding:4px" onerror="this.parentNode.style.display='none'"></div>`;}
 function rowToSlip(s){return {id:s.id,slip_no:s.slip_no,no:String(s.slip_no).padStart(3,'0'),sent:(s.sent_date||''),vendor:s.vendor||'',project:s.project||'',sender:s.sender||'',status:s.status||'ส่งแล้ว',received:(s.received_date||''),receiver:s.receiver||'',note:s.note||'',count:'0',company:s.company};}
@@ -531,8 +559,8 @@ function renderTools(){
     else if(so==='old')rows=[...rows].sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt)));
     $('#tcount').textContent=`${rows.length} เครื่อง`;
     const pg=pgSlice('tools',rows);
-    $('#ttbl').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th>บริษัท</th><th>ชื่อ</th><th>ยี่ห้อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th><th>ที่อยู่</th></tr></thead><tbody>${
-      pg.rows.map(t=>`<tr style="cursor:pointer" onclick="toolDetail(${t.i})"><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.brand)||'-'}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td><td>${esc((t.loc||'').split(' / ')[0])||'-'}</td></tr>`).join('')||'<tr><td colspan=9 class="empty">ไม่พบ</td></tr>'
+    $('#ttbl').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th></th><th>บริษัท</th><th>ชื่อ</th><th>ยี่ห้อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th><th>ที่อยู่</th></tr></thead><tbody>${
+      pg.rows.map(t=>`<tr style="cursor:pointer" onclick="toolDetail(${t.i})"><td class="thumbcell">${toolThumb(t)}</td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.brand)||'-'}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td><td>${esc((t.loc||'').split(' / ')[0])||'-'}</td></tr>`).join('')||'<tr><td colspan=10 class="empty">ไม่พบ</td></tr>'
     }</tbody></table></div>${pg.html}`;
   };
   PG_REDRAW['tools']=draw;
@@ -1234,6 +1262,7 @@ async function restoreSlip(no,co){
 
 /* ============ BORROW (เบิก-คืน) ============ */
 let borrowTab='out',selBor=new Set(),borPR={},borNote={},borDraft=null;
+let borView='card';
 function renderBorrow(){
   selBor=new Set();borPR={};borNote={};
   $('#view').innerHTML=`<div class="tabs"><button class="${borrowTab==='out'?'on':''}" onclick="setBT('out')">📤 เบิก (เอาออกไซต์)</button><button class="${borrowTab==='move'?'on':''}" onclick="setBT('move')">🔀 ย้ายไซต์</button><button class="${borrowTab==='in'?'on':''}" onclick="setBT('in')">📥 คืน (กลับออฟฟิต)</button></div><div id="bbody"></div>`;
@@ -1263,11 +1292,12 @@ function drawBorrow(){
       ${borDraft&&mode==='out'?'':`<button class="btn ${mode==='in'?'green':'primary'}" id="bgo">${btn}</button>`}</div></div>
     <div class="panel">
     <h3>${title} (${list.length})</h3>
-    <div class="toolbar"><input class="search" id="bq" placeholder="🔎 ค้นหา…"></div>
+    <div class="toolbar" style="display:flex;gap:10px;align-items:center"><input class="search" id="bq" placeholder="🔎 ค้นหา…" style="flex:1">${out?`<div class="vswitch"><button id="vwCard" class="${borView==='card'?'on':''}" onclick="setBorView('card')">▦ การ์ด</button><button id="vwTable" class="${borView==='table'?'on':''}" onclick="setBorView('table')">☰ ตาราง</button></div>`:''}</div>
     <div id="btbl"></div></div>
     <datalist id="dl_p3">${S.lookups.people.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>
     <datalist id="dl_pr">${S.lookups.projects.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>`;
   const draw=()=>{const q=$('#bq').value.trim().toLowerCase();const rows=list.filter(t=>!q||(t.name+t.no+t.code+(t.model||'')+(t.sn||'')).toLowerCase().includes(q));
+    if(out&&borView==='card'){$('#btbl').innerHTML=borCardsHtml(rows);return;}
     const pg=pgSlice('borrow',rows);
     $('#btbl').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th></th><th>บริษัท</th><th>ชื่อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th>${out?'<th>เลขที่ PR</th><th>หมายเหตุ</th>':''}</tr></thead><tbody>${
       pg.rows.map(t=>`<tr><td><input type="checkbox" ${selBor.has(t.i)?'checked':''} onchange="togBor(${t.i},this.checked)"></td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td>${out?`<td><input value="${esc(borPR[t.i]||'')}" oninput="borPR[${t.i}]=this.value" placeholder="PR..." style="width:100%;min-width:90px;padding:3px 5px"></td><td><input value="${esc(borNote[t.i]||'')}" oninput="borNote[${t.i}]=this.value" placeholder="หมายเหตุ" style="width:100%;min-width:100px;padding:3px 5px"></td>`:''}</tr>`).join('')||`<tr><td colspan=${out?10:8} class="empty">ไม่มี</td></tr>`
@@ -1277,7 +1307,46 @@ function drawBorrow(){
   if($('#bgo'))$('#bgo').onclick=(mode==='out'?previewBorrow:mode==='move'?doMove:doBorrow);
   if(mode==='out'&&$('#bdraft'))$('#bdraft').onclick=saveDraft;
 }
-function togBor(i,on){on?selBor.add(i):selBor.delete(i);$('#bform').style.display=selBor.size?'block':'none';$('#bcount').textContent=`เลือก ${selBor.size}`;}
+function togBor(i,on){on?selBor.add(i):selBor.delete(i);updateBorBar();}
+function updateBorBar(){if($('#bform'))$('#bform').style.display=selBor.size?'block':'none';if($('#bcount'))$('#bcount').textContent=`เลือก ${selBor.size}`;}
+function setBorView(v){borView=v;const a=$('#vwCard'),b=$('#vwTable');if(a)a.classList.toggle('on',v==='card');if(b)b.classList.toggle('on',v==='table');pgReset('borrow');if(PG_REDRAW['borrow'])PG_REDRAW['borrow']();}
+function borCardsHtml(rows){
+  const groups=[],gm={};
+  rows.forEach(t=>{const k=t.company+'|'+t.cat+'|'+t.name+'|'+(t.brand||'')+'|'+(t.model||'');
+    if(!gm[k]){gm[k]={company:t.company,cat:t.cat,name:t.name,brand:t.brand||'',model:t.model||'',units:[],gi:groups.length};groups.push(gm[k]);}
+    gm[k].units.push(t);});
+  window._borGroups=groups;
+  if(!groups.length)return '<div class="empty" style="padding:34px">ไม่มีเครื่องว่าง</div>';
+  return `<div class="cardgrid">${groups.map(g=>{
+    const pk=g.units.filter(u=>selBor.has(u.i)).length,rep=g.units[0];
+    const url=rep.imageUrl||(modelKey(rep)?('/m/'+modelKey(rep)+'.png'):'');
+    const photo=url?`<img src="${esc(url)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="tcph-fb" style="display:none">🧰</span>`:`<span class="tcph-fb">🧰</span>`;
+    return `<div class="tcard ${pk?'on':''}" onclick="openUnitPicker(${g.gi})">
+      <div class="tcphoto">${photo}<span class="tcavail">ว่าง ${g.units.length}</span>${pk?`<span class="tcpick">เลือก ${pk}</span>`:''}</div>
+      <div class="tcbody"><div class="tcnm">${esc(itemDesc(rep))||esc(g.cat)}</div>
+      <div class="tcsub">${g.model?esc(g.model):''} ${coBadge(g.company)}</div>
+      <div class="tccat">${esc(g.cat)} · แตะเลือกตัว ›</div></div></div>`;}).join('')}</div>`;
+}
+function openUnitPicker(gi){const g=(window._borGroups||[])[gi];if(!g)return;openModal(pickerHtml(gi));}
+function pickerHtml(gi){const g=window._borGroups[gi],pk=g.units.filter(u=>selBor.has(u.i)).length;
+  return `<h3 style="margin:0 0 4px;font-size:17px">${esc(itemDesc(g.units[0]))||esc(g.cat)}</h3>
+    <div class="muted" style="font-size:12.5px;margin-bottom:14px">${esc(g.brand)} ${esc(g.model)} · ${esc(g.cat)} · ${coBadge(g.company)} · ว่าง ${g.units.length} ตัว</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+      <span class="muted" style="font-size:13px">เลือกตัวที่จะเอา (แตะ NO):</span>
+      <a onclick="pickAllUnits(${gi})" style="margin-left:auto;color:var(--blue);font-size:12.5px;font-weight:600;cursor:pointer">เลือกทั้งหมด</a>
+      <a onclick="pickNoneUnits(${gi})" style="color:var(--blue);font-size:12.5px;font-weight:600;cursor:pointer">ล้าง</a></div>
+    <div id="pkunits" class="pkgrid">${pickerUnitsHtml(gi)}</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+      <b id="pkn">เลือกในหมวดนี้ ${pk}/${g.units.length}</b><div style="flex:1"></div>
+      <button class="btn primary" onclick="closeModal()">เสร็จ</button></div>`;
+}
+function pickerUnitsHtml(gi){const g=window._borGroups[gi];
+  return g.units.map(u=>`<div class="pkunit ${selBor.has(u.i)?'on':''}" onclick="pickUnit(${u.i},${gi})">${esc(u.no)||'(ไม่มี NO)'}<small>${selBor.has(u.i)?'✓ เลือกแล้ว':(u.sn?esc(u.sn):'ว่าง')}</small></div>`).join('');
+}
+function refreshPicker(gi){const g=window._borGroups[gi];if($('#pkunits'))$('#pkunits').innerHTML=pickerUnitsHtml(gi);const pk=g.units.filter(u=>selBor.has(u.i)).length;if($('#pkn'))$('#pkn').textContent=`เลือกในหมวดนี้ ${pk}/${g.units.length}`;updateBorBar();if(PG_REDRAW['borrow'])PG_REDRAW['borrow']();}
+function pickUnit(i,gi){selBor.has(i)?selBor.delete(i):selBor.add(i);refreshPicker(gi);}
+function pickAllUnits(gi){window._borGroups[gi].units.forEach(u=>selBor.add(u.i));refreshPicker(gi);}
+function pickNoneUnits(gi){window._borGroups[gi].units.forEach(u=>selBor.delete(u.i));refreshPicker(gi);}
 async function doBorrow(){
   if(!selBor.size)return;
   const out=borrowTab==='out';const date=$('#b_date').value;
