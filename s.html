@@ -90,7 +90,7 @@ function fmtDate(d){if(!d)return '';const M=['ม.ค.','ก.พ.','มี.ค.'
 async function boot(){
   TID=new URLSearchParams(location.search).get('t');
   const {data:{session}}=await sb.auth.getSession();
-  if(!session)return screenLogin();
+  if(!session)return TID?publicView():screenLogin();
   ME={email:session.user.email};
   const {data:pr}=await sb.from('profiles').select('role,company').eq('id',session.user.id).maybeSingle();
   ME.role=pr?pr.role:'pending'; ME.company=pr?pr.company:null;
@@ -267,6 +267,40 @@ function screenMsg(icon,title,sub){
     <div style="font-size:17px;font-weight:600;color:#0f172a">${esc(title)}</div>
     <div style="margin-top:6px;max-width:300px">${esc(sub)}</div>
     <a href="/" style="margin-top:18px;color:var(--blue);text-decoration:none;font-weight:600">ไปหน้าหลัก ›</a></div>`;
+}
+async function publicView(){
+  const {data,error}=await sb.rpc('public_tool_info',{tid:TID});
+  const t=Array.isArray(data)?data[0]:data;
+  if(error||!t)return screenMsg('❓','ไม่พบเครื่องนี้','QR อาจเสีย หรือเครื่องถูกลบ · ถ้าคุณเป็นพนักงาน กดเข้าสู่ระบบ');
+  applyTheme(t.company);
+  const code=((t.category||'')+' '+(t.no||'')).trim();
+  $('#app').innerHTML=`
+  <div class="hd">
+    <div class="top">
+      <a href="/"><span style="font-size:16px">‹</span> ปิด</a>
+      <a href="#" onclick="screenLogin();return false">🔑 เข้าสู่ระบบ (พนักงาน)</a>
+    </div>
+    <div class="idn">
+      <div class="ico">🧰</div>
+      <div style="min-width:0">
+        <div class="meta">${esc(t.company)} · NO.${esc(t.no||'-')}</div>
+        <h1>${esc(t.name||'(ไม่ระบุชื่อ)')}</h1>
+        ${t.brand?`<div class="brand">${esc(t.brand)}</div>`:''}
+      </div>
+    </div>
+    <div class="stat" style="background:rgba(255,255,255,.12);color:#cfe0f5">👀 ดูอย่างเดียว — สแกนเพื่อระบุตัวเครื่อง</div>
+  </div>
+  <div class="bd">
+    <div class="card">
+      <div class="row"><span class="k">รหัส</span><span class="v">${esc(code)||'-'}</span></div>
+      <div class="row"><span class="k">หมวด</span><span class="v">${esc(t.category)||'-'}</span></div>
+      <div class="row"><span class="k">ชื่อ</span><span class="v">${esc(t.name)||'-'}</span></div>
+      <div class="row"><span class="k">ยี่ห้อ / รุ่น</span><span class="v">${esc(t.brand)||'-'}${t.model?' · '+esc(t.model):''}</span></div>
+      <div class="row"><span class="k">NO</span><span class="v">${esc(t.no)||'-'}</span></div>
+      <div class="row"><span class="k">S/N</span><span class="v">${esc(t.serial)||'-'}</span></div>
+    </div>
+    <div class="muted" style="font-size:12.5px;text-align:center;padding:2px 12px">ต้องการรับเข้า / ส่งซ่อม / ย้ายไซต์ ต้องเข้าสู่ระบบด้วยบัญชีพนักงาน</div>
+  </div>`;
 }
 function screenLogin(){
   $('#app').innerHTML=`<div class="center" style="justify-content:flex-start;padding-top:60px">
