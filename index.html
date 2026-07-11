@@ -501,8 +501,15 @@ function renderDash(){
     <table><thead><tr><th>เครื่อง</th><th>บ.</th><th>ย้ายไป</th><th>โดย</th><th>เมื่อ</th></tr></thead><tbody>${
       _moves.map(m=>`<tr><td><b>${esc(m.code||m.no||'-')}</b></td><td>${coBadge(m.company)}</td><td><b>${esc(m.project)||'-'}</b></td><td>${esc(m.actor||m.recordedBy||'-')}</td><td>${esc(fmtDateTH(m.date))||'-'}</td></tr>`).join('')}</tbody></table>
   </div>`:'';
+  const _dorm=dormantTools();
+  const dormAlert=_dorm.length?`<div class="panel" style="border-left:4px solid #64748b;background:#f8fafc">
+    <h3 style="margin:0">⏳ เครื่องไม่เคลื่อนไหวเกิน 1 ปี (${_dorm.length})
+      <a onclick="dormantModal()" style="cursor:pointer">ดูทั้งหมด + จัดการ ›</a></h3>
+    <p class="muted" style="margin:6px 0 0;font-size:12.5px">🔴 ถูกยืมค้างไซต์ ${_dorm.filter(x=>x.t.status==='ถูกยืม').length} (เสี่ยงหาย) · 🟠 ว่างนอนสโตร์ ${_dorm.filter(x=>x.t.status==='ว่าง').length} (พิจารณาขายซาก) · ⚙️ ค้างซ่อม ${_dorm.filter(x=>x.t.status==='ส่งซ่อม').length}</p>
+  </div>`:'';
   $('#view').innerHTML=`
     ${pendAlert}
+    ${dormAlert}
     ${moveAlert}
     ${notif}
     <div class="cards">${cards}</div>
@@ -1008,13 +1015,15 @@ function disposeTool(i){const t=S.tools[i];
     <p class="muted">${esc(t.code)} · ${coBadge(t.company)} · ${esc(t.name)}</p>
     <div style="background:#fef3c7;color:#92400e;padding:9px 12px;border-radius:8px;font-size:13px;margin:8px 0">เครื่องจะถูก<b>ตัดออกจากทะเบียนใช้งาน</b> (เบิก/ไซต์/รายงาน จะไม่เห็น) แต่ยังเก็บบันทึกไว้ในหน้า "ตัดจำหน่าย/ขายซาก" · กู้คืนได้ถ้าตัดผิด</div>
     <div class="flexrow"><div class="field"><label>วันที่ตัดจำหน่าย</label><input type="date" id="dp_date" value="${today}"></div></div>
-    <div class="field"><label>เหตุผล (เช่น เก่า / เสียซ่อมไม่คุ้ม / สูญหาย)</label><input id="dp_note" placeholder="ระบุเหตุผล"></div>
+    <div class="flexrow"><div class="field"><label>ประเภท</label><select id="dp_reason"><option>ขายซาก</option><option>สูญหาย</option><option>ชำแหละอะไหล่</option><option>เสื่อมสภาพ/เก่า</option><option value="">อื่นๆ (ระบุเอง)</option></select></div></div>
+    <div class="field"><label>รายละเอียดเพิ่มเติม (ไม่บังคับ)</label><input id="dp_note" placeholder="เช่น หายที่ไซต์ A / ขายให้ร้าน..."></div>
     <div class="flexrow" style="margin-top:16px"><button class="btn" style="background:#f59e0b;color:#fff" onclick="doDispose(${i})">🗄️ ยืนยันตัดจำหน่าย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
 }
 async function doDispose(i){const t=S.tools[i];
   if(!canEditCo(t.company)){toast('ทำได้เฉพาะบริษัทตัวเอง');return;}
   const d=$('#dp_date').value||new Date().toISOString().slice(0,10);
-  const note=$('#dp_note').value.trim();
+  const rsn=$('#dp_reason')?$('#dp_reason').value:'';
+  const note=((rsn?rsn+' ':'')+$('#dp_note').value.trim()).trim();
   const {error}=await sb.from('tools').update({disposed:true,disposed_at:d,disposal_note:note,updated_at:new Date().toISOString()}).eq('id',t.id);
   if(error){toast('ตัดจำหน่ายไม่ได้: '+error.message);return;}
   await logAudit('ตัดจำหน่าย',t.company,t.code,(note?note+' ':'')+'('+d+')');
@@ -1474,6 +1483,32 @@ async function doMove(){
 
 /* ============ cross-company borrow helpers ============ */
 function lastBorrowMov(toolId){const c=S.movements.filter(m=>m.tool_id===toolId&&(m.type==='เบิก'||m.type==='ย้ายไซต์'));return c.sort((a,b)=>String(a.createdAt||a.date).localeCompare(String(b.createdAt||b.date))).pop();}
+function dormantTools(){
+  const cut=new Date(Date.now()-365*86400000).toISOString().slice(0,10);
+  const lastBy={};
+  S.movements.forEach(m=>{if(!m.tool_id)return;const d=(m.date||'').slice(0,10);if(d&&(!lastBy[m.tool_id]||d>lastBy[m.tool_id]))lastBy[m.tool_id]=d;});
+  return S.tools.filter(t=>inView(t)).map(t=>({t,last:lastBy[t.id]||String(t.createdAt||'').slice(0,10)}))
+    .filter(x=>x.last&&x.last<cut).sort((a,b)=>a.last.localeCompare(b.last));
+}
+function dormantModal(){
+  const all=dormantTools();
+  const days=l=>Math.floor((Date.now()-new Date(l).getTime())/86400000);
+  const grp=(st,icon,hint)=>{
+    const rows=all.filter(x=>x.t.status===st);
+    if(!rows.length)return '';
+    return `<h3 style="font-size:14px;margin:16px 0 6px">${icon} ${st} (${rows.length}) <span class="muted" style="font-weight:400;font-size:12px">— ${hint}</span></h3>
+      <table><thead><tr><th>รหัส</th><th>ชื่อ</th><th>บ.</th><th>อยู่ที่</th><th class="center">นิ่งมา</th></tr></thead><tbody>${
+      rows.map(x=>`<tr style="cursor:pointer" onclick="toolDetail(${x.t.i})"><td><b>${esc(x.t.code)}</b></td><td>${esc(x.t.name).slice(0,26)}</td><td>${coBadge(x.t.company)}</td><td>${esc((x.t.loc||'').split(' / ')[0])||'-'}</td><td class="center"><b>${days(x.last)}</b> วัน</td></tr>`).join('')}</tbody></table>`;
+  };
+  const other=all.filter(x=>!['ถูกยืม','ว่าง','ส่งซ่อม'].includes(x.t.status));
+  openModal(`<h3>⏳ เครื่องไม่เคลื่อนไหวเกิน 1 ปี (${all.length})</h3>
+    <p class="muted" style="font-size:12.5px">นับจากการเคลื่อนไหวล่าสุดของแต่ละเครื่อง · แตะแถวเพื่อเปิดจัดการ (ตัดจำหน่าย/แก้ไข)</p>
+    ${grp('ถูกยืม','🔴','ค้างไซต์นานผิดปกติ — ทวงถาม / แจ้งหาย')}
+    ${grp('ว่าง','🟠','นอนสโตร์ไม่ถูกใช้ — ตรวจนับจริง / ขายซาก')}
+    ${grp('ส่งซ่อม','⚙️','ค้างร้านซ่อมข้ามปี — ตามร้าน / ชำแหละซาก')}
+    ${other.length?grp(other[0].t.status,'•',''):''}
+    <div class="flexrow" style="margin-top:14px"><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`,true);
+}
 function crossBorrows(){const all=[];S.tools.forEach(t=>{if(t.status!=='ถูกยืม')return;const m=lastBorrowMov(t.id);const by=m?m.company:null;if(!by||by===t.company)return;all.push({t,by});});return all;}
 
 /* ============ HISTORY (3 แท็บ) ============ */
