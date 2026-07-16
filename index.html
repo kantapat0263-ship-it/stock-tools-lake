@@ -2077,7 +2077,7 @@ function scanDone(t,msg){ scanTool=null;
 
 /* ============ QR LABELS (ป้าย QR — เฟส 1) ============ */
 const QR_BASE='https://stock-tools-lake.vercel.app/s.html?t=';
-let selLabel=new Set(), lblFiltered=[], lblOnlyUntagged=false;
+let selLabel=new Set(), lblFiltered=[], lblOnlyUntagged=false, LBLSIZE='big';
 async function toggleTag(id,on){
   const t=S.tools.find(x=>x.id===id); if(!t)return;
   t.tagged=on; t.taggedAt=on?new Date().toISOString():'';
@@ -2086,9 +2086,9 @@ async function toggleTag(id,on){
   if(PG_REDRAW['labels'])PG_REDRAW['labels']();
 }
 /* วาด QR ลง canvas ตรงๆ จาก module matrix (คมชัด ไม่ต้องโหลดรูป) */
-function drawQR(ctx,text,x,y,size){
+function drawQR(ctx,text,x,y,size,ec){
   if(!window.qrcode)throw new Error('ไลบรารี QR ยังโหลดไม่เสร็จ ลองรีเฟรช');
-  const qr=qrcode(0,'H');qr.addData(text);qr.make();
+  const qr=qrcode(0,ec||'H');qr.addData(text);qr.make();
   const n=qr.getModuleCount(),quiet=2,cell=size/(n+quiet*2);
   ctx.fillStyle='#000';
   for(let r=0;r<n;r++)for(let c=0;c<n;c++){if(qr.isDark(r,c))ctx.fillRect(Math.floor(x+(c+quiet)*cell),Math.floor(y+(r+quiet)*cell),Math.ceil(cell),Math.ceil(cell));}
@@ -2117,7 +2117,25 @@ function labelCanvas(t){
   x.fillStyle='#fff';f('800',17);x.fillText(t.company||'',bx+bw/2,by+20*k);
   return c;
 }
-function labelDataURL(t){return labelCanvas(t).toDataURL('image/png');}
+function labelCanvas4x2(t){
+  const s=20,W=40*s,H=20*s,c=document.createElement('canvas');c.width=W;c.height=H;
+  const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,W,H);
+  drawQR(x,QR_BASE+t.id,1*s,1*s,18*s,'M');
+  x.fillStyle='#000';x.textBaseline='alphabetic';
+  const FT='Tahoma,"Noto Sans Thai",Arial,sans-serif',f=(w,sz)=>x.font=w+' '+(sz*s)+'px '+FT;
+  const rx=20.5*s, rr=39*s, rw=rr-rx;
+  x.textAlign='left';
+  f('800',5.6);x.fillText(t.no||t.code||'',rx,7.6*s,rw);
+  f('600',2.6);x.fillText(t.cat||'',rx,11.4*s,rw);
+  f('600',2.8);const bm=[t.brand,t.model].filter(Boolean).join(' ')||t.name||'';x.fillText(bm,rx,14.8*s,rw);
+  x.strokeStyle='#000';x.lineWidth=Math.max(1,.3*s);x.beginPath();x.moveTo(rx,15.8*s);x.lineTo(rr,15.8*s);x.stroke();
+  f('400',2.4);x.fillStyle='#333';x.fillText('S/N '+(t.sn||'-'),rx,18.6*s,rw*0.68);
+  x.textAlign='right';f('700',2.4);x.fillStyle='#111';x.fillText(t.company||'',rr,18.6*s);
+  return c;
+}
+function labelCanvasFor(t){return LBLSIZE==='small'?labelCanvas4x2(t):labelCanvas(t);}
+function labelDataURL(t){return labelCanvasFor(t).toDataURL('image/png');}
+function setLblSize(v){LBLSIZE=v;const a=$('#lsz_big'),b=$('#lsz_small');if(a)a.classList.toggle('on',v==='big');if(b)b.classList.toggle('on',v==='small');}
 function downloadLabel(id){const t=(S.tools||[]).find(x=>x.id===id);if(!t){toast('ไม่พบเครื่อง');return;}
   try{const a=document.createElement('a');a.href=labelDataURL(t);a.download='label_'+String(t.no||t.code||id).replace(/[^\w\-ก-๙]+/g,'_')+'.png';document.body.appendChild(a);a.click();a.remove();toast('ดาวน์โหลดป้ายแล้ว');}catch(e){toast('สร้างป้ายไม่ได้: '+e.message);} }
 async function downloadLabelsSel(){
@@ -2146,6 +2164,9 @@ function renderLabels(){
       <button class="btn" id="lnone">ล้าง</button>
       <button class="btn" id="luntag" style="margin-left:8px">☐ เฉพาะยังไม่ติด TAG</button></div>
     <div id="ltagcount" style="font-size:13px;margin:8px 0"></div>
+    <div style="margin:8px 0;font-size:13px;display:flex;align-items:center;gap:9px;flex-wrap:wrap">ขนาดป้าย:
+      <div class="vswitch"><button id="lsz_big" class="on" onclick="setLblSize('big')">5×3 ซม. (ติดตัวเครื่อง)</button><button id="lsz_small" onclick="setLblSize('small')">4×2 ซม. (ป้ายห้อย · QR ใหญ่)</button></div>
+      <span class="muted" style="font-size:12px">มีผลกับดาวน์โหลด PNG + พิมพ์</span></div>
     <div style="background:#eff6ff;border-left:4px solid var(--blue);padding:9px 12px;border-radius:8px;margin:10px 0;font-size:13px;line-height:1.6">📲 <b>ทำแท็ก NFC:</b> กด <b>📋 URL</b> ท้ายแถวเพื่อคัดลอก แล้วเขียนลงแท็กด้วยแอป (เช่น “NFC Tools”) แบบ <b>URL/Link</b> · แตะมือถือ = เปิดหน้าเดียวกับ QR รับของได้เลย · <b>แท็กติดบนโลหะต้องใช้แบบ on-metal</b></div>
     <div class="selbar" style="position:sticky;top:10px;z-index:5;background:var(--card);box-shadow:0 6px 16px rgba(0,0,0,.10);border-radius:10px;padding:10px 14px;margin:10px 0">
       <b id="lcount">เลือก 0</b><div class="spacer"></div>
@@ -2182,16 +2203,17 @@ function printLabels(){
   let cells='';
   for(const t of tools){let u='';try{u=labelDataURL(t);}catch(e){}
     cells+=`<div class="lbl"><img src="${u}"></div>`;}
+  const sm=LBLSIZE==='small', cols=sm?4:3, iw=sm?'40mm':'50mm', ih=sm?'20mm':'30mm', gap=sm?'4mm':'5mm', sz=sm?'4×2':'5×3';
   const w=window.open('','_blank');
   w.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ป้ายเต็ม (${tools.length} ดวง)</title>
     <style>*{box-sizing:border-box;margin:0;padding:0}
       body{font-family:"Noto Sans Thai",Tahoma,sans-serif;padding:8mm;color:#111}
       h1{font-size:14px;margin-bottom:6mm;color:#555}
-      .grid{display:grid;grid-template-columns:repeat(3,50mm);gap:5mm}
+      .grid{display:grid;grid-template-columns:repeat(${cols},${iw});gap:${gap}}
       .lbl{page-break-inside:avoid}
-      .lbl img{width:50mm;height:30mm;display:block;border:1px solid #ccc}
+      .lbl img{width:${iw};height:${ih};display:block;border:1px solid #ccc}
       @media print{body{padding:5mm}h1{display:none}}
-    </style></head><body><h1>ป้ายเต็ม 5×3 ซม. — ${tools.length} ดวง (พิมพ์/บันทึก PDF)</h1><div class="grid">${cells}</div>
+    </style></head><body><h1>ป้ายเต็ม ${sz} ซม. — ${tools.length} ดวง (พิมพ์/บันทึก PDF)</h1><div class="grid">${cells}</div>
     <scr`+`ipt>window.onload=function(){setTimeout(function(){window.print();},400);}</scr`+`ipt></body></html>`);
   w.document.close();
 }
