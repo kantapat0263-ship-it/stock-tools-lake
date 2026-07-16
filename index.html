@@ -2125,14 +2125,12 @@ function labelCanvas4x2(t){
   const FT='Tahoma,"Noto Sans Thai",Arial,sans-serif',f=(w,sz)=>x.font=w+' '+(sz*s)+'px '+FT;
   const rx=20.5*s, rr=39*s, rw=rr-rx;
   x.textAlign='left';
-  f('800',5.6);x.fillText(t.no||t.code||'',rx,7.6*s,rw);
-  f('600',2.6);x.fillText(t.cat||'',rx,11.4*s,rw);
-  f('600',2.8);const bm=[t.brand,t.model].filter(Boolean).join(' ')||t.name||'';x.fillText(bm,rx,14.8*s,rw);
-  x.strokeStyle='#000';x.lineWidth=Math.max(1,.3*s);x.beginPath();x.moveTo(rx,15.8*s);x.lineTo(rr,15.8*s);x.stroke();
-  const coTxt=t.company||'';
-  f('700',2.4);const coW=coTxt?x.measureText(coTxt).width:0;
-  f('400',2.4);x.fillStyle='#333';x.textAlign='left';x.fillText('S/N '+(t.sn||'-'),rx,18.6*s,Math.max(40,rr-coW-12-rx));
-  x.textAlign='right';f('700',2.4);x.fillStyle='#111';x.fillText(coTxt,rr,18.6*s);
+  f('800',5.6);x.fillStyle='#000';x.fillText(t.no||t.code||'',rx,6.6*s,rw);
+  f('400',2.5);x.fillStyle='#555';x.fillText('S/N '+(t.sn||'-'),rx,9.9*s,rw);
+  f('600',2.5);x.fillStyle='#000';x.fillText(t.cat||'',rx,13.0*s,rw);
+  f('600',2.7);const bm=[t.brand,t.model].filter(Boolean).join(' ')||t.name||'';x.fillText(bm,rx,16.1*s,rw);
+  x.strokeStyle='#000';x.lineWidth=Math.max(1,.25*s);x.beginPath();x.moveTo(rx,17.2*s);x.lineTo(rr,17.2*s);x.stroke();
+  f('700',2.6);x.fillStyle='#111';x.textAlign='right';x.fillText(t.company||'',rr,19.5*s);
   return c;
 }
 function labelCanvasFor(t){return LBLSIZE==='small'?labelCanvas4x2(t):labelCanvas(t);}
