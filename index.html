@@ -1403,7 +1403,7 @@ function borrowDocHtml(items,who,proj,date,no,issueCo){
   function copy(p,stamp){
     let rows='';
     for(let r=0;r<PER;r++){const gi=p*PER+r,it=items[gi];
-      rows+=`<tr><td class="c">${gi+1}</td><td>${it?esc(it.cat||it.name):''}</td><td>${it?esc(it.brand||''):''}</td><td>${it?esc(it.model||''):''}</td><td class="c">${it?esc(it.sn):''}</td><td class="c">${it?esc(it.no):''}</td><td class="c">${it?esc(it.pr||''):''}</td><td>${it?esc(it.note||''):''}</td></tr>`;}
+      rows+=`<tr><td class="c">${gi+1}</td><td>${it?esc(itemDesc(it)):''}</td><td>${it?esc(it.brand||''):''}</td><td>${it?esc(it.model||''):''}</td><td class="c">${it?esc(it.sn):''}</td><td class="c">${it?esc(it.no):''}</td><td class="c">${it?esc(it.pr||''):''}</td><td>${it?esc(it.note||''):''}</td></tr>`;}
     return `<div class="bcopy">
       <div class="bhd">
         <div class="blogo">${LOGO[CO]?`<img src="${LOGO[CO]}" alt="${esc(CO)}">`:esc(CO)}</div>
