@@ -166,10 +166,8 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
   body{background:#fff}
   .app,.scrim{display:none !important}
   #printArea{display:block !important;font-family:Tahoma,'Noto Sans Thai',sans-serif;color:#000;padding:0}
-  @page{size:A4 portrait;margin:12mm}
-  @page land{size:A4 landscape;margin:8mm}
+  @page{size:A4 landscape;margin:8mm}
 }
-.doc.land{page:land}
 .rsdoc{font-size:11px}
 .rshd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
 .rshd-l{flex:1;font-size:12px;font-weight:bold;line-height:1.3}
@@ -187,7 +185,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
 .rsdoc table{table-layout:fixed}
 .rsdoc th,.rsdoc td.c{text-align:center}
 .rsdoc td{height:23px;vertical-align:middle;overflow-wrap:anywhere;word-break:break-word}
-.rspage{page:land;break-after:page}
+.rspage{break-after:page}
 .rspage:last-of-type{break-after:auto}
 /* ใบส่งเครื่องมือ 2 สำเนา/แผ่น */
 .bpair{display:flex;width:100%;align-items:stretch}
@@ -1124,7 +1122,7 @@ async function commitRepair(){
   await sb.from('movements').insert(items.map(it=>({company:ISS,owner_company:it.t.company,recorded_by:(ME&&ME.email)||'',tool_id:it.t.id,occurred_on:date||null,type:'ส่งซ่อม',slip_no:slipN,actor:sender,counterparty:vendor,reason:it.reason,project:it.project||null})));
   await ensureLookup('vendors',vendor);await ensureLookup('people',sender);
   pendingRepair=null;closeModal();
-  $('#printArea').innerHTML=repairDocHtml(slip,date,vendor,sender,items,ISS);window.print();
+  $('#printArea').innerHTML=repairDocHtml(slip,date,vendor,sender,items,ISS);printNow(true);
   toast(`บันทึก + ออกใบส่งซ่อม ${ISS} #${slip} แล้ว`);
   await loadAll();go('repair');
 }
@@ -1390,6 +1388,13 @@ async function doBorrow(){
 let pendingBorrow=null;
 function itemDesc(t){const n=(t.name||'').trim(),c=(t.cat||'').trim();return (c&&n&&n.length<=12)?(c+' '+n):(n||c);}
 function fmtDateTH(iso){if(!iso)return '';const p=String(iso).slice(0,10).split('-');if(p.length<3)return String(iso);const M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const d=parseInt(p[2],10),mo=parseInt(p[1],10),y=parseInt(p[0],10);if(!d||!mo||!y||mo>12)return String(iso);return d+' '+M[mo-1]+' '+(y+543);}
+function printNow(landscape){
+  let st=document.getElementById('pgstyle');
+  if(!st){st=document.createElement('style');st.id='pgstyle';document.head.appendChild(st);}
+  st.textContent='@media print{@page{size:A4 '+(landscape?'landscape':'portrait')+';margin:'+(landscape?'8mm':'12mm')+'}}';
+  const imgs=[...document.querySelectorAll('#printArea img')];
+  Promise.all(imgs.map(im=>(im&&im.decode)?im.decode().catch(()=>{}):Promise.resolve())).then(()=>{setTimeout(()=>window.print(),30);});
+}
 function borrowDocHtml(items,who,proj,date,no,issueCo){
   const CO=issueCo||COMPANY;
   const co=CO==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)';
@@ -1451,7 +1456,7 @@ async function commitBorrow(){
   }
   await ensureLookup('people',who);await ensureLookup('projects',proj);
   pendingBorrow=null;closeModal();
-  $('#printArea').innerHTML=borrowDocHtml(items,who,proj,date,bn,ISS);window.print();
+  $('#printArea').innerHTML=borrowDocHtml(items,who,proj,date,bn,ISS);printNow(true);
   toast(`เบิก ${items.length} เครื่อง → ออกใบส่งไซต์ ${ISS} #${String(bn).padStart(3,'0')} แล้ว`);await loadAll();renderBorrow();
 }
 async function saveDraft(){
@@ -1584,7 +1589,7 @@ function histBorrows(){
 function reprintBorrow(i){
   const b=(window._bb||[])[i]; if(!b){toast('ไม่พบรายการ');return;}
   $('#printArea').innerHTML=borrowDocHtml(b.tools,b.who,b.project,b.date,b.no,b.company);
-  window.print();
+  printNow(true);
 }
 function histDrafts(){
   const bb=draftBatches(); window._bb=bb;
@@ -1615,7 +1620,7 @@ async function issueDraft(i){
   if(bnErr){toast('ออกเลขใบไม่ได้: '+bnErr.message);return;}
   for(const mid of b.movIds){if(mid)await sb.from('movements').update({borrow_no:bn,is_draft:false}).eq('id',mid);}
   borDraft=null;
-  $('#printArea').innerHTML=borrowDocHtml(b.tools,b.who,b.project,b.date,bn,b.company);window.print();
+  $('#printArea').innerHTML=borrowDocHtml(b.tools,b.who,b.project,b.date,bn,b.company);printNow(true);
   toast(`ออกใบส่งไซต์ ${b.company} #${String(bn).padStart(3,'0')} แล้ว`);await loadAll();go('history');
 }
 async function cancelDraft(i){
@@ -1654,7 +1659,7 @@ async function issueRepairDraft(i){
   for(const mid of b.movIds){if(mid)await sb.from('movements').update({slip_no:slipN,is_draft:false}).eq('id',mid);}
   rDraft=null;
   const items=b.tools.map(t=>({t,reason:t.reason||'',project:t.project||''}));
-  $('#printArea').innerHTML=repairDocHtml(String(slipN).padStart(3,'0'),b.date,b.vendor,b.sender,items,b.company);window.print();
+  $('#printArea').innerHTML=repairDocHtml(String(slipN).padStart(3,'0'),b.date,b.vendor,b.sender,items,b.company);printNow(true);
   toast(`ออกใบส่งซ่อม ${b.company} #${String(slipN).padStart(3,'0')} แล้ว`);await loadAll();go('history');
 }
 async function cancelRepairDraft(i){
@@ -1829,7 +1834,7 @@ function reprintSlip(slipNo,co){
   const items=sent.map(m=>{const t=m.tool_id?S.tools.find(x=>x.id===m.tool_id):null;
     return {t:t||{name:m.label||'',cat:'',sn:'',no:'',loc:'',company:co},reason:m.reason||'',project:m.project||''};});
   $('#printArea').innerHTML=repairDocHtml(s.no,s.sent,s.vendor,s.sender,items,co);
-  window.print();
+  printNow(true);
 }
 function histSlips(){
   $('#hbody').innerHTML=`<div class="panel">
