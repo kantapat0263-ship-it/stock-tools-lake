@@ -267,6 +267,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
 <div id="loginScrim" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#0f2744,#16365c);align-items:center;justify-content:center;z-index:100">
   <div style="background:#fff;border-radius:16px;padding:30px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.35)">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><div style="width:42px;height:42px;border-radius:10px;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px">LG</div><div><b style="font-size:18px">LOTUS GROUP STOCK</b><div style="font-size:11px;color:#64748b">ระบบจัดการเครื่องมือ (PAC + LOTUS)</div></div></div>
+    <div class="field"><label>ชื่อ-สกุล <span style="color:#94a3b8;font-weight:400">(กรอกตอนสมัครใหม่)</span></label><input id="li_name" autocomplete="name" placeholder="เช่น สมชาย ใจดี" style="width:100%"></div>
     <div class="field"><label>อีเมล</label><input id="li_email" type="email" autocomplete="username" style="width:100%"></div>
     <div class="field"><label>รหัสผ่าน</label><input id="li_pass" type="password" autocomplete="current-password" style="width:100%" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <div id="li_msg" style="color:#dc2626;font-size:12px;min-height:16px;margin:4px 0"></div>
@@ -386,7 +387,7 @@ async function init(){
   if(!session){showLogin();return;}
   const u=session.user;
   const {data:pr}=await sb.from('profiles').select('*').eq('id',u.id).maybeSingle();
-  ME={id:u.id,email:u.email,role:pr?pr.role:'pending',company:pr?pr.company:null};
+  ME={id:u.id,email:u.email,fullName:(pr&&pr.full_name)||'',role:pr?pr.role:'pending',company:pr?pr.company:null};
   if(ME.role!=='admin' && !ME.company){
     document.body.innerHTML=`<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:inherit;background:#0f172a;color:#fff">
       <div style="font-size:46px">⏳</div>
@@ -408,7 +409,7 @@ async function init(){
   }
   $('#loginScrim').style.display='none';
   document.querySelector('.app').style.display='flex';
-  $('#uemail').textContent=ME.email; $('#urole').textContent=(ME.role==='admin'?'ผู้ดูแลระบบ':'พนักงาน '+(ME.company||''));
+  $('#uemail').textContent=ME.fullName||ME.email; $('#urole').textContent=(ME.role==='admin'?'ผู้ดูแลระบบ':(ME.role==='site'?'ผู้ดูแลหน้างาน ':'พนักงาน ')+(ME.company||''));
   if(ME.role==='admin'){$('#navUsers').style.display='';$('#navAudit').style.display='';}
   if(ME.role!=='admin'&&ME.company){COMPANY=ME.company;FILTER=ME.company;document.querySelectorAll('#coswitch button').forEach(b=>b.classList.toggle('on',(b.dataset.co||'')===FILTER));}
   applyTheme(ME.company);
@@ -425,10 +426,11 @@ function showLogin(){$('#loginScrim').style.display='flex';document.querySelecto
 async function doLogin(){const e=$('#li_email').value.trim(),p=$('#li_pass').value;$('#li_msg').textContent='กำลังเข้าสู่ระบบ…';
   const {error}=await sb.auth.signInWithPassword({email:e,password:p});
   if(error){$('#li_msg').textContent='เข้าสู่ระบบไม่ได้: '+error.message;return;} init();}
-async function doSignup(){const e=$('#li_email').value.trim(),p=$('#li_pass').value;
-  if(!e||p.length<6){$('#li_msg').textContent='ใส่อีเมล + รหัสผ่าน (อย่างน้อย 6 ตัว)';return;}
+async function doSignup(){const e=$('#li_email').value.trim(),p=$('#li_pass').value,nm=$('#li_name').value.trim();
+  if(!nm){$('#li_msg').style.color='#dc2626';$('#li_msg').textContent='กรุณากรอกชื่อ-สกุล ก่อนสมัคร';return;}
+  if(!e||p.length<6){$('#li_msg').style.color='#dc2626';$('#li_msg').textContent='ใส่อีเมล + รหัสผ่าน (อย่างน้อย 6 ตัว)';return;}
   $('#li_msg').textContent='กำลังสมัคร…';
-  const {data,error}=await sb.auth.signUp({email:e,password:p});
+  const {data,error}=await sb.auth.signUp({email:e,password:p,options:{data:{full_name:nm}}});
   if(error){$('#li_msg').textContent='สมัครไม่ได้: '+error.message;return;}
   if(data.session){$('#li_msg').textContent='สมัครสำเร็จ! กำลังเข้าสู่ระบบ…';setTimeout(init,600);}
   else{$('#li_msg').style.color='#16a34a';$('#li_msg').textContent='สมัครแล้ว — โปรดยืนยันอีเมลก่อน หรือกด เข้าสู่ระบบ';}}
@@ -2333,9 +2335,10 @@ async function renderUsers(){
   if(error){$('#view').innerHTML='<div class="panel empty">โหลดไม่ได้: '+esc(error.message)+'</div>';return;}
   $('#view').innerHTML=`<div class="panel">
     <h3>ผู้ใช้ทั้งหมด (${profs.length}) <span class="muted" style="font-weight:400">— ตั้งบทบาท + บริษัท แล้วกดบันทึก</span></h3>
-    <table><thead><tr><th>อีเมล</th><th>บทบาท</th><th>เห็นบริษัท</th><th></th></tr></thead><tbody>${
+    <table><thead><tr><th>ชื่อ-สกุล</th><th>อีเมล</th><th>บทบาท</th><th>เห็นบริษัท</th><th></th></tr></thead><tbody>${
       profs.map(p=>`<tr>
-        <td><b>${esc(p.email||p.id.slice(0,8))}</b></td>
+        <td><input id="un_${p.id}" value="${esc(p.full_name||'')}" placeholder="ชื่อ-สกุล" style="width:100%;min-width:130px;padding:5px 8px"></td>
+        <td><b style="font-size:12.5px">${esc(p.email||p.id.slice(0,8))}</b></td>
         <td><select id="ur_${p.id}"><option value="pending" ${p.role==='pending'?'selected':''}>⏳ รออนุมัติ (ยังไม่ให้สิทธิ์)</option><option value="staff" ${p.role==='staff'?'selected':''}>พนักงาน (staff)</option><option value="site" ${p.role==='site'?'selected':''}>ผู้ดูแลหน้างาน (สแกนย้ายไซต์อย่างเดียว)</option><option value="admin" ${p.role==='admin'?'selected':''}>ผู้ดูแล (admin — เห็นทุกบริษัท)</option></select></td>
         <td><select id="uc_${p.id}"><option value="" ${!p.company?'selected':''}>— ยังไม่กำหนด (ยังเข้าไม่ได้)</option><option value="PAC" ${p.company==='PAC'?'selected':''}>PAC</option><option value="LOTUS" ${p.company==='LOTUS'?'selected':''}>LOTUS</option></select></td>
         <td><button class="btn primary" style="padding:6px 14px" onclick="saveUser('${p.id}')">บันทึก</button> ${p.id!==ME.id?`<button class="btn" style="background:#fee2e2;color:#b91c1c;padding:6px 12px" onclick="delUser('${p.id}','${esc(p.email||'')}')">ลบ</button>`:`<span class="muted" style="font-size:12px">(คุณ)</span>`}</td>
@@ -2345,8 +2348,8 @@ async function renderUsers(){
   </div>`;
 }
 async function saveUser(id){
-  const role=$('#ur_'+id).value, company=$('#uc_'+id).value||null;
-  const {error}=await sb.from('profiles').update({role,company}).eq('id',id);
+  const role=$('#ur_'+id).value, company=$('#uc_'+id).value||null, full_name=($('#un_'+id)?$('#un_'+id).value.trim():'')||null;
+  const {error}=await sb.from('profiles').update({role,company,full_name}).eq('id',id);
   if(error){toast('บันทึกไม่ได้: '+error.message);return;}
   toast('อัปเดตสิทธิ์แล้ว');renderUsers();
 }
