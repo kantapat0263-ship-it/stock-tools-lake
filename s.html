@@ -78,7 +78,7 @@ let TOOL=null, ME=null, TID=null, SITES=[];
 let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tmo);tmo=setTimeout(()=>t.classList.remove('on'),2400);}
 
 const STC={'ว่าง':['#16a34a','#dcfce7'],'ถูกยืม':['#2563eb','#dbeafe'],'ส่งซ่อม':['#d97706','#fef3c7'],'รอส่งซ่อม':['#d97706','#fef3c7'],'ชำรุด':['#dc2626','#fee2e2'],'สูญหาย':['#dc2626','#fee2e2']};
-const TYC={'เบิก':['#2563eb','📤'],'คืน':['#16a34a','📥'],'ส่งซ่อม':['#d97706','🔧'],'รับคืนจากซ่อม':['#0d9488','✅'],'แจ้งชำรุด':['#dc2626','⚠️'],'ย้ายไซต์':['#7c3aed','🔀']};
+const TYC={'เบิก':['#2563eb','📤'],'คืน':['#16a34a','📥'],'ส่งซ่อม':['#d97706','🔧'],'รับคืนจากซ่อม':['#0d9488','✅'],'แจ้งชำรุด':['#dc2626','⚠️'],'ย้ายไซต์':['#7c3aed','🔀'],'ยืนยันรับ':['#0891b2','📍']};
 
 function applyTheme(co){const r=document.documentElement.style;
   if(co==='LOTUS'){r.setProperty('--navy','#3f4a22');r.setProperty('--navydark','#2a3217');r.setProperty('--blue','#5c7a29');}
@@ -119,9 +119,16 @@ function render(t,mv){
   let actions='';
   if(ME&&ME.role==='site'){
     if(t.status==='ถูกยืม'){
-      actions=`<div class="muted" style="font-size:13px;margin-bottom:7px">🔀 ย้ายเครื่องนี้ไปไซต์ใหม่ — ตอนนี้อยู่ที่ <b>${esc(t.location)||'-'}</b></div>
+      const ord=(mv||[]).slice().sort((a,b)=>String((a.occurred_on||'')+(a.created_at||'')).localeCompare(String((b.occurred_on||'')+(b.created_at||''))));
+      let lb=-1;for(let k=ord.length-1;k>=0;k--){if(ord[k].type==='เบิก'){lb=k;break;}}
+      let conf=null;if(lb>=0){for(let k=lb+1;k<ord.length;k++){if(ord[k].type==='ยืนยันรับ'){conf=ord[k];break;}}}
+      const site=((t.location||'').split('/')[0]||'').trim();
+      actions=(conf
+        ?`<div style="background:#dcfce7;color:#166534;padding:11px 13px;border-radius:11px;margin-bottom:11px;font-size:13.5px">✅ รับเข้าไซต์แล้ว · โดย <b>${esc(conf.actor||conf.recorded_by||'-')}</b>${conf.occurred_on?' · '+esc(fmtDate(conf.occurred_on)):''}</div>`
+        :`<input id="rnote" class="inp" placeholder="โน้ต (ไม่บังคับ)" style="margin-bottom:9px"><button class="btn primary" onclick="actReceiveAtSite()">✅ รับเข้าไซต์ (ยืนยันของถึงแล้ว)</button>`)
+        +`<div class="muted" style="font-size:13px;margin:13px 0 7px">🔀 หรือย้ายเครื่องนี้ไปไซต์ใหม่ — ตอนนี้อยู่ที่ <b>${esc(t.location)||'-'}</b></div>
         <select id="movesite" class="inp" style="margin-bottom:9px"><option value="">— เลือกไซต์ปลายทาง —</option>${SITES.map(s=>`<option>${esc(s)}</option>`).join('')}</select>
-        <button class="btn primary" style="background:var(--blue)" onclick="actMoveSite()">🔀 ย้ายไปไซต์นี้</button>`;
+        <button class="btn" style="background:var(--blue);color:#fff" onclick="actMoveSite()">🔀 ย้ายไปไซต์นี้</button>`;
     }else{
       actions=`<div class="muted" style="font-size:13px;text-align:center;padding:6px">— เครื่องนี้สถานะ ${esc(t.status)} · ย้ายได้เฉพาะเครื่องที่ "ถูกยืม" ออกไซต์อยู่ (เครื่องในออฟฟิศ ต้องเบิกที่ออฟฟิศ)</div>`;
     }
@@ -241,6 +248,13 @@ async function actMoveSite(){
   const {data:ins}=await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'ย้ายไซต์',project:site,actor:ME.email}).select('id').maybeSingle();
   LAST={label:'ย้ายไซต์',toolId:TOOL.id,name:(TOOL.no||TOOL.name||''),prevTool:prev,movId:ins&&ins.id,slip:null};
   afterAction('🔀 ย้ายไป '+site+' แล้ว');
+}
+async function actReceiveAtSite(){
+  const note=noteVal(),prev=snapTool(TOOL),co=(ME.role==='admin')?TOOL.company:ME.company;
+  const site=((TOOL.location||'').split('/')[0]||'').trim();
+  const {data:ins}=await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'ยืนยันรับ',actor:(ME.fullName||ME.email),project:(site&&site!=='ออฟฟิต')?site:null,note}).select('id').maybeSingle();
+  LAST={label:'ยืนยันรับเข้าไซต์',toolId:TOOL.id,name:(TOOL.no||TOOL.name||''),prevTool:prev,movId:ins&&ins.id,slip:null};
+  afterAction('📍 ยืนยันรับเข้าไซต์แล้ว');
 }
 async function actDraftDispatch(){
   const site=($('#dsite')&&$('#dsite').value||'').trim();
