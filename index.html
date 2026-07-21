@@ -1602,6 +1602,8 @@ function borrowBatches(draftsOnly){
   Object.values(byTool).forEach(a=>a.sort((x,y)=>String((x.date||'')+(x.createdAt||'')).localeCompare(String((y.date||'')+(y.createdAt||'')))));
   const closeMov=(m)=>{const a=byTool[m.tool_id]||[];const i=a.findIndex(x=>x.id===m.id);if(i<0)return null;
     for(let j=i+1;j<a.length;j++){const ty=a[j].type;if(ty==='คืน'||ty==='รับคืนจากซ่อม')return a[j];if(ty==='เบิก')return {type:'เบิกใหม่',date:a[j].date};}return null;};
+  const receiverOf=(m)=>{const a=byTool[m.tool_id]||[];const i=a.findIndex(x=>x.id===m.id);if(i<0)return '';
+    for(let j=i+1;j<a.length;j++){const ty=a[j].type;if(ty==='ยืนยันรับ')return a[j].actor||'';if(ty==='คืน'||ty==='เบิก')return '';}return '';};
   S.movements.forEach(m=>{
     if(m.type!=='เบิก'||m.isDraft)return;
     const issCo=m.company,date=m.date,proj=m.project,who=m.actor;
@@ -1611,6 +1613,7 @@ function borrowBatches(draftsOnly){
     const info=t?Object.assign({},t,{pr:m.prNo,note:m.note||''}):{name:m.label||m.code||'',cat:'',no:'',code:m.code||'',company:issCo,brand:'',model:'',sn:'',pr:m.prNo,note:m.note||''};
     const cm=closeMov(m);
     info._returned=!!cm; info._returnOn=cm?(cm.date||''):''; info._returnType=cm?cm.type:'';
+    info._receiver=receiverOf(m);
     if(!info._returned)g.out++;
     g.tools.push(info); g.movIds.push(m.id);
   });
@@ -1628,9 +1631,10 @@ function histBorrows(){
     <div id="hbtbl" style="max-height:62vh;overflow:auto"></div></div>`;
   const draw=()=>{const q=$('#hbq').value.trim().toLowerCase();
     const list=batches.map((b,i)=>({b,i})).filter(o=>(!borOutOnly||(o.b.out||0)>0)&&(!q||((o.b.no!=null?String(o.b.no).padStart(3,'0'):'')+' '+(o.b.project||'')+' '+(o.b.who||'')+' '+(o.b.company||'')+' '+(o.b.date||'')).toLowerCase().includes(q)));
-    $('#hbtbl').innerHTML=`<table class="locktbl"><thead><tr><th>เลขที่</th><th>โครงการ / ไซต์</th><th>บ.</th><th>ผู้เบิก</th><th>วันที่เบิก</th><th class="center">จำนวน</th><th>สถานะ</th><th></th></tr></thead><tbody>${
+    $('#hbtbl').innerHTML=`<table class="locktbl"><thead><tr><th>เลขที่</th><th>โครงการ / ไซต์</th><th>บ.</th><th>ผู้เบิก</th><th>ผู้รับของ</th><th>วันที่เบิก</th><th class="center">จำนวน</th><th>สถานะ</th><th></th></tr></thead><tbody>${
       list.map(({b,i})=>{const done=(b.out||0)===0;const st=done?`<span class="chip" style="background:#dcfce7;color:#15803d">✅ คืนครบ</span>`:`<span class="chip" style="background:#fef3c7;color:#92400e">⏳ ค้าง ${b.out}/${b.tools.length}</span>`;
-      return `<tr style="cursor:pointer" onclick="borrowSlipDetail(${i})"><td><b>${b.no!=null?String(b.no).padStart(3,'0'):'-'}</b></td><td><b>${esc(b.project)||'-'}</b></td><td>${coBadge(b.company)}</td><td>${esc(b.who)||'-'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td>${st}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 11px" onclick="event.stopPropagation();editBorrowBatchForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:var(--blue);color:#fff;padding:5px 11px" onclick="event.stopPropagation();reprintBorrow(${i})">🖨️ พิมพ์</button></td></tr>`;}).join('')||`<tr><td colspan=8 class="empty">${q?'ไม่พบรายการที่ค้นหา':(borOutOnly?'ไม่มีใบที่ยังมีของค้าง':'ยังไม่มีใบเบิก')}</td></tr>`
+      const recv=[...new Set(b.tools.map(t=>t._receiver).filter(Boolean))].join(', ');
+      return `<tr style="cursor:pointer" onclick="borrowSlipDetail(${i})"><td><b>${b.no!=null?String(b.no).padStart(3,'0'):'-'}</b></td><td><b>${esc(b.project)||'-'}</b></td><td>${coBadge(b.company)}</td><td>${esc(b.who)||'-'}</td><td>${recv?esc(recv):'<span class="muted">—</span>'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td>${st}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 11px" onclick="event.stopPropagation();editBorrowBatchForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:var(--blue);color:#fff;padding:5px 11px" onclick="event.stopPropagation();reprintBorrow(${i})">🖨️ พิมพ์</button></td></tr>`;}).join('')||`<tr><td colspan=9 class="empty">${q?'ไม่พบรายการที่ค้นหา':(borOutOnly?'ไม่มีใบที่ยังมีของค้าง':'ยังไม่มีใบเบิก')}</td></tr>`
     }</tbody></table>`;};
   $('#hbq').oninput=draw;
   $('#hbout').onclick=()=>{borOutOnly=!borOutOnly;$('#hbout').classList.toggle('primary',borOutOnly);$('#hbout').textContent=(borOutOnly?'☑':'☐')+' เฉพาะที่ยังมีของค้าง';draw();};
@@ -1645,12 +1649,14 @@ function borrowSlipDetail(i){
   const b=(window._bb||[])[i]; if(!b){toast('ไม่พบใบเบิก');return;}
   const done=(b.out||0)===0;
   const stC=done?'#16a34a':'#d97706', stTxt=done?'✅ คืนครบแล้ว':`⏳ ยังค้าง ${b.out}/${b.tools.length}`;
+  const recv=[...new Set(b.tools.map(t=>t._receiver).filter(Boolean))].map(esc).join(', ');
   const rows=b.tools.map((t,ix)=>{
     let s;
     if(t._returned){const lbl=t._returnType==='เบิกใหม่'?'🔄 ถูกเบิกใหม่':'✅ คืนแล้ว';
       s=`<span style="color:#16a34a">${lbl}${t._returnOn?' · '+esc(fmtDateTH(t._returnOn)):''}</span>`;
     }else s=`<span style="color:#d97706">⏳ ยังค้างที่ไซต์</span>`;
-    return `<tr><td class="center">${ix+1}</td><td><b>${esc(itemDesc(t))||'-'}</b></td><td class="center">${esc(t.no)||'-'}</td><td>${esc(t.pr)||'-'}</td><td>${s}</td></tr>`;
+    const rc=t._receiver?`<div class="muted" style="font-size:11.5px">📍 รับที่ไซต์: ${esc(t._receiver)}</div>`:'';
+    return `<tr><td class="center">${ix+1}</td><td><b>${esc(itemDesc(t))||'-'}</b></td><td class="center">${esc(t.no)||'-'}</td><td>${esc(t.pr)||'-'}</td><td>${s}${rc}</td></tr>`;
   }).join('');
   const kv=(k,v)=>`<div><span class="muted">${k}:</span> <b>${v}</b></div>`;
   openModal(`<h3>📋 ใบเบิก / ส่งไซต์ ${b.no!=null?'#'+String(b.no).padStart(3,'0'):''} ${coBadge(b.company)}</h3>
@@ -1658,6 +1664,7 @@ function borrowSlipDetail(i){
       ${kv('โครงการ/ไซต์',esc(b.project)||'-')}
       ${kv('สถานะ',`<span style="color:${stC}">${stTxt}</span>`)}
       ${kv('ผู้เบิก',esc(b.who)||'-')}
+      ${kv('ผู้รับของ (ที่ไซต์)',recv||'—')}
       ${kv('วันที่เบิก',esc(fmtDateTH(b.date))||'-')}
       ${kv('จำนวน',b.tools.length+' เครื่อง')}
       ${kv('คืนแล้ว',(b.tools.length-(b.out||0))+' / '+b.tools.length)}
