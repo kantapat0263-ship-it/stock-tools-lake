@@ -319,7 +319,7 @@ function toolThumb(t){const url=toolImgUrl(t);
 function toolImgHtml(t){const url=toolImgUrl(t);if(!url)return '';
   return `<div style="text-align:center;margin:2px 0 12px"><img src="${esc(url)}" alt="" style="max-width:100%;max-height:150px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;padding:4px" onerror="this.parentNode.style.display='none'"></div>`;}
 function rowToSlip(s){return {id:s.id,slip_no:s.slip_no,no:String(s.slip_no).padStart(3,'0'),sent:(s.sent_date||''),vendor:s.vendor||'',project:s.project||'',sender:s.sender||'',status:s.status||'ส่งแล้ว',received:(s.received_date||''),receiver:s.receiver||'',note:s.note||'',count:'0',company:s.company};}
-function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||'',borrowNo:(m.borrow_no!=null?m.borrow_no:null),prNo:(m.pr_no||''),isDraft:!!m.is_draft};}
+function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||'',borrowNo:(m.borrow_no!=null?m.borrow_no:null),prNo:(m.pr_no||''),isDraft:!!m.is_draft,receiver:(m.receiver||'')};}
 async function fetchAllMov(){
   const all=[];const PAGE=1000;let from=0;
   for(;;){
@@ -1613,7 +1613,7 @@ function borrowBatches(draftsOnly){
     const info=t?Object.assign({},t,{pr:m.prNo,note:m.note||''}):{name:m.label||m.code||'',cat:'',no:'',code:m.code||'',company:issCo,brand:'',model:'',sn:'',pr:m.prNo,note:m.note||''};
     const cm=closeMov(m);
     info._returned=!!cm; info._returnOn=cm?(cm.date||''):''; info._returnType=cm?cm.type:'';
-    info._receiver=receiverOf(m);
+    info._manualReceiver=(m.receiver||''); info._receiver=info._manualReceiver||receiverOf(m);
     if(!info._returned)g.out++;
     g.tools.push(info); g.movIds.push(m.id);
   });
@@ -1791,12 +1791,15 @@ function editBorrowBatchForm(i){
   const elig=S.tools.filter(t=>t.status==='ว่าง'&&inView(t));
   const peo=S.lookups.people.slice(); if(b.who&&!peo.includes(b.who))peo.unshift(b.who);
   const prj=S.lookups.projects.slice(); if(b.project&&!prj.includes(b.project))prj.unshift(b.project);
+  const brecv=[...new Set(b.tools.map(t=>t._manualReceiver).filter(Boolean))][0]||'';
+  const peor=S.lookups.people.slice(); if(brecv&&!peor.includes(brecv))peor.unshift(brecv);
   openModal(`<h3>✏️ แก้ไขใบส่งไซต์ ${coBadge(b.company)}</h3>
     <div class="flexrow">
       <div class="field"><label>วันที่</label><input id="eb_date" type="date" value="${esc(b.date)}"></div>
       <div class="field"><label>ผู้เบิก</label><div style="display:flex;gap:6px"><select id="eb_who" style="flex:1"><option value="">— เลือกผู้เบิก —</option>${peo.map(p=>`<option ${p===b.who?'selected':''}>${esc(p)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addPersonInline('eb_who')" title="เพิ่มผู้เบิก">➕</button></div></div>
       <div class="field"><label>โครงการ / ไซต์</label><div style="display:flex;gap:6px"><select id="eb_proj" style="flex:1"><option value="">— เลือกไซต์ —</option>${prj.map(p=>`<option ${p===b.project?'selected':''}>${esc(p)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addSiteInline('eb_proj')" title="เพิ่มไซต์">➕</button></div></div>
     </div>
+    <div class="flexrow"><div class="field"><label>ผู้รับของ (ที่ไซต์) <span class="muted" style="font-weight:400">— กรอกมือ / เว้นไว้ก็ได้</span></label><div style="display:flex;gap:6px"><select id="eb_recv" style="flex:1"><option value="">— ยังไม่มี —</option>${peor.map(p=>`<option ${p===brecv?'selected':''}>${esc(p)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addPersonInline('eb_recv')" title="เพิ่มชื่อผู้รับ">➕</button></div></div></div>
     <p class="muted" style="font-size:12px;margin:6px 0 2px">เครื่องในใบ ${b.tools.length} เครื่อง — ติ๊ก "เอาออก" เครื่องที่ไม่ต้องการ (จะกลับเป็น "ว่าง" · อัปเดตที่อยู่เครื่องที่เหลือให้ด้วย)</p>
     <div style="max-height:30vh;overflow:auto"><table><thead><tr><th>เครื่อง / NO</th><th>เลขที่ PR</th><th>หมายเหตุ</th><th class="center">เอาออก</th></tr></thead><tbody>${
       b.tools.map((t,j)=>`<tr><td>${esc(t.cat)||esc(t.name)||'-'} ${esc(t.no)||''}</td><td><input data-bpr="${j}" value="${esc(t.pr||'')}" placeholder="PR" style="width:100%;min-width:80px"></td><td><input data-bnt="${j}" value="${esc(t.note||'')}" placeholder="หมายเหตุ" style="width:100%;min-width:90px"></td><td class="center"><input type="checkbox" data-brm="${j}"></td></tr>`).join('')||'<tr><td colspan=4 class="empty">ไม่มีเครื่อง</td></tr>'
@@ -1812,7 +1815,7 @@ function editBorrowBatchForm(i){
 }
 async function saveBorrowBatch(i){
   const b=(window._bb||[])[i]; if(!b)return;
-  const date=$('#eb_date').value, who=$('#eb_who').value.trim(), proj=$('#eb_proj').value.trim();
+  const date=$('#eb_date').value, who=$('#eb_who').value.trim(), proj=$('#eb_proj').value.trim(), recv=($('#eb_recv')?$('#eb_recv').value.trim():'');
   if(!who||!proj){toast('กรอก ผู้เบิก + โครงการ ให้ครบ');return;}
   for(let j=0;j<b.tools.length;j++){
     const t=b.tools[j], movId=b.movIds[j];
@@ -1822,15 +1825,15 @@ async function saveBorrowBatch(i){
       if(t.status==='ถูกยืม')await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:new Date().toISOString()}).eq('id',t.id);
       continue;}
     const prEl=document.querySelector(`[data-bpr="${j}"]`),ntEl=document.querySelector(`[data-bnt="${j}"]`);
-    if(movId)await sb.from('movements').update({occurred_on:date||null,project:proj,actor:who,pr_no:(prEl?prEl.value.trim():'')||null,note:(ntEl?ntEl.value.trim():'')||null}).eq('id',movId);
+    if(movId)await sb.from('movements').update({occurred_on:date||null,project:proj,actor:who,receiver:(recv||null),pr_no:(prEl?prEl.value.trim():'')||null,note:(ntEl?ntEl.value.trim():'')||null}).eq('id',movId);
     if(t.status==='ถูกยืม')await sb.from('tools').update({location:proj+' / '+who,pending_dest:proj,updated_at:new Date().toISOString()}).eq('id',t.id);
   }
   const adds=[...document.querySelectorAll('[data-badd]:checked')].map(c=>c.getAttribute('data-badd'));
   for(const tid of adds){const t=S.tools.find(x=>x.id===tid); if(!t)continue;
     await sb.from('tools').update({status:'ถูกยืม',location:proj+' / '+who,receipt_pending:true,pending_dest:proj,dispatched_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',tid);
-    await sb.from('movements').insert({company:b.company,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:tid,occurred_on:date||null,type:'เบิก',project:proj,actor:who,borrow_no:b.no,is_draft:!!b.draft});
+    await sb.from('movements').insert({company:b.company,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:tid,occurred_on:date||null,type:'เบิก',project:proj,actor:who,receiver:recv||null,borrow_no:b.no,is_draft:!!b.draft});
   }
-  await ensureLookup('people',who);await ensureLookup('projects',proj);
+  await ensureLookup('people',who);if(recv)await ensureLookup('people',recv);await ensureLookup('projects',proj);
   closeModal();toast(adds.length?`แก้ไขใบส่งไซต์ + เพิ่ม ${adds.length} เครื่องแล้ว`:'แก้ไขใบส่งไซต์แล้ว');await loadAll();go('history');
 }
 function histRecent(){
