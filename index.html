@@ -398,6 +398,7 @@ async function init(){
     </div>`;
     return;
   }
+  if(!ME.fullName){ showNameGate(); return; }
   if(ME.role==='site'){
     document.body.innerHTML=`<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:inherit;background:#0f172a;color:#fff">
       <div style="font-size:46px">📷</div>
@@ -435,6 +436,27 @@ async function doSignup(){const e=$('#li_email').value.trim(),p=$('#li_pass').va
   if(data.session){$('#li_msg').textContent='สมัครสำเร็จ! กำลังเข้าสู่ระบบ…';setTimeout(init,600);}
   else{$('#li_msg').style.color='#16a34a';$('#li_msg').textContent='สมัครแล้ว — โปรดยืนยันอีเมลก่อน หรือกด เข้าสู่ระบบ';}}
 async function logout(){await sb.auth.signOut();location.reload();}
+function showNameGate(){
+  document.body.innerHTML=`<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:'Noto Sans Thai',sans-serif;background:linear-gradient(135deg,#0f2744,#16365c);color:#fff">
+    <div style="font-size:42px">👤</div>
+    <div style="font-size:20px;font-weight:700;margin-top:8px">กรอกชื่อ-สกุลก่อนใช้งาน</div>
+    <div style="margin-top:6px;max-width:340px;color:#cbd5e1;line-height:1.6;font-size:14px">ระบบต้องใช้ชื่อคุณแสดงตัวตนตามจุดต่างๆ (เช่น ผู้รับของ) — กรอกครั้งเดียวจบ</div>
+    <input id="ng_name" placeholder="เช่น สมชาย ใจดี" style="margin-top:16px;width:280px;max-width:88vw;padding:12px 14px;border-radius:10px;border:0;font-size:15px" onkeydown="if(event.key==='Enter')saveMyName()">
+    <div id="ng_msg" style="color:#fca5a5;font-size:13px;min-height:18px;margin-top:8px"></div>
+    <button onclick="saveMyName()" style="margin-top:4px;width:280px;max-width:88vw;padding:12px;border-radius:10px;border:0;background:#2563eb;color:#fff;font-weight:700;font-size:15px;cursor:pointer">บันทึกชื่อ</button>
+    <a href="#" onclick="sb.auth.signOut().then(()=>location.reload());return false" style="margin-top:16px;color:#93b4d6;text-decoration:none;font-size:13px">ออกจากระบบ</a>
+  </div>`;
+  setTimeout(()=>{const el=document.getElementById('ng_name');if(el)el.focus();},50);
+}
+async function saveMyName(){
+  const nm=(document.getElementById('ng_name').value||'').trim();
+  const msg=document.getElementById('ng_msg');
+  if(!nm){msg.style.color='#fca5a5';msg.textContent='กรุณากรอกชื่อ-สกุล';return;}
+  msg.style.color='#a7f3d0';msg.textContent='กำลังบันทึก…';
+  const {error}=await sb.from('profiles').update({full_name:nm}).eq('id',ME.id);
+  if(error){msg.style.color='#fca5a5';msg.textContent='บันทึกไม่ได้: '+error.message;return;}
+  location.reload();
+}
 
 /* ============ router ============ */
 const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ 👋'],tools:['ทะเบียนเครื่องมือ','รายการเครื่องมือทั้งหมด'],borrow:['เบิก / คืน','เครื่องออกไซต์ · ย้ายไซต์ · กลับเข้าออฟฟิต'],bysite:['ของตามไซต์','ดูเครื่องที่อยู่แต่ละไซต์งานตอนนี้'],scan:['สแกน','สแกน QR → รับคืนเข้าระบบ (จากไซต์ / จากซ่อม)'],repair:['ส่งซ่อม','สร้างใบส่งซ่อม → พิมพ์'],receive:['รับคืนจากซ่อม','บันทึกเครื่องที่ซ่อมเสร็จ'],history:['ประวัติ','ไล่ดูการเคลื่อนไหวรายเครื่อง'],report:['รายงาน','สรุปภาพรวม + ดาวน์โหลดเป็นไฟล์ Excel/CSV'],labels:['ป้าย QR','สร้าง QR ไม่ซ้ำของแต่ละเครื่อง → พิมพ์เป็นป้าย'],sites:['จัดการไซต์งาน','เพิ่ม / แก้ชื่อ / ลบ / รวมไซต์ซ้ำ — กันชื่อโครงการเพี้ยน'],cats:['จัดการหมวด','เพิ่ม / แก้ / ลบ / รวมหมวดซ้ำ — หมวด = ประเภทกว้างๆ'],contacts:['จัดการผู้เบิก / ช่าง','แก้ชื่อ / รวมชื่อซ้ำ / ลบ ผู้เบิก·ผู้ส่ง·ช่าง — แก้แล้วอัปเดตใบเก่าให้ด้วย'],trash:['ถังขยะ','เครื่องที่ถูกลบ — กู้คืนได้'],disposed:['ตัดจำหน่าย / ขายซาก','เครื่องที่ตัดออกจากทรัพย์สินแล้ว — บัญชีดู/ดาวน์โหลดได้ · กู้คืนได้ถ้าตัดผิด'],audit:['ประวัติแก้ไข','บันทึกการเพิ่ม/แก้ไข/ลบ ทั้งระบบ (เฉพาะ admin)'],users:['จัดการผู้ใช้','ตั้งบทบาท + บริษัท ของผู้ใช้ (เฉพาะ admin)']};
