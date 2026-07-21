@@ -1559,32 +1559,56 @@ function renderHistory(){
 }
 function borrowBatches(draftsOnly){
   const groups={};
-  S.tools.forEach(t=>{
-    if(t.status!=='ถูกยืม')return;
-    const mv=S.movements.filter(m=>m.tool_id===t.id&&m.type==='เบิก').sort((a,b)=>String((a.date||'')+(a.createdAt||'')).localeCompare(String((b.date||'')+(b.createdAt||'')))).pop();
-    if(!mv)return;
-    if(draftsOnly?!mv.isDraft:mv.isDraft)return; // ใบร่าง vs ใบที่ออกแล้ว แยกกัน
-    const issCo=mv.company,date=mv.date,proj=mv.project,who=mv.actor;
-    const key=draftsOnly?(issCo+'|'+date+'|'+proj+'|'+who):((mv.borrowNo!=null)?(issCo+'#'+mv.borrowNo):(issCo+'|'+date+'|'+proj+'|'+who));
-    const g=groups[key]=groups[key]||{date,project:proj,who,company:issCo,no:(mv.borrowNo!=null?mv.borrowNo:null),draft:!!draftsOnly,tools:[],movIds:[]};
-    g.tools.push(Object.assign({},t,{pr:mv.prNo,note:mv.note||''})); g.movIds.push(mv.id);
+  if(draftsOnly){
+    // ใบร่าง: ดูจากเครื่องที่ "ถูกยืม" อยู่ตอนนี้ (ยังไม่ออกใบ)
+    S.tools.forEach(t=>{
+      if(t.status!=='ถูกยืม')return;
+      const mv=S.movements.filter(m=>m.tool_id===t.id&&m.type==='เบิก').sort((a,b)=>String((a.date||'')+(a.createdAt||'')).localeCompare(String((b.date||'')+(b.createdAt||'')))).pop();
+      if(!mv||!mv.isDraft)return;
+      const issCo=mv.company,date=mv.date,proj=mv.project,who=mv.actor;
+      const key=issCo+'|'+date+'|'+proj+'|'+who;
+      const g=groups[key]=groups[key]||{date,project:proj,who,company:issCo,no:null,draft:true,tools:[],movIds:[]};
+      g.tools.push(Object.assign({},t,{pr:mv.prNo,note:mv.note||''})); g.movIds.push(mv.id);
+    });
+    return Object.values(groups).filter(g=>!FILTER||g.company===FILTER).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  }
+  // ใบเบิกที่ออกแล้ว: สร้างจาก movement "เบิก" ทุกใบ (เก็บไว้แม้คืนครบ) + เช็คว่าคืนแล้วหรือยังต่อเครื่อง
+  const byTool={};
+  S.movements.forEach(m=>{(byTool[m.tool_id]=byTool[m.tool_id]||[]).push(m);});
+  Object.values(byTool).forEach(a=>a.sort((x,y)=>String((x.date||'')+(x.createdAt||'')).localeCompare(String((y.date||'')+(y.createdAt||'')))));
+  const isReturned=(m)=>{const a=byTool[m.tool_id]||[];const i=a.findIndex(x=>x.id===m.id);if(i<0)return false;
+    for(let j=i+1;j<a.length;j++){const ty=a[j].type;if(ty==='คืน'||ty==='รับคืนจากซ่อม'||ty==='เบิก')return true;}return false;};
+  S.movements.forEach(m=>{
+    if(m.type!=='เบิก'||m.isDraft)return;
+    const issCo=m.company,date=m.date,proj=m.project,who=m.actor;
+    const key=(m.borrowNo!=null)?(issCo+'#'+m.borrowNo):(issCo+'|'+date+'|'+proj+'|'+who);
+    const g=groups[key]=groups[key]||{date,project:proj,who,company:issCo,no:(m.borrowNo!=null?m.borrowNo:null),draft:false,tools:[],movIds:[],out:0};
+    const t=S.tools.find(x=>x.id===m.tool_id);
+    const info=t?Object.assign({},t,{pr:m.prNo,note:m.note||''}):{name:m.label||m.code||'',cat:'',no:'',code:m.code||'',company:issCo,brand:'',model:'',sn:'',pr:m.prNo,note:m.note||''};
+    info._returned=isReturned(m); if(!info._returned)g.out++;
+    g.tools.push(info); g.movIds.push(m.id);
   });
   return Object.values(groups).filter(g=>!FILTER||g.company===FILTER).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||(b.no||0)-(a.no||0));
 }
 function draftBatches(){return borrowBatches(true);}
+let borOutOnly=false;
 function histBorrows(){
   const batches=borrowBatches(); window._bb=batches;
   $('#hbody').innerHTML=`<div class="panel">
-    <h3>📋 ใบเบิก / ส่งไซต์ (ของที่ยังไม่คืน) <span class="muted" style="font-weight:400">— พิมพ์ใบส่งไซต์ย้อนหลังได้ (เช่น เครื่องที่เบิกไปก่อนมีระบบใบ)</span></h3>
-    <div class="toolbar" style="margin:0 0 8px">
-      <input class="search" id="hbq" placeholder="🔎 ค้นหา เลขที่ / โครงการ-ไซต์ / ผู้เบิก / บริษัท"></div>
+    <h3>📋 ใบเบิก / ส่งไซต์ <span class="muted" style="font-weight:400">— เก็บทุกใบ · มีป้ายบอกว่าคืนครบหรือยัง · พิมพ์ย้อนหลังได้</span></h3>
+    <div class="toolbar" style="margin:0 0 8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <input class="search" id="hbq" placeholder="🔎 ค้นหา เลขที่ / โครงการ-ไซต์ / ผู้เบิก / บริษัท" style="flex:1">
+      <button class="btn" id="hbout">☐ เฉพาะที่ยังมีของค้าง</button></div>
     <div id="hbtbl" style="max-height:62vh;overflow:auto"></div></div>`;
   const draw=()=>{const q=$('#hbq').value.trim().toLowerCase();
-    const list=batches.map((b,i)=>({b,i})).filter(o=>!q||((o.b.no!=null?String(o.b.no).padStart(3,'0'):'')+' '+(o.b.project||'')+' '+(o.b.who||'')+' '+(o.b.company||'')+' '+(o.b.date||'')).toLowerCase().includes(q));
-    $('#hbtbl').innerHTML=`<table class="locktbl"><thead><tr><th>เลขที่</th><th>โครงการ / ไซต์</th><th>บ.</th><th>ผู้เบิก</th><th>วันที่เบิก</th><th class="center">จำนวน</th><th></th></tr></thead><tbody>${
-      list.map(({b,i})=>`<tr><td><b>${b.no!=null?String(b.no).padStart(3,'0'):'-'}</b></td><td><b>${esc(b.project)||'-'}</b></td><td>${coBadge(b.company)}</td><td>${esc(b.who)||'-'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 11px" onclick="editBorrowBatchForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:var(--blue);color:#fff;padding:5px 11px" onclick="reprintBorrow(${i})">🖨️ พิมพ์</button></td></tr>`).join('')||`<tr><td colspan=7 class="empty">${q?'ไม่พบรายการที่ค้นหา':'ไม่มีของที่เบิกค้างอยู่'}</td></tr>`
+    const list=batches.map((b,i)=>({b,i})).filter(o=>(!borOutOnly||(o.b.out||0)>0)&&(!q||((o.b.no!=null?String(o.b.no).padStart(3,'0'):'')+' '+(o.b.project||'')+' '+(o.b.who||'')+' '+(o.b.company||'')+' '+(o.b.date||'')).toLowerCase().includes(q)));
+    $('#hbtbl').innerHTML=`<table class="locktbl"><thead><tr><th>เลขที่</th><th>โครงการ / ไซต์</th><th>บ.</th><th>ผู้เบิก</th><th>วันที่เบิก</th><th class="center">จำนวน</th><th>สถานะ</th><th></th></tr></thead><tbody>${
+      list.map(({b,i})=>{const done=(b.out||0)===0;const st=done?`<span class="chip" style="background:#dcfce7;color:#15803d">✅ คืนครบ</span>`:`<span class="chip" style="background:#fef3c7;color:#92400e">⏳ ค้าง ${b.out}/${b.tools.length}</span>`;
+      return `<tr><td><b>${b.no!=null?String(b.no).padStart(3,'0'):'-'}</b></td><td><b>${esc(b.project)||'-'}</b></td><td>${coBadge(b.company)}</td><td>${esc(b.who)||'-'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td>${st}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 11px" onclick="editBorrowBatchForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:var(--blue);color:#fff;padding:5px 11px" onclick="reprintBorrow(${i})">🖨️ พิมพ์</button></td></tr>`;}).join('')||`<tr><td colspan=8 class="empty">${q?'ไม่พบรายการที่ค้นหา':(borOutOnly?'ไม่มีใบที่ยังมีของค้าง':'ยังไม่มีใบเบิก')}</td></tr>`
     }</tbody></table>`;};
-  $('#hbq').oninput=draw;draw();
+  $('#hbq').oninput=draw;
+  $('#hbout').onclick=()=>{borOutOnly=!borOutOnly;$('#hbout').classList.toggle('primary',borOutOnly);$('#hbout').textContent=(borOutOnly?'☑':'☐')+' เฉพาะที่ยังมีของค้าง';draw();};
+  draw();
 }
 function reprintBorrow(i){
   const b=(window._bb||[])[i]; if(!b){toast('ไม่พบรายการ');return;}
