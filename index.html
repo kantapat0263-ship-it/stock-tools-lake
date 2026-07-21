@@ -740,7 +740,7 @@ async function deleteSite(i){
   toast('ลบไซต์ '+s+' แล้ว');await loadAll();go('sites');
 }
 /* ============ จัดการผู้เบิก / ช่าง (people + vendors) ============ */
-let _peopleList=[], _vendorsList=[];
+let _peopleList=[], _vendorsList=[], _receiversList=[];
 function renderContacts(){
   $('#view').innerHTML=`
   <div class="panel">
@@ -752,12 +752,19 @@ function renderContacts(){
     <h3>🔧 จัดการช่าง / ร้านซ่อม <span class="muted" style="font-weight:400">— แก้ชื่อ / รวม / ลบ · อัปเดตใบส่งซ่อมเก่าให้ด้วย</span></h3>
     <div class="toolbar" style="margin:8px 0"><input class="search" id="newvendor" placeholder="ชื่อช่าง/ร้านใหม่…" style="max-width:300px"><button class="btn primary" id="addvendorBtn" style="margin-left:8px">➕ เพิ่มช่าง</button></div>
     <div id="vendorbody"></div>
+  </div>
+  <div class="panel">
+    <h3>📍 จัดการผู้รับของ (ที่ไซต์) <span class="muted" style="font-weight:400">— ชุดแยกจากผู้เบิก · แก้ / รวม / ลบ · แก้ชื่อแล้วอัปเดตใบเบิกเก่าให้ด้วย</span></h3>
+    <div class="toolbar" style="margin:8px 0"><input class="search" id="newreceiver" placeholder="ชื่อผู้รับของใหม่…" style="max-width:300px"><button class="btn primary" id="addreceiverBtn" style="margin-left:8px">➕ เพิ่มชื่อ</button></div>
+    <div id="receiverbody"></div>
   </div>`;
   $('#addpersonBtn').onclick=addPerson;
   $('#newperson').addEventListener('keydown',e=>{if(e.key==='Enter')addPerson();});
   $('#addvendorBtn').onclick=addVendor;
   $('#newvendor').addEventListener('keydown',e=>{if(e.key==='Enter')addVendor();});
-  drawPeople(); drawVendors();
+  $('#addreceiverBtn').onclick=addReceiver;
+  $('#newreceiver').addEventListener('keydown',e=>{if(e.key==='Enter')addReceiver();});
+  drawPeople(); drawVendors(); drawReceivers();
 }
 function drawPeople(){
   _peopleList=[...S.lookups.people].sort((a,b)=>String(a).localeCompare(String(b),'th'));
@@ -853,6 +860,52 @@ async function deleteVendor(i){
   const n=_vendorsList[i];const use=(S.slips||[]).filter(s=>s.vendor===n).length;
   if(!confirm(use?('⚠️ ช่าง "'+n+'" ใช้ในใบซ่อม '+use+' ใบ\nลบออกจากลิสต์? (ใบยังอยู่ แค่หายจากตัวเลือก)'):('ลบช่าง "'+n+'" ออกจากลิสต์?')))return;
   const {error}=await sb.from('vendors').delete().eq('name',n); if(error){toast('ลบไม่ได้: '+error.message);return;}
+  toast('ลบ '+n+' แล้ว');await loadAll();go('contacts');
+}
+/* ---- ผู้รับของ (receivers) ---- */
+function drawReceivers(){
+  _receiversList=[...(S.lookups.receivers||[])].sort((a,b)=>String(a).localeCompare(String(b),'th'));
+  const useC=n=>S.movements.filter(m=>m.receiver===n).length;
+  $('#receiverbody').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th>ชื่อผู้รับของ (ที่ไซต์)</th><th class="center">ใช้ในใบเบิก</th><th></th></tr></thead><tbody>${
+    _receiversList.map((n,i)=>`<tr><td><b>${esc(n)}</b></td><td class="center">${useC(n)||'-'}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:4px 9px" onclick="renameReceiver(${i})">✏️ แก้</button> <button class="btn" style="padding:4px 9px" onclick="mergeReceiver(${i})">🔀 รวม</button> <button class="btn" style="padding:4px 9px;background:#fee2e2;color:#b91c1c" onclick="deleteReceiver(${i})">🗑️</button></td></tr>`).join('')||'<tr><td colspan=3 class="empty">ยังไม่มีชื่อ — หน้างานเพิ่มเองผ่านช่อง "ผู้รับของ" ตอนแก้ใบเบิก</td></tr>'
+  }</tbody></table></div>`;
+}
+async function addReceiver(){
+  const name=($('#newreceiver').value||'').trim(); if(!name){toast('ใส่ชื่อก่อน');return;}
+  if((S.lookups.receivers||[]).some(p=>p.toLowerCase()===name.toLowerCase())){toast('มีชื่อนี้อยู่แล้ว');return;}
+  const {error}=await sb.from('receivers').insert({company:COMPANY,name}); if(error){toast('เพิ่มไม่ได้: '+error.message);return;}
+  toast('➕ เพิ่ม '+name);await loadAll();go('contacts');
+}
+async function reassignReceiverRefs(oldN,newN){ await sb.from('movements').update({receiver:newN}).eq('receiver',oldN); }
+async function renameReceiver(i){
+  const oldN=_receiversList[i];const newN=(prompt('เปลี่ยนชื่อผู้รับของ "'+oldN+'" เป็น:',oldN)||'').trim();
+  if(!newN||newN===oldN)return;
+  const exists=(S.lookups.receivers||[]).some(p=>p.toLowerCase()===newN.toLowerCase()&&p!==oldN);
+  if(exists&&!confirm('มีชื่อ "'+newN+'" อยู่แล้ว — รวม "'+oldN+'" เข้ากับมันแทนไหม?'))return;
+  toast('กำลังเปลี่ยนชื่อ + แก้ใบเก่า…');
+  await reassignReceiverRefs(oldN,newN);
+  if(!(S.lookups.receivers||[]).some(p=>p===newN))await sb.from('receivers').insert({company:COMPANY,name:newN});
+  await sb.from('receivers').delete().eq('name',oldN);
+  toast('✅ เปลี่ยนเป็น "'+newN+'" แล้ว');await loadAll();go('contacts');
+}
+function mergeReceiver(i){
+  const src=_receiversList[i];const others=_receiversList.filter(s=>s!==src);
+  if(!others.length){toast('ไม่มีชื่ออื่นให้รวม');return;}
+  openModal(`<h3>🔀 รวมชื่อผู้รับของซ้ำ</h3><p class="muted">ย้ายใบเบิกทั้งหมดของ "<b>${esc(src)}</b>" ไปชื่อที่เลือก แล้วลบ "${esc(src)}" ทิ้ง</p>
+    <div class="field"><label>รวม "${esc(src)}" เข้ากับ</label><select id="mergeTo">${others.map(s=>`<option>${esc(s)}</option>`).join('')}</select></div>
+    <div class="flexrow" style="margin-top:16px"><button class="btn primary" onclick="doMergeReceiver('${jsq(src)}')">🔀 รวมเลย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
+}
+async function doMergeReceiver(src){
+  const dest=$('#mergeTo').value;if(!dest||dest===src){closeModal();return;}
+  closeModal();toast('กำลังรวม + แก้ใบเก่า…');
+  await reassignReceiverRefs(src,dest);
+  await sb.from('receivers').delete().eq('name',src);
+  toast('✅ รวม "'+src+'" → "'+dest+'" แล้ว');await loadAll();go('contacts');
+}
+async function deleteReceiver(i){
+  const n=_receiversList[i];const use=S.movements.filter(m=>m.receiver===n).length;
+  if(!confirm(use?('⚠️ ชื่อ "'+n+'" ใช้ในใบเบิก '+use+' รายการ\nลบออกจากลิสต์? (ใบยังอยู่ แค่หายจากตัวเลือก)'):('ลบชื่อ "'+n+'" ออกจากลิสต์?')))return;
+  const {error}=await sb.from('receivers').delete().eq('name',n); if(error){toast('ลบไม่ได้: '+error.message);return;}
   toast('ลบ '+n+' แล้ว');await loadAll();go('contacts');
 }
 
