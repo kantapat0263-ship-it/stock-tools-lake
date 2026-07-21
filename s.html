@@ -92,9 +92,10 @@ async function boot(){
   const {data:{session}}=await sb.auth.getSession();
   if(!session)return TID?publicView():screenLogin();
   ME={email:session.user.email};
-  const {data:pr}=await sb.from('profiles').select('role,company').eq('id',session.user.id).maybeSingle();
-  ME.role=pr?pr.role:'pending'; ME.company=pr?pr.company:null;
+  const {data:pr}=await sb.from('profiles').select('role,company,full_name').eq('id',session.user.id).maybeSingle();
+  ME.role=pr?pr.role:'pending'; ME.company=pr?pr.company:null; ME.fullName=(pr&&pr.full_name)||'';
   if(ME.role!=='admin' && !ME.company)return screenMsg('⏳','รออนุมัติ','บัญชีนี้เพิ่งสมัคร ยังไม่ได้รับสิทธิ์ — แจ้งผู้ดูแลให้กำหนดบริษัท/บทบาทก่อน');
+  if(!ME.fullName)return screenNameGate();
   if(!TID)return screenScanner();
   await load();
 }
@@ -320,6 +321,25 @@ async function doLogin(){
   const {error}=await sb.auth.signInWithPassword({email:e,password:p});
   if(error){$('#lmsg').textContent='เข้าไม่ได้: '+error.message;return;}
   boot();
+}
+function screenNameGate(){
+  $('#app').innerHTML=`<div class="center" style="justify-content:flex-start;padding-top:56px">
+    <div class="big">👤</div>
+    <div style="font-size:17px;font-weight:600;color:#0f172a">กรอกชื่อ-สกุลก่อนใช้งาน</div>
+    <div style="margin:6px 0 16px;max-width:290px">ระบบใช้ชื่อคุณแสดงตัวตน (เช่น ผู้รับของ) — กรอกครั้งเดียวจบ</div>
+    <div style="width:100%;max-width:300px;text-align:left">
+      <input class="inp" id="ng_name" placeholder="เช่น สมชาย ใจดี" onkeydown="if(event.key==='Enter')saveMyName()">
+      <button class="btn primary" style="background:var(--blue)" onclick="saveMyName()">บันทึกชื่อ</button>
+      <div id="ng_msg" class="muted" style="font-size:13px;margin-top:10px;text-align:center"></div>
+    </div></div>`;
+}
+async function saveMyName(){
+  const nm=($('#ng_name').value||'').trim(); if(!nm){$('#ng_msg').textContent='กรุณากรอกชื่อ-สกุล';return;}
+  $('#ng_msg').textContent='กำลังบันทึก…';
+  const {data:{session}}=await sb.auth.getSession();
+  const {error}=await sb.from('profiles').update({full_name:nm}).eq('id',session.user.id);
+  if(error){$('#ng_msg').textContent='บันทึกไม่ได้: '+error.message;return;}
+  location.reload();
 }
 
 /* ---- กล้องสแกน QR ในหน้านี้ (เต็มจอ ไม่ออกไปหน้าเว็บที่มีเมนู) ---- */
