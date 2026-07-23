@@ -302,8 +302,8 @@ const $=s=>document.querySelector(s);
 const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ============ status helpers ============ */
-const STC={'ว่าง':'#16a34a','ถูกยืม':'#2563eb','ส่งซ่อม':'#64748b','รอส่งซ่อม':'#d97706','ชำรุด':'#dc2626'};
-function chip(st){const c=STC[st]||'#94a3b8';const bg={'#16a34a':'#dcfce7','#2563eb':'#dbeafe','#64748b':'#f1f5f9','#d97706':'#fef3c7','#dc2626':'#fee2e2'}[c]||'#f1f5f9';
+const STC={'ว่าง':'#16a34a','ถูกยืม':'#2563eb','ส่งซ่อม':'#64748b','รอส่งซ่อม':'#d97706','ชำรุด':'#dc2626','ยังไม่ตรวจนับ':'#7c3aed'};
+function chip(st){const c=STC[st]||'#94a3b8';const bg={'#16a34a':'#dcfce7','#2563eb':'#dbeafe','#64748b':'#f1f5f9','#d97706':'#fef3c7','#dc2626':'#fee2e2','#7c3aed':'#ede9fe'}[c]||'#f1f5f9';
   return `<span class="chip" style="background:${bg};color:${c}"><span class="dot" style="background:${c}"></span>${esc(st||'-')}</span>`;}
 function count(st){return S.tools.filter(t=>t.status===st&&inView(t)).length;}
 
@@ -492,7 +492,7 @@ function renderDash(){
   const strip=life.map((s,idx)=>`<div class="st"><div class="b">${s[0]}</div><small>${s[1]}</small></div>${idx<life.length-1?'<span class="ar">→</span>':''}`).join('');
 
   // donut
-  const segs=[['ว่าง',freeN],['ถูกยืม',borrowN],['ส่งซ่อม',repairN],['รอส่งซ่อม',count('รอส่งซ่อม')],['ชำรุด',count('ชำรุด')]];
+  const segs=[['ว่าง',freeN],['ถูกยืม',borrowN],['ส่งซ่อม',repairN],['รอส่งซ่อม',count('รอส่งซ่อม')],['ชำรุด',count('ชำรุด')],['ยังไม่ตรวจนับ',count('ยังไม่ตรวจนับ')]];
   const donut=mkDonut(segs,total);
 
   // pending repair table
