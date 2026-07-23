@@ -77,7 +77,7 @@ let TOOL=null, ME=null, TID=null, SITES=[];
 
 let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tmo);tmo=setTimeout(()=>t.classList.remove('on'),2400);}
 
-const STC={'ว่าง':['#16a34a','#dcfce7'],'ถูกยืม':['#2563eb','#dbeafe'],'ส่งซ่อม':['#d97706','#fef3c7'],'รอส่งซ่อม':['#d97706','#fef3c7'],'ชำรุด':['#dc2626','#fee2e2'],'สูญหาย':['#dc2626','#fee2e2']};
+const STC={'ว่าง':['#16a34a','#dcfce7'],'ถูกยืม':['#2563eb','#dbeafe'],'ส่งซ่อม':['#d97706','#fef3c7'],'รอส่งซ่อม':['#d97706','#fef3c7'],'ชำรุด':['#dc2626','#fee2e2'],'สูญหาย':['#dc2626','#fee2e2'],'ยังไม่ตรวจนับ':['#7c3aed','#ede9fe']};
 const TYC={'เบิก':['#2563eb','📤'],'คืน':['#16a34a','📥'],'ส่งซ่อม':['#d97706','🔧'],'รับคืนจากซ่อม':['#0d9488','✅'],'แจ้งชำรุด':['#dc2626','⚠️'],'ย้ายไซต์':['#7c3aed','🔀'],'ยืนยันรับ':['#0891b2','📍']};
 
 function applyTheme(co){const r=document.documentElement.style;
