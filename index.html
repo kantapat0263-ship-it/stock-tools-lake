@@ -2300,6 +2300,20 @@ function labelDataURL(t){return labelCanvasFor(t).toDataURL('image/png');}
 function setLblSize(v){LBLSIZE=v;const a=$('#lsz_big'),b=$('#lsz_small');if(a)a.classList.toggle('on',v==='big');if(b)b.classList.toggle('on',v==='small');}
 function downloadLabel(id){const t=(S.tools||[]).find(x=>x.id===id);if(!t){toast('ไม่พบเครื่อง');return;}
   try{const a=document.createElement('a');a.href=labelDataURL(t);a.download='label_'+String(t.no||t.code||id).replace(/[^\w\-ก-๙]+/g,'_')+'.png';document.body.appendChild(a);a.click();a.remove();toast('ดาวน์โหลดป้ายแล้ว');}catch(e){toast('สร้างป้ายไม่ได้: '+e.message);} }
+function selectFromPasteList(){
+  const raw=($('#lpaste').value||'').trim();
+  if(!raw){toast('ยังไม่ได้วางลิสต์ NO.');return;}
+  const norm=s=>String(s||'').trim().toUpperCase().replace(/\s+/g,'');
+  const idx={}; S.tools.forEach(t=>{const k=norm(t.no); if(k&&!(k in idx))idx[k]=t; const c=norm(t.code); if(c&&!(c in idx))idx[c]=t;});
+  const toks=raw.split(/[\s,;]+/).map(norm).filter(Boolean);
+  const seen=new Set(); let found=0; const miss=[];
+  toks.forEach(tok=>{ if(seen.has(tok))return; seen.add(tok);
+    const t=idx[tok]; if(t)selLabel.add(t.id),found++; else miss.push(tok); });
+  if(PG_REDRAW['labels'])PG_REDRAW['labels']();
+  $('#lcount').textContent='เลือก '+selLabel.size;
+  $('#lpasteres').innerHTML=`✅ เลือกได้ <b style="color:#16a34a">${found}</b> ตัว`+(miss.length?` · ❌ หาไม่เจอ <b style="color:#dc2626">${miss.length}</b>: <span style="color:#dc2626">${miss.map(esc).join(', ')}</span>`:' · ครบทุกตัว 🎉');
+  toast(found+' ตัวถูกเลือกแล้ว — กด “⬇️ ป้าย PNG (ที่เลือก)” ได้เลย');
+}
 async function downloadLabelsSel(){
   const tools=S.tools.filter(t=>selLabel.has(t.id));
   if(!tools.length){toast('ยังไม่ได้เลือกเครื่อง');return;}
@@ -2329,6 +2343,15 @@ function renderLabels(){
     <div style="margin:8px 0;font-size:13px;display:flex;align-items:center;gap:9px;flex-wrap:wrap">ขนาดป้าย:
       <div class="vswitch"><button id="lsz_big" class="on" onclick="setLblSize('big')">5×3 ซม. (ติดตัวเครื่อง)</button><button id="lsz_small" onclick="setLblSize('small')">4×2 ซม. (ป้ายห้อย · QR ใหญ่)</button></div>
       <span class="muted" style="font-size:12px">มีผลกับดาวน์โหลด PNG + พิมพ์</span></div>
+    <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:11px 13px;border-radius:8px;margin:10px 0">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">📋 เลือกเป็นชุดจากลิสต์ NO. <span class="muted" style="font-weight:400">— วางรหัสที่ได้มา (ทีละบรรทัด หรือคั่นด้วย , / เว้นวรรค) แล้วกดปุ่ม ระบบจะติ๊กให้อัตโนมัติ ไม่ต้องค้นทีละตัว</span></div>
+      <textarea id="lpaste" rows="4" placeholder="L-LAM-002&#10;L-MW-001&#10;P-TC-001&#10;L-HD3-014 ..." style="width:100%;font-family:monospace;font-size:13px;padding:8px;border:1px solid var(--line);border-radius:8px;resize:vertical;box-sizing:border-box"></textarea>
+      <div style="margin-top:7px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn primary" id="lpastebtn">🔎 จับคู่ + เลือกจากลิสต์</button>
+        <button class="btn" id="lpasteclr">ล้างช่อง</button>
+        <span id="lpasteres" style="font-size:13px"></span>
+      </div>
+    </div>
     <div style="background:#eff6ff;border-left:4px solid var(--blue);padding:9px 12px;border-radius:8px;margin:10px 0;font-size:13px;line-height:1.6">📲 <b>ทำแท็ก NFC:</b> กด <b>📋 URL</b> ท้ายแถวเพื่อคัดลอก แล้วเขียนลงแท็กด้วยแอป (เช่น “NFC Tools”) แบบ <b>URL/Link</b> · แตะมือถือ = เปิดหน้าเดียวกับ QR รับของได้เลย · <b>แท็กติดบนโลหะต้องใช้แบบ on-metal</b></div>
     <div class="selbar" style="position:sticky;top:10px;z-index:5;background:var(--card);box-shadow:0 6px 16px rgba(0,0,0,.10);border-radius:10px;padding:10px 14px;margin:10px 0">
       <b id="lcount">เลือก 0</b><div class="spacer"></div>
@@ -2352,6 +2375,8 @@ function renderLabels(){
   $('#lall').onclick=()=>{lblFiltered.forEach(t=>selLabel.add(t.id));draw();};
   $('#lnone').onclick=()=>{selLabel=new Set();draw();};
   $('#luntag').onclick=()=>{lblOnlyUntagged=!lblOnlyUntagged;$('#luntag').classList.toggle('primary',lblOnlyUntagged);$('#luntag').textContent=(lblOnlyUntagged?'☑':'☐')+' เฉพาะยังไม่ติด TAG';pgReset('labels');draw();};
+  $('#lpastebtn').onclick=selectFromPasteList;
+  $('#lpasteclr').onclick=()=>{$('#lpaste').value='';$('#lpasteres').innerHTML='';};
   $('#lprint').onclick=printLabels;
   $('#ldl').onclick=downloadLabelsSel;
   $('#lurls').onclick=exportNfcUrls;
