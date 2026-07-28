@@ -1327,10 +1327,21 @@ async function doReceiveStock(){
     return {t,slipN:m?m.slipNo:null,company:m?m.company:COMPANY};});
   for(const it of items){const t=it.t,slipN=it.slipN;
     await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',t.id);
-    await sb.from('movements').insert({company:it.company,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'รับคืนจากซ่อม',slip_no:slipN,actor:recv});
-    if(slipN!=null)await sb.from('repair_slips').update({status:'รับคืนครบ',received_date:date||null,receiver:recv}).eq('company',it.company).eq('slip_no',slipN);}
+    await sb.from('movements').insert({company:it.company,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'รับคืนจากซ่อม',slip_no:slipN,actor:recv});}
+  const slips=new Map();
+  items.forEach(it=>{if(it.slipN!=null)slips.set(it.company+'|'+it.slipN,it);});
+  for(const it of slips.values())await updateSlipReturnStatus(it.company,it.slipN,date,recv);
   if(recv)await ensureLookup('people',recv);
   toast(`✅ รับเข้า STOCK ${items.length} เครื่อง → สถานะว่าง พร้อมเบิก`);await loadAll();go('receive');
+}
+/* ปิดใบเป็น "รับคืนครบ" เฉพาะเมื่อเครื่องทุกตัวในใบมี movement รับคืนแล้ว ไม่งั้นตั้ง "รับคืนบางส่วน" ให้ใบยังโผล่ในรายการค้างรับ */
+async function updateSlipReturnStatus(co,slipN,date,recv){
+  const {data:ms}=await sb.from('movements').select('tool_id,type').eq('company',co).eq('slip_no',slipN).eq('deleted',false).in('type',['ส่งซ่อม','รับคืนจากซ่อม']);
+  const sent=new Set(),got=new Set();
+  (ms||[]).forEach(m=>{if(!m.tool_id)return;if(m.type==='ส่งซ่อม')sent.add(m.tool_id);else got.add(m.tool_id);});
+  const complete=sent.size>0&&[...sent].every(id=>got.has(id));
+  if(complete)await sb.from('repair_slips').update({status:'รับคืนครบ',received_date:date||null,receiver:recv||''}).eq('company',co).eq('slip_no',slipN);
+  else await sb.from('repair_slips').update({status:'รับคืนบางส่วน',received_date:null,receiver:recv||''}).eq('company',co).eq('slip_no',slipN);
 }
 function cancelSlip(no,co){
   openModal(`<h3>🚫 ยกเลิกใบส่งซ่อม #${esc(no)} ${coBadge(co)}</h3>
@@ -2218,9 +2229,10 @@ async function scanReceiveSite(){ const t=scanTool; if(!t)return;
 }
 async function scanReceiveRepair(){ const t=scanTool; if(!t)return;
   const m=[...S.movements].reverse().find(x=>x.tool_id===t.id&&x.type==='ส่งซ่อม'); const slipN=m?m.slipNo:null;
+  const slipCo=m?m.company:COMPANY;
   await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:new Date().toISOString()}).eq('id',t.id);
-  await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:today(),type:'รับคืนจากซ่อม',slip_no:slipN,actor:(ME&&ME.email)||''});
-  if(slipN!=null)await sb.from('repair_slips').update({status:'รับคืนครบ',received_date:today(),receiver:(ME&&ME.email)||''}).eq('company',(m?m.company:COMPANY)).eq('slip_no',slipN);
+  await sb.from('movements').insert({company:slipCo,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:today(),type:'รับคืนจากซ่อม',slip_no:slipN,actor:(ME&&ME.email)||''});
+  if(slipN!=null)await updateSlipReturnStatus(slipCo,slipN,today(),(ME&&ME.email)||'');
   toast('📥 รับคืนจากซ่อม '+t.code+' แล้ว'); await loadAll(); scanDone(t,'รับคืนจากซ่อมแล้ว');
 }
 async function scanReportBroken(){ const t=scanTool; if(!t)return;

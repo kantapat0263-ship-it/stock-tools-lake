@@ -234,8 +234,16 @@ async function actReceiveRepair(){
   if(slipN!=null){const {data:sp}=await sb.from('repair_slips').select('status,received_date,receiver').eq('company',m.company).eq('slip_no',slipN).maybeSingle();
     if(sp)slipPrev={company:m.company,slip_no:slipN,prev:{status:sp.status,received_date:sp.received_date,receiver:sp.receiver}};}
   await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:now()}).eq('id',TOOL.id);
-  const {data:ins}=await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'รับคืนจากซ่อม',slip_no:slipN,actor:ME.email,note}).select('id').maybeSingle();
-  if(slipN!=null)await sb.from('repair_slips').update({status:'รับคืนครบ',received_date:today(),receiver:ME.email}).eq('company',m.company).eq('slip_no',slipN);
+  const {data:ins}=await sb.from('movements').insert({company:(m?m.company:co),owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'รับคืนจากซ่อม',slip_no:slipN,actor:ME.email,note}).select('id').maybeSingle();
+  if(slipN!=null){
+    // ปิดใบเป็น "รับคืนครบ" เฉพาะเมื่อเครื่องทุกตัวในใบมี movement รับคืนแล้ว
+    const {data:ms}=await sb.from('movements').select('tool_id,type').eq('company',m.company).eq('slip_no',slipN).eq('deleted',false).in('type',['ส่งซ่อม','รับคืนจากซ่อม']);
+    const sent=new Set(),got=new Set();
+    (ms||[]).forEach(x=>{if(!x.tool_id)return;if(x.type==='ส่งซ่อม')sent.add(x.tool_id);else got.add(x.tool_id);});
+    const complete=sent.size>0&&[...sent].every(id=>got.has(id));
+    if(complete)await sb.from('repair_slips').update({status:'รับคืนครบ',received_date:today(),receiver:ME.email}).eq('company',m.company).eq('slip_no',slipN);
+    else await sb.from('repair_slips').update({status:'รับคืนบางส่วน',received_date:null,receiver:ME.email}).eq('company',m.company).eq('slip_no',slipN);
+  }
   LAST={label:'รับคืนจากซ่อม',toolId:TOOL.id,name:(TOOL.no||TOOL.name||''),prevTool:prev,movId:ins&&ins.id,slip:slipPrev};
   afterAction('📥 รับคืนจากซ่อมแล้ว');
 }
