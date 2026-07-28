@@ -1900,11 +1900,12 @@ async function saveBorrowBatch(i){
     const rm=document.querySelector(`[data-brm="${j}"]`);
     if(rm&&rm.checked){
       if(movId)await sb.from('movements').update({deleted:true}).eq('id',movId);
-      if(t.status==='ถูกยืม')await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:new Date().toISOString()}).eq('id',t.id);
+      // แตะสถานะเครื่องเฉพาะเมื่อรายการในใบนี้ยังเปิดอยู่ (_returned=false) — ถ้าเครื่องถูกคืนแล้วไปเบิกใหม่ใบอื่น สถานะปัจจุบันเป็นของใบนั้น ห้ามทับ
+      if(t.status==='ถูกยืม'&&!t._returned)await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:new Date().toISOString()}).eq('id',t.id);
       continue;}
     const prEl=document.querySelector(`[data-bpr="${j}"]`),ntEl=document.querySelector(`[data-bnt="${j}"]`);
     if(movId)await sb.from('movements').update({occurred_on:date||null,project:proj,actor:who,receiver:(recv||null),pr_no:(prEl?prEl.value.trim():'')||null,note:(ntEl?ntEl.value.trim():'')||null}).eq('id',movId);
-    if(t.status==='ถูกยืม')await sb.from('tools').update({location:proj+' / '+who,pending_dest:proj,updated_at:new Date().toISOString()}).eq('id',t.id);
+    if(t.status==='ถูกยืม'&&!t._returned)await sb.from('tools').update({location:proj+' / '+who,pending_dest:proj,updated_at:new Date().toISOString()}).eq('id',t.id);
   }
   const adds=[...document.querySelectorAll('[data-badd]:checked')].map(c=>c.getAttribute('data-badd'));
   for(const tid of adds){const t=S.tools.find(x=>x.id===tid); if(!t)continue;
