@@ -250,7 +250,7 @@ async function actReceiveRepair(){
 async function actMoveSite(){
   const sel=$('#movesite'),site=sel?sel.value.trim():'';
   if(!site){toast('เลือกไซต์ปลายทางก่อน');return;}
-  if(site===(TOOL.location||'')){toast('เครื่องอยู่ไซต์นี้อยู่แล้ว');return;}
+  if(site===((TOOL.location||'').split('/')[0]||'').trim()){toast('เครื่องอยู่ไซต์นี้อยู่แล้ว');return;}
   const prev=snapTool(TOOL),co=TOOL.company;
   await sb.from('tools').update({location:site,pending_dest:site,dispatched_at:now(),updated_at:now()}).eq('id',TOOL.id);
   const {data:ins}=await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'ย้ายไซต์',project:site,actor:ME.email}).select('id').maybeSingle();
