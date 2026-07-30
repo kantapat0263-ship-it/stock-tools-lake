@@ -72,7 +72,7 @@ const SB_KEY='sb_publishable_P7s42m8Z66_0fT0VjCxXrg_wXsc0ONi';
 const sb=window.supabase.createClient(SB_URL,SB_KEY);
 const $=s=>document.querySelector(s);
 const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}; /* วันที่ท้องถิ่น — กันวันเพี้ยนก่อน 7 โมงเช้า (UTC) */
 let TOOL=null, ME=null, TID=null, SITES=[];
 
 let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tmo);tmo=setTimeout(()=>t.classList.remove('on'),2400);}
