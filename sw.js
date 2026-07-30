@@ -1,6 +1,6 @@
 // Service worker — LOTUS GROUP STOCK (network-first; HTML ดึงสดเสมอ, cache shell ไว้ใช้ตอนออฟไลน์)
-const CACHE = 'lg-stock-v2';
-const SHELL = ['/', '/index.html', '/guide.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
+const CACHE = 'lg-stock-v3';
+const SHELL = ['/', '/index.html', '/s.html', '/guide.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).catch(() => {}));
@@ -24,11 +24,21 @@ self.addEventListener('fetch', e => {
   e.respondWith((async () => {
     try {
       const net = await fetch(e.request, freshHtml ? { cache: 'no-store' } : {});
-      const c = await caches.open(CACHE);
-      c.put(e.request, net.clone());
+      if (net.ok) {
+        const c = await caches.open(CACHE);
+        // HTML เก็บด้วย pathname (ตัด ?t=... ทิ้ง) — /s.html?t=X ทุกตัวอัปเดต entry เดียวกัน ไม่งอกไม่จำกัด
+        c.put(freshHtml ? url.pathname : e.request, net.clone());
+      }
       return net;
     } catch {
-      return (await caches.match(e.request)) || caches.match('/index.html');
+      const cached = await caches.match(e.request, { ignoreSearch: true });
+      if (cached) return cached;
+      // ต้อง fallback ตาม path: เสิร์ฟ index.html ที่ URL /s.html?t=... จะเจอสคริปต์ redirect ของ index แล้ววนลูป
+      if (freshHtml) {
+        const page = url.pathname.startsWith('/s.html') ? '/s.html' : '/index.html';
+        return (await caches.match(page)) || Response.error();
+      }
+      return Response.error();
     }
   })());
 });
