@@ -297,7 +297,8 @@ async function logAudit(action,company,code,detail){try{await sb.from('audit_log
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
 let S = {tools:[],slips:[],movements:[],lookups:{categories:[],projects:[],people:[],vendors:[]},nextSlip:1};
 let CUR='dash', ME=null;
-function today(){const d=new Date();return d.toISOString().slice(0,10);}
+function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function today(){return ymd(new Date());} /* วันที่ท้องถิ่น (ไทย) — ห้ามใช้ toISOString ตัดวัน เพราะ UTC ช้ากว่าไทย 7 ชม. ทำวันเพี้ยนก่อน 7 โมงเช้า */
 const $=s=>document.querySelector(s);
 const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -352,16 +353,16 @@ async function loadAll(){
   S.slips=(s.data||[]).map(rowToSlip);
   S.movements=(mv.data||[]).map(m=>rowToMov(m,byId));
   const rc={},slc={};
-  S.movements.forEach(m=>{if(m.type==='ส่งซ่อม'){if(m.tool_id)rc[m.tool_id]=(rc[m.tool_id]||0)+1;if(m.slip)slc[m.slip]=(slc[m.slip]||0)+1;}});
+  S.movements.forEach(m=>{if(m.type==='ส่งซ่อม'){if(m.tool_id)rc[m.tool_id]=(rc[m.tool_id]||0)+1;if(m.slip)slc[m.company+'|'+m.slip]=(slc[m.company+'|'+m.slip]||0)+1;}});
   S.tools.forEach(x=>x.repairs=String(rc[x.id]||0));
-  S.slips.forEach(x=>x.count=String(slc[x.no]||0));
+  S.slips.forEach(x=>x.count=String(slc[x.company+'|'+x.no]||0));
   const nm=d=>[...new Set((d.data||[]).map(r=>r.name).filter(Boolean))].sort();
   S.lookups={categories:nm(c),projects:nm(p),people:nm(pe),vendors:nm(v),receivers:nm(rcv)};
   S.audit=(au.data||[]);
   S.trash=(tr.data||[]).map(rowToTool);
   S.disposed=(di.data||[]).map(rowToTool);
   S.slipTrash=(st.data||[]).map(rowToSlip);
-  S.nextSlipByCo={};['PAC','LOTUS'].forEach(co=>S.nextSlipByCo[co]=(S.slips.filter(x=>x.company===co).reduce((m,x)=>Math.max(m,x.slip_no||0),0))+1);
+  S.nextSlipByCo={};['PAC','LOTUS'].forEach(co=>S.nextSlipByCo[co]=([...S.slips,...(S.slipTrash||[])].filter(x=>x.company===co).reduce((m,x)=>Math.max(m,x.slip_no||0),0))+1);
   const {data:cntRows}=await sb.from('app_counters').select('company,value').eq('name','borrow');
   S.nextBorrowByCo={};['PAC','LOTUS'].forEach(co=>{const r=(cntRows||[]).find(x=>x.company===co);let v=((r&&r.value)||0)+1;if(v>999)v=1;S.nextBorrowByCo[co]=v;});
 }
@@ -477,8 +478,8 @@ $('#reset').onclick=e=>{e.preventDefault();if(confirm('ออกจากระ�
 
 /* ============ DASHBOARD ============ */
 function renderDash(){
-  const total=S.tools.length, freeN=count('ว่าง'), borrowN=count('ถูกยืม'), repairN=count('ส่งซ่อม');
-  const pendingSlips=S.slips.filter(s=>s.status!=='รับคืนครบ');
+  const total=S.tools.filter(inView).length, freeN=count('ว่าง'), borrowN=count('ถูกยืม'), repairN=count('ส่งซ่อม');
+  const pendingSlips=S.slips.filter(s=>s.status!=='รับคืนครบ'&&(!FILTER||s.company===FILTER));
   const pct=n=>total?Math.round(n/total*100):0;
   const cards=[
     ['🧰','เครื่องมือทั้งหมด',total,'#0f172a',''],
@@ -517,7 +518,7 @@ function renderDash(){
     <h3 style="margin:0 0 6px">📍 เครื่องค้างที่ไซต์เกิน 30 วัน — ยังไม่คืน (${_late.length})</h3>
     <table><thead><tr><th>รหัส</th><th>บ.</th><th>อยู่ที่</th><th class="center">ค้างมา</th></tr></thead><tbody>${_late.slice(0,8).map(t=>{const d=Math.floor((Date.now()-new Date(t.dispatchedAt||t.updated))/86400000);return `<tr><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.loc)||'-'}</td><td class="center"><b>${d} วัน</b></td></tr>`;}).join('')}</tbody></table>
   </div>`:'';
-  const _mvcut=new Date(Date.now()-7*86400000).toISOString().slice(0,10);
+  const _mvcut=ymd(new Date(Date.now()-7*86400000));
   const _moves=S.movements.filter(m=>m.type==='ย้ายไซต์'&&inViewMov(m)&&(m.date||'')>=_mvcut).reverse().slice(0,10);
   const moveAlert=_moves.length?`<div class="panel" style="border-left:4px solid #7c3aed;background:#faf5ff">
     <h3 style="margin:0 0 6px">🔀 การโยกเครื่องล่าสุด (7 วันล่าสุด) — ${_moves.length} รายการ <span class="muted" style="font-weight:400;font-size:12px">· รวมที่หน้างานสแกนย้ายเอง</span></h3>
@@ -1098,18 +1099,17 @@ async function restoreTool(ti){const t=(S.trash||[])[ti];if(!t)return;
   toast('กู้คืนแล้ว: '+t.code);await loadAll();go('trash');}
 function disposeTool(i){const t=S.tools[i];
   if(!canEditCo(t.company)){toast('ทำได้เฉพาะบริษัทตัวเอง');return;}
-  const today=new Date().toISOString().slice(0,10);
   openModal(`<h3>🗄️ ตัดจำหน่าย / ขายซาก</h3>
     <p class="muted">${esc(t.code)} · ${coBadge(t.company)} · ${esc(t.name)}</p>
     <div style="background:#fef3c7;color:#92400e;padding:9px 12px;border-radius:8px;font-size:13px;margin:8px 0">เครื่องจะถูก<b>ตัดออกจากทะเบียนใช้งาน</b> (เบิก/ไซต์/รายงาน จะไม่เห็น) แต่ยังเก็บบันทึกไว้ในหน้า "ตัดจำหน่าย/ขายซาก" · กู้คืนได้ถ้าตัดผิด</div>
-    <div class="flexrow"><div class="field"><label>วันที่ตัดจำหน่าย</label><input type="date" id="dp_date" value="${today}"></div></div>
+    <div class="flexrow"><div class="field"><label>วันที่ตัดจำหน่าย</label><input type="date" id="dp_date" value="${today()}"></div></div>
     <div class="flexrow"><div class="field"><label>ประเภท</label><select id="dp_reason"><option>ขายซาก</option><option>สูญหาย</option><option>ชำแหละอะไหล่</option><option>เสื่อมสภาพ/เก่า</option><option value="">อื่นๆ (ระบุเอง)</option></select></div></div>
     <div class="field"><label>รายละเอียดเพิ่มเติม (ไม่บังคับ)</label><input id="dp_note" placeholder="เช่น หายที่ไซต์ A / ขายให้ร้าน..."></div>
     <div class="flexrow" style="margin-top:16px"><button class="btn" style="background:#f59e0b;color:#fff" onclick="doDispose(${i})">🗄️ ยืนยันตัดจำหน่าย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
 }
 async function doDispose(i){const t=S.tools[i];
   if(!canEditCo(t.company)){toast('ทำได้เฉพาะบริษัทตัวเอง');return;}
-  const d=$('#dp_date').value||new Date().toISOString().slice(0,10);
+  const d=$('#dp_date').value||today();
   const rsn=$('#dp_reason')?$('#dp_reason').value:'';
   const note=((rsn?rsn+' ':'')+$('#dp_note').value.trim()).trim();
   const {error}=await sb.from('tools').update({disposed:true,disposed_at:d,disposal_note:note,updated_at:new Date().toISOString()}).eq('id',t.id);
@@ -1205,7 +1205,11 @@ function previewRepair(){
 }
 async function commitRepair(){
   if(!pendingRepair)return;
-  const {slipN,slip,date,vendor,sender,items,co}=pendingRepair;const ISS=co||COMPANY;
+  const {date,vendor,sender,items,co}=pendingRepair;const ISS=co||COMPANY;
+  // ออกเลขจริงจากเซิร์ฟเวอร์ตอนบันทึก (atomic — กันชนกันตอนกดพร้อมกัน / กันซ้ำกับใบในถังขยะ)
+  const {data:slipN,error:snErr}=await sb.rpc('next_repair_no',{p_company:ISS});
+  if(snErr||!slipN){toast('ออกเลขใบไม่ได้: '+((snErr&&snErr.message)||'ไม่ทราบสาเหตุ'));return;}
+  const slip=String(slipN).padStart(3,'0');
   const sres=await sb.from('repair_slips').insert({company:ISS,slip_no:slipN,sent_date:date||null,vendor,project:'',sender,status:'ส่งแล้ว'});
   if(sres.error){toast('บันทึกไม่ได้: '+sres.error.message);return;}
   for(const it of items){await sb.from('tools').update({status:'ส่งซ่อม',location:vendor||'ร้านซ่อม',updated_at:new Date().toISOString()}).eq('id',it.t.id);}
@@ -1341,7 +1345,8 @@ async function updateSlipReturnStatus(co,slipN,date,recv){
   (ms||[]).forEach(m=>{if(!m.tool_id)return;if(m.type==='ส่งซ่อม')sent.add(m.tool_id);else got.add(m.tool_id);});
   const complete=sent.size>0&&[...sent].every(id=>got.has(id));
   if(complete)await sb.from('repair_slips').update({status:'รับคืนครบ',received_date:date||null,receiver:recv||''}).eq('company',co).eq('slip_no',slipN);
-  else await sb.from('repair_slips').update({status:'รับคืนบางส่วน',received_date:null,receiver:recv||''}).eq('company',co).eq('slip_no',slipN);
+  else if(got.size>0)await sb.from('repair_slips').update({status:'รับคืนบางส่วน',received_date:null,receiver:recv||''}).eq('company',co).eq('slip_no',slipN);
+  else await sb.from('repair_slips').update({status:'ส่งแล้ว',received_date:null}).eq('company',co).eq('slip_no',slipN);
 }
 function cancelSlip(no,co){
   openModal(`<h3>🚫 ยกเลิกใบส่งซ่อม #${esc(no)} ${coBadge(co)}</h3>
@@ -1590,7 +1595,7 @@ async function doMove(){
 /* ============ cross-company borrow helpers ============ */
 function lastBorrowMov(toolId){const c=S.movements.filter(m=>m.tool_id===toolId&&(m.type==='เบิก'||m.type==='ย้ายไซต์'));return c.sort((a,b)=>String(a.createdAt||a.date).localeCompare(String(b.createdAt||b.date))).pop();}
 function dormantTools(){
-  const cut=new Date(Date.now()-365*86400000).toISOString().slice(0,10);
+  const cut=ymd(new Date(Date.now()-365*86400000));
   const lastBy={};
   S.movements.forEach(m=>{if(!m.tool_id)return;const d=(m.date||'').slice(0,10);if(d&&(!lastBy[m.tool_id]||d>lastBy[m.tool_id]))lastBy[m.tool_id]=d;});
   return S.tools.filter(t=>inView(t)).map(t=>({t,last:lastBy[t.id]||String(t.createdAt||'').slice(0,10)}))
@@ -1643,7 +1648,7 @@ function pgBar(k,total,from,shown,pages){if(!total)return '';const st=pgState(k)
 function pgSize(k,v){const st=pgState(k);st.size=parseInt(v,10)||50;st.page=1;pgRedraw(k);}
 function pgGo(k,p){pgState(k).page=Math.max(1,parseInt(p,10)||1);pgRedraw(k);}
 function pgRedraw(k){PG_REDRAW[k]&&PG_REDRAW[k]();}
-function dayLabel(dstr){if(!dstr)return 'ไม่ระบุวันที่';const y=new Date(Date.now()-86400000).toISOString().slice(0,10);if(dstr===today())return 'วันนี้ ('+dstr+')';if(dstr===y)return 'เมื่อวาน ('+dstr+')';return dstr;}
+function dayLabel(dstr){if(!dstr)return 'ไม่ระบุวันที่';const y=ymd(new Date(Date.now()-86400000));if(dstr===today())return 'วันนี้ ('+dstr+')';if(dstr===y)return 'เมื่อวาน ('+dstr+')';return dstr;}
 function dDiff(a,b){if(!a||!b)return null;const d=Math.round((new Date(b)-new Date(a))/86400000);return isNaN(d)?null:d;}
 function setHT(t){histTab=t;renderHistory();}
 function renderHistory(){
@@ -1812,7 +1817,8 @@ function addToRepairDraft(i){
 async function issueRepairDraft(i){
   const b=(window._rd||[])[i]; if(!b){toast('ไม่พบใบร่าง');return;}
   if(!confirm(`ออกใบส่งซ่อม ${b.company} ร้าน ${b.vendor||'-'} (${b.tools.length} เครื่อง)?\nระบบจะออกเลขที่ + พิมพ์ใบ`))return;
-  const slipN=(S.slips.filter(x=>x.company===b.company).reduce((m,x)=>Math.max(m,x.slip_no||0),0))+1;
+  const {data:slipN,error:snErr}=await sb.rpc('next_repair_no',{p_company:b.company});
+  if(snErr||!slipN){toast('ออกเลขใบไม่ได้: '+((snErr&&snErr.message)||'ไม่ทราบสาเหตุ'));return;}
   const sres=await sb.from('repair_slips').insert({company:b.company,slip_no:slipN,sent_date:b.date||null,vendor:b.vendor,project:'',sender:b.sender,status:'ส่งแล้ว'});
   if(sres.error){toast('ออกใบไม่ได้: '+sres.error.message);return;}
   for(const mid of b.movIds){if(mid)await sb.from('movements').update({slip_no:slipN,is_draft:false}).eq('id',mid);}
@@ -2099,6 +2105,9 @@ async function saveSlip(){
     await sb.from('tools').update({status:'ส่งซ่อม',location:vendor||'ร้านซ่อม',updated_at:new Date().toISOString()}).eq('id',tid);
     await sb.from('movements').insert({company:e.co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:tid,occurred_on:sent||null,type:'ส่งซ่อม',slip_no:e.slipNo,actor:sender,counterparty:vendor,reason,project:project||null});
   }
+  // คำนวณสถานะใบใหม่หลังแก้ (เพิ่มเครื่อง → ใบที่ปิดแล้วกลับมาเปิดค้าง / ถอดเครื่องค้างตัวสุดท้าย → ปิดใบ)
+  const curSlip=S.slips.find(x=>x.company===e.co&&x.slip_no===e.slipNo);
+  await updateSlipReturnStatus(e.co,e.slipNo,(curSlip&&curSlip.received)||null,(curSlip&&curSlip.receiver)||'');
   await ensureLookup('vendors',vendor);await ensureLookup('people',sender);
   closeModal();toast(adds.length?`แก้ไขใบส่งซ่อม #${String(e.slipNo).padStart(3,'0')} + เพิ่ม ${adds.length} เครื่องแล้ว`:'แก้ไขใบส่งซ่อม #'+String(e.slipNo).padStart(3,'0')+' แล้ว');await loadAll();go('history');
 }
