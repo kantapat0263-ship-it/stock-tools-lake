@@ -295,7 +295,7 @@ function applyTheme(co){const r=document.documentElement.style;
 function canEditCo(co){return !!ME;}
 async function logAudit(action,company,code,detail){try{await sb.from('audit_log').insert({company,user_email:(ME&&ME.email)||'',action,tool_code:code,detail:detail||''});}catch(e){}}
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
-let S = {tools:[],slips:[],movements:[],lookups:{categories:[],projects:[],people:[],vendors:[]},nextSlip:1};
+let S = {tools:[],slips:[],movements:[],lookups:{categories:[],projects:[],people:[],vendors:[]}};
 let CUR='dash', ME=null;
 function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function today(){return ymd(new Date());} /* วันที่ท้องถิ่น (ไทย) — ห้ามใช้ toISOString ตัดวัน เพราะ UTC ช้ากว่าไทย 7 ชม. ทำวันเพี้ยนก่อน 7 โมงเช้า */
@@ -366,7 +366,7 @@ async function loadAll(){
   const {data:cntRows}=await sb.from('app_counters').select('company,value').eq('name','borrow');
   S.nextBorrowByCo={};['PAC','LOTUS'].forEach(co=>{const r=(cntRows||[]).find(x=>x.company===co);let v=((r&&r.value)||0)+1;if(v>999)v=1;S.nextBorrowByCo[co]=v;});
 }
-async function ensureLookup(tbl,name,co){name=(name||'').trim();if(!name)return;if((S.lookups[tbl]||[]).includes(name))return;try{await sb.from(tbl).insert({company:co||COMPANY,name});}catch(e){}}
+async function ensureLookup(tbl,name,co){name=(name||'').trim();if(!name)return;if((S.lookups[tbl]||[]).some(x=>String(x).toLowerCase()===name.toLowerCase()))return;try{await sb.from(tbl).insert({company:co||COMPANY,name});}catch(e){}}
 async function reload(view){_rtReloadAt=Date.now();hideRT();await loadAll();go(view||CUR);}
 /* ---- realtime: แจ้งเตือนเมื่อผู้ใช้อื่นแก้ข้อมูล (แบบ A: แบนเนอร์ ไม่รีเฟรชเอง กันฟอร์มที่กำลังกรอกหาย) ---- */
 let _rtReloadAt=0;
@@ -500,7 +500,7 @@ function renderDash(){
   const ptbl=pendingSlips.slice(0,6).map(s=>`<tr><td><b>${esc(s.no)}</b></td><td>${esc(s.vendor)||'-'}</td><td>${esc(s.sent)}</td><td>${esc(s.status)}</td><td class="center">${esc(s.count)}</td></tr>`).join('')||'<tr><td colspan=5 class="empty">ไม่มี</td></tr>';
 
   // borrowed list
-  const btbl=S.tools.filter(t=>t.status==='ถูกยืม').slice(0,6).map(t=>`<tr><td><b>${esc(t.no)}</b></td><td>${esc(t.name).slice(0,34)}</td><td>${esc(t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=3 class="empty">ไม่มี</td></tr>';
+  const btbl=S.tools.filter(t=>t.status==='ถูกยืม').slice(0,6).map(t=>`<tr><td><b>${esc(t.no)}</b></td><td>${esc((t.name||'').slice(0,34))}</td><td>${esc(t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=3 class="empty">ไม่มี</td></tr>';
 
   // recent activity
   const recent=[...S.movements.filter(inViewMov)].slice(-8).reverse().map(m=>`<li><div class="ti">${({'เบิก':'📤','คืน':'📥','ส่งซ่อม':'⚙️','รับคืนจากซ่อม':'✅','แจ้งชำรุด':'⚠️','ย้ายไซต์':'🔀'}[m.type]||'•')}</div><div><b>${esc(m.type)}</b> ${esc(m.code||m.note||'')}<div class="sub muted">${esc(m.date)} ${m.actor?'· '+esc(m.actor):''} ${m.project?'· '+esc(m.project):''}</div></div></li>`).join('');
@@ -510,7 +510,7 @@ function renderDash(){
   const _bor=(ME&&ME.company)?_xb.filter(x=>x.by===ME.company&&x.t.company!==ME.company):[];
   const notif=(_lent.length||_bor.length)?`<div class="panel" style="border-left:4px solid #f59e0b;background:#fffbeb">
     ${_lent.length?`<h3 style="margin:0 0 6px">🔔 เครื่องของ ${esc(FILTER||(ME&&ME.company)||'(ทุกบริษัท)')} ถูกอีกบริษัทยืมอยู่ (${_lent.length})</h3>
-      <table><thead><tr><th>รหัส</th><th>ชื่อ</th><th>ยืมโดย</th><th>อยู่ที่</th></tr></thead><tbody>${_lent.map(x=>`<tr><td><b>${esc(x.t.code)}</b></td><td>${esc(x.t.name).slice(0,30)}</td><td>${coBadge(x.by)}</td><td>${esc(x.t.loc)||'-'}</td></tr>`).join('')}</tbody></table>`:''}
+      <table><thead><tr><th>รหัส</th><th>ชื่อ</th><th>ยืมโดย</th><th>อยู่ที่</th></tr></thead><tbody>${_lent.map(x=>`<tr><td><b>${esc(x.t.code)}</b></td><td>${esc((x.t.name||'').slice(0,30))}</td><td>${coBadge(x.by)}</td><td>${esc(x.t.loc)||'-'}</td></tr>`).join('')}</tbody></table>`:''}
     ${_bor.length?`<p class="muted" style="margin:8px 0 0">📤 คุณกำลังยืมเครื่องของบริษัทอื่นอยู่ ${_bor.length} รายการ</p>`:''}
   </div>`:'';
   const _late=S.tools.filter(t=>{if(t.status!=='ถูกยืม'||!inView(t))return false;const s=t.dispatchedAt||t.updated;return s&&(Date.now()-new Date(s))>30*86400000;});
@@ -554,7 +554,7 @@ function renderDash(){
           <button class="btn" onclick="go('receive')">📥 รับคืนจากซ่อม</button>
           <button class="btn" onclick="go('tools')">🧰 ทะเบียน</button>
         </div>
-        <p class="muted" style="margin-top:16px;font-size:13px">เลขใบส่งซ่อมถัดไป: <b>${String(S.nextSlip).padStart(3,'0')}</b></p>
+        <p class="muted" style="margin-top:16px;font-size:13px">เลขใบส่งซ่อมถัดไป: ${FILTER?('<b>'+String((S.nextSlipByCo&&S.nextSlipByCo[FILTER])||1).padStart(3,'0')+'</b>'):['PAC','LOTUS'].map(co=>co+' <b>'+String((S.nextSlipByCo&&S.nextSlipByCo[co])||1).padStart(3,'0')+'</b>').join(' · ')}</p>
       </div>
     </div>`;
 }
@@ -714,8 +714,9 @@ async function reassignSiteRefs(oldN,newN){
 async function renameSite(i){
   const oldN=_sitesList[i];const newN=(prompt('เปลี่ยนชื่อไซต์ "'+oldN+'" เป็น:',oldN)||'').trim();
   if(!newN||newN===oldN)return;
-  const exists=S.lookups.projects.some(p=>p.toLowerCase()===newN.toLowerCase()&&p!==oldN);
-  if(exists&&!confirm('มีไซต์ "'+newN+'" อยู่แล้ว — รวม "'+oldN+'" เข้ากับมันแทนไหม?'))return;
+  const canon=S.lookups.projects.find(p=>p.toLowerCase()===newN.toLowerCase()&&p!==oldN);
+  if(canon&&!confirm('มีไซต์ "'+canon+'" อยู่แล้ว — รวม "'+oldN+'" เข้ากับมันแทนไหม?'))return;
+  if(canon)newN=canon;
   toast('กำลังเปลี่ยนชื่อ + ย้ายประวัติ…');
   await reassignSiteRefs(oldN,newN);
   if(!S.lookups.projects.some(p=>p===newN))await sb.from('projects').insert({company:COMPANY,name:newN});
@@ -727,7 +728,7 @@ function mergeSite(i){
   if(!others.length){toast('ไม่มีไซต์อื่นให้รวม');return;}
   openModal(`<h3>🔀 รวมไซต์ซ้ำ</h3><p class="muted">ย้ายของ + ประวัติทั้งหมดของ "<b>${esc(src)}</b>" ไปไซต์ที่เลือก แล้วลบ "${esc(src)}" ทิ้ง</p>
     <div class="field"><label>รวม "${esc(src)}" เข้ากับ</label><select id="mergeTo">${others.map(s=>`<option>${esc(s)}</option>`).join('')}</select></div>
-    <div class="flexrow" style="margin-top:16px"><button class="btn primary" onclick="doMergeSite('${jsq(src)}')">🔀 รวมเลย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
+    <div class="flexrow" style="margin-top:16px"><button class="btn primary" onclick="doMergeSite('${esc(jsq(src))}')">🔀 รวมเลย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
 }
 async function doMergeSite(src){
   const dest=$('#mergeTo').value;if(!dest||dest===src){closeModal();return;}
@@ -806,8 +807,9 @@ async function reassignVendorRefs(oldN,newN){
 async function renamePerson(i){
   const oldN=_peopleList[i];const newN=(prompt('เปลี่ยนชื่อ "'+oldN+'" เป็น:',oldN)||'').trim();
   if(!newN||newN===oldN)return;
-  const exists=S.lookups.people.some(p=>p.toLowerCase()===newN.toLowerCase()&&p!==oldN);
-  if(exists&&!confirm('มีชื่อ "'+newN+'" อยู่แล้ว — รวม "'+oldN+'" เข้ากับมันแทนไหม?'))return;
+  const canon=S.lookups.people.find(p=>p.toLowerCase()===newN.toLowerCase()&&p!==oldN);
+  if(canon&&!confirm('มีชื่อ "'+canon+'" อยู่แล้ว — รวม "'+oldN+'" เข้ากับมันแทนไหม?'))return;
+  if(canon)newN=canon;
   toast('กำลังเปลี่ยนชื่อ + แก้ใบเก่า…');
   await reassignPersonRefs(oldN,newN);
   if(!S.lookups.people.some(p=>p===newN))await sb.from('people').insert({company:COMPANY,name:newN});
@@ -817,8 +819,9 @@ async function renamePerson(i){
 async function renameVendor(i){
   const oldN=_vendorsList[i];const newN=(prompt('เปลี่ยนชื่อช่าง "'+oldN+'" เป็น:',oldN)||'').trim();
   if(!newN||newN===oldN)return;
-  const exists=S.lookups.vendors.some(v=>v.toLowerCase()===newN.toLowerCase()&&v!==oldN);
-  if(exists&&!confirm('มีช่าง "'+newN+'" อยู่แล้ว — รวม "'+oldN+'" เข้ากับมันแทนไหม?'))return;
+  const canon=S.lookups.vendors.find(v=>v.toLowerCase()===newN.toLowerCase()&&v!==oldN);
+  if(canon&&!confirm('มีช่าง "'+canon+'" อยู่แล้ว — รวม "'+oldN+'" เข้ากับมันแทนไหม?'))return;
+  if(canon)newN=canon;
   toast('กำลังเปลี่ยนชื่อ + แก้ใบเก่า…');
   await reassignVendorRefs(oldN,newN);
   if(!S.lookups.vendors.some(v=>v===newN))await sb.from('vendors').insert({company:COMPANY,name:newN});
@@ -830,7 +833,7 @@ function mergePerson(i){
   if(!others.length){toast('ไม่มีชื่ออื่นให้รวม');return;}
   openModal(`<h3>🔀 รวมชื่อซ้ำ</h3><p class="muted">ย้ายประวัติทั้งหมดของ "<b>${esc(src)}</b>" ไปชื่อที่เลือก แล้วลบ "${esc(src)}" ทิ้ง</p>
     <div class="field"><label>รวม "${esc(src)}" เข้ากับ</label><select id="mergeTo">${others.map(s=>`<option>${esc(s)}</option>`).join('')}</select></div>
-    <div class="flexrow" style="margin-top:16px"><button class="btn primary" onclick="doMergePerson('${jsq(src)}')">🔀 รวมเลย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
+    <div class="flexrow" style="margin-top:16px"><button class="btn primary" onclick="doMergePerson('${esc(jsq(src))}')">🔀 รวมเลย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
 }
 async function doMergePerson(src){
   const dest=$('#mergeTo').value;if(!dest||dest===src){closeModal();return;}
@@ -844,7 +847,7 @@ function mergeVendor(i){
   if(!others.length){toast('ไม่มีช่างอื่นให้รวม');return;}
   openModal(`<h3>🔀 รวมช่างซ้ำ</h3><p class="muted">ย้ายใบส่งซ่อมทั้งหมดของ "<b>${esc(src)}</b>" ไปช่างที่เลือก แล้วลบ "${esc(src)}" ทิ้ง</p>
     <div class="field"><label>รวม "${esc(src)}" เข้ากับ</label><select id="mergeTo">${others.map(s=>`<option>${esc(s)}</option>`).join('')}</select></div>
-    <div class="flexrow" style="margin-top:16px"><button class="btn primary" onclick="doMergeVendor('${jsq(src)}')">🔀 รวมเลย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
+    <div class="flexrow" style="margin-top:16px"><button class="btn primary" onclick="doMergeVendor('${esc(jsq(src))}')">🔀 รวมเลย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
 }
 async function doMergeVendor(src){
   const dest=$('#mergeTo').value;if(!dest||dest===src){closeModal();return;}
@@ -883,8 +886,9 @@ async function reassignReceiverRefs(oldN,newN){ await sb.from('movements').updat
 async function renameReceiver(i){
   const oldN=_receiversList[i];const newN=(prompt('เปลี่ยนชื่อผู้รับของ "'+oldN+'" เป็น:',oldN)||'').trim();
   if(!newN||newN===oldN)return;
-  const exists=(S.lookups.receivers||[]).some(p=>p.toLowerCase()===newN.toLowerCase()&&p!==oldN);
-  if(exists&&!confirm('มีชื่อ "'+newN+'" อยู่แล้ว — รวม "'+oldN+'" เข้ากับมันแทนไหม?'))return;
+  const canon=(S.lookups.receivers||[]).find(p=>p.toLowerCase()===newN.toLowerCase()&&p!==oldN);
+  if(canon&&!confirm('มีชื่อ "'+canon+'" อยู่แล้ว — รวม "'+oldN+'" เข้ากับมันแทนไหม?'))return;
+  if(canon)newN=canon;
   toast('กำลังเปลี่ยนชื่อ + แก้ใบเก่า…');
   await reassignReceiverRefs(oldN,newN);
   if(!(S.lookups.receivers||[]).some(p=>p===newN))await sb.from('receivers').insert({company:COMPANY,name:newN});
@@ -896,7 +900,7 @@ function mergeReceiver(i){
   if(!others.length){toast('ไม่มีชื่ออื่นให้รวม');return;}
   openModal(`<h3>🔀 รวมชื่อผู้รับของซ้ำ</h3><p class="muted">ย้ายใบเบิกทั้งหมดของ "<b>${esc(src)}</b>" ไปชื่อที่เลือก แล้วลบ "${esc(src)}" ทิ้ง</p>
     <div class="field"><label>รวม "${esc(src)}" เข้ากับ</label><select id="mergeTo">${others.map(s=>`<option>${esc(s)}</option>`).join('')}</select></div>
-    <div class="flexrow" style="margin-top:16px"><button class="btn primary" onclick="doMergeReceiver('${jsq(src)}')">🔀 รวมเลย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
+    <div class="flexrow" style="margin-top:16px"><button class="btn primary" onclick="doMergeReceiver('${esc(jsq(src))}')">🔀 รวมเลย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
 }
 async function doMergeReceiver(src){
   const dest=$('#mergeTo').value;if(!dest||dest===src){closeModal();return;}
@@ -950,8 +954,9 @@ async function reassignCatRefs(oldN,newN){ await sb.from('tools').update({catego
 async function renameCat(i){
   const oldN=_catsList[i];const newN=(prompt('เปลี่ยนชื่อหมวด "'+oldN+'" เป็น:',oldN)||'').trim();
   if(!newN||newN===oldN)return;
-  const exists=S.lookups.categories.some(c=>c.toLowerCase()===newN.toLowerCase()&&c!==oldN);
-  if(exists&&!confirm('มีหมวด "'+newN+'" อยู่แล้ว — รวม "'+oldN+'" เข้ากับมันแทนไหม?'))return;
+  const canon=S.lookups.categories.find(c=>c.toLowerCase()===newN.toLowerCase()&&c!==oldN);
+  if(canon&&!confirm('มีหมวด "'+canon+'" อยู่แล้ว — รวม "'+oldN+'" เข้ากับมันแทนไหม?'))return;
+  if(canon)newN=canon;
   toast('กำลังเปลี่ยนชื่อหมวด + ย้ายเครื่อง…');
   await reassignCatRefs(oldN,newN);
   if(!S.lookups.categories.some(c=>c===newN))await sb.from('categories').insert({company:COMPANY,name:newN});
@@ -963,7 +968,7 @@ function mergeCat(i){
   if(!others.length){toast('ไม่มีหมวดอื่นให้รวม');return;}
   openModal(`<h3>🔀 รวมหมวดซ้ำ</h3><p class="muted">ย้ายเครื่องทั้งหมดของ "<b>${esc(src)}</b>" ไปหมวดที่เลือก แล้วลบ "${esc(src)}" ทิ้ง</p>
     <div class="field"><label>รวม "${esc(src)}" เข้ากับ</label><select id="mergeCatTo">${others.map(c=>`<option>${esc(c)}</option>`).join('')}</select></div>
-    <div class="flexrow" style="margin-top:16px"><button class="btn primary" onclick="doMergeCat('${jsq(src)}')">🔀 รวมเลย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
+    <div class="flexrow" style="margin-top:16px"><button class="btn primary" onclick="doMergeCat('${esc(jsq(src))}')">🔀 รวมเลย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
 }
 async function doMergeCat(src){
   const dest=$('#mergeCatTo').value;if(!dest||dest===src){closeModal();return;}
@@ -1043,7 +1048,7 @@ async function removeToolImg(i){
 function toolDetail(i){
   const t=S.tools[i];
   const editable=canEditCo(t.company);
-  const hist=S.movements.filter(m=>m.code===t.code).slice(-6).reverse();
+  const hist=S.movements.filter(m=>m.tool_id===t.id).slice(-6).reverse();
   const audits=(S.audit||[]).filter(a=>a.tool_code===t.code&&a.company===t.company).slice(0,8);
   const histHtml=`<h3 style="font-size:14px;margin-top:16px">ประวัติการใช้งานล่าสุด</h3>
     <ul class="tl">${hist.map(m=>`<li><div class="ti">${({'เบิก':'📤','คืน':'📥','ส่งซ่อม':'⚙️','รับคืนจากซ่อม':'✅','ย้ายไซต์':'🔀'}[m.type]||'•')}</div><div><b>${esc(m.type)}</b> ${m.slip?'ใบ'+esc(m.slip):''}<div class="sub muted">${esc(m.date)} ${m.project?'· '+esc(m.project):''} ${m.actor?'· '+esc(m.actor):''}</div></div></li>`).join('')||'<li class="muted">ยังไม่มีประวัติ</li>'}</ul>
@@ -1189,7 +1194,7 @@ function togRepair(i,on){on?selRepair.add(i):selRepair.delete(i);
   $('#rform').style.display=selRepair.size?'block':'none';
   $('#rcount').textContent=`เลือก ${selRepair.size} เครื่อง`;
   $('#rsel').innerHTML='<table><thead><tr><th>เครื่อง</th><th>NO</th><th>โครงการ (มาจากไซต์ไหน)</th><th>อาการ/สาเหตุ</th></tr></thead><tbody>'+
-    [...selRepair].map(ix=>{const t=S.tools[ix];return `<tr><td>${esc(t.name).slice(0,26)}</td><td>${esc(t.no)}</td><td><input data-rpj="${ix}" list="dl_rpj" value="${esc(rPj[ix]||'')}" oninput="rPj[${ix}]=this.value" placeholder="ไซต์/โครงการ" style="width:100%;min-width:110px"></td><td><input data-rsn="${ix}" value="${esc(rRsn[ix]||'')}" oninput="rRsn[${ix}]=this.value" placeholder="เช่น ลูกปืนแตก" style="width:100%;min-width:110px"></td></tr>`;}).join('')+'</tbody></table>';
+    [...selRepair].map(ix=>{const t=S.tools[ix];return `<tr><td>${esc((t.name||'').slice(0,26))}</td><td>${esc(t.no)}</td><td><input data-rpj="${ix}" list="dl_rpj" value="${esc(rPj[ix]||'')}" oninput="rPj[${ix}]=this.value" placeholder="ไซต์/โครงการ" style="width:100%;min-width:110px"></td><td><input data-rsn="${ix}" value="${esc(rRsn[ix]||'')}" oninput="rRsn[${ix}]=this.value" placeholder="เช่น ลูกปืนแตก" style="width:100%;min-width:110px"></td></tr>`;}).join('')+'</tbody></table>';
 }
 function previewRepair(){
   if(!selRepair.size)return;
@@ -1314,10 +1319,10 @@ function renderReceive(){
      <div id="rvtbl"></div>
    </div>
    <datalist id="dl_p2">${S.lookups.people.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist>`;
-  const slipOf=code=>{const m=[...S.movements].reverse().find(m=>m.code===code&&m.type==='ส่งซ่อม');return m?m.slip:'';};
+  const slipOf=tl=>{const m=[...S.movements].reverse().find(m=>m.tool_id===tl.id&&m.type==='ส่งซ่อม');return m?m.slip:'';};
   const drawRv=()=>{const pg=pgSlice('receive',out);
     $('#rvtbl').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th>ใบส่งซ่อม</th><th>อยู่ที่</th></tr></thead><tbody>${
-      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selRecv.has(t.i)?'checked':''} onchange="togRecv(${t.i},this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,36)}</td><td>${esc(t.no)}</td><td>${esc(slipOf(t.code))}</td><td>${esc(t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=7 class="empty">ไม่มีเครื่องอยู่ร้านซ่อม</td></tr>'
+      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selRecv.has(t.i)?'checked':''} onchange="togRecv(${t.i},this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc((t.name||'').slice(0,36))}</td><td>${esc(t.no)}</td><td>${esc(slipOf(t))}</td><td>${esc(t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=7 class="empty">ไม่มีเครื่องอยู่ร้านซ่อม</td></tr>'
     }</tbody></table></div>${pg.html}`;};
   PG_REDRAW['receive']=drawRv; drawRv();
   $('#rvgo').onclick=doReceiveStock;
@@ -1609,7 +1614,7 @@ function dormantModal(){
     if(!rows.length)return '';
     return `<h3 style="font-size:14px;margin:16px 0 6px">${icon} ${st} (${rows.length}) <span class="muted" style="font-weight:400;font-size:12px">— ${hint}</span></h3>
       <table><thead><tr><th>รหัส</th><th>ชื่อ</th><th>บ.</th><th>อยู่ที่</th><th class="center">นิ่งมา</th></tr></thead><tbody>${
-      rows.map(x=>`<tr style="cursor:pointer" onclick="toolDetail(${x.t.i})"><td><b>${esc(x.t.code)}</b></td><td>${esc(x.t.name).slice(0,26)}</td><td>${coBadge(x.t.company)}</td><td>${esc((x.t.loc||'').split(' / ')[0])||'-'}</td><td class="center"><b>${days(x.last)}</b> วัน</td></tr>`).join('')}</tbody></table>`;
+      rows.map(x=>`<tr style="cursor:pointer" onclick="toolDetail(${x.t.i})"><td><b>${esc(x.t.code)}</b></td><td>${esc((x.t.name||'').slice(0,26))}</td><td>${coBadge(x.t.company)}</td><td>${esc((x.t.loc||'').split(' / ')[0])||'-'}</td><td class="center"><b>${days(x.last)}</b> วัน</td></tr>`).join('')}</tbody></table>`;
   };
   const other=all.filter(x=>!['ถูกยืม','ว่าง','ส่งซ่อม'].includes(x.t.status));
   openModal(`<h3>⏳ เครื่องไม่เคลื่อนไหวเกิน 1 ปี (${all.length})</h3>
@@ -1617,7 +1622,7 @@ function dormantModal(){
     ${grp('ถูกยืม','🔴','ค้างไซต์นานผิดปกติ — ทวงถาม / แจ้งหาย')}
     ${grp('ว่าง','🟠','นอนสโตร์ไม่ถูกใช้ — ตรวจนับจริง / ขายซาก')}
     ${grp('ส่งซ่อม','⚙️','ค้างร้านซ่อมข้ามปี — ตามร้าน / ชำแหละซาก')}
-    ${other.length?grp(other[0].t.status,'•',''):''}
+    ${[...new Set(other.map(x=>x.t.status))].map(st=>grp(st,'•','')).join('')}
     <div class="flexrow" style="margin-top:14px"><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`,true);
 }
 function crossBorrows(){const all=[];S.tools.forEach(t=>{if(t.status!=='ถูกยืม')return;const m=lastBorrowMov(t.id);const by=m?m.company:null;if(!by||by===t.company)return;all.push({t,by});});return all;}
@@ -1892,7 +1897,7 @@ function editBorrowBatchForm(i){
     <div id="eb_addbox" style="display:none;margin-top:8px;border-top:1px dashed var(--line);padding-top:8px">
       <input class="search" id="eb_addq" oninput="_filterPick('eb_addlist','eb_addq')" placeholder="🔎 ค้นหาเครื่องว่าง…" style="margin-bottom:6px;width:100%">
       <div id="eb_addlist" style="max-height:26vh;overflow:auto">${
-        elig.map(t=>`<label data-pickrow style="display:flex;gap:8px;align-items:center;padding:5px 2px;border-bottom:0.5px solid var(--line)"><input type="checkbox" data-badd="${t.id}"><b>${esc(t.code)}</b> <span style="flex:1">${esc(t.name).slice(0,30)}</span> ${coBadge(t.company)}</label>`).join('')||'<div class="empty">ไม่มีเครื่องว่าง</div>'
+        elig.map(t=>`<label data-pickrow style="display:flex;gap:8px;align-items:center;padding:5px 2px;border-bottom:0.5px solid var(--line)"><input type="checkbox" data-badd="${t.id}"><b>${esc(t.code)}</b> <span style="flex:1">${esc((t.name||'').slice(0,30))}</span> ${coBadge(t.company)}</label>`).join('')||'<div class="empty">ไม่มีเครื่องว่าง</div>'
       }</div>
     </div>
     <div class="flexrow" style="margin-top:10px"><button class="btn primary" onclick="saveBorrowBatch(${i})">💾 บันทึก</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`,true);
@@ -2097,7 +2102,7 @@ async function saveSlip(){
       if(m.tool_id){const t=S.tools.find(x=>x.id===m.tool_id);if(t&&t.status==='ส่งซ่อม')await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',m.tool_id);}
       continue;}
     const r=document.querySelector(`[data-er="${i}"]`),p=document.querySelector(`[data-ep="${i}"]`);
-    if(m.id)await sb.from('movements').update({reason:r?r.value:(m.reason||''),project:(p?p.value.trim():'')||null}).eq('id',m.id);}
+    if(m.id)await sb.from('movements').update({occurred_on:sent||null,reason:r?r.value:(m.reason||''),project:(p?p.value.trim():'')||null}).eq('id',m.id);}
   const adds=[...document.querySelectorAll('[data-radd]:checked')].map(c=>c.getAttribute('data-radd'));
   for(const tid of adds){const t=S.tools.find(x=>x.id===tid); if(!t)continue;
     const rs=document.querySelector(`[data-rar="${tid}"]`); const reason=rs?rs.value.trim():'';
@@ -2194,13 +2199,13 @@ function resolveScan(text){
   let t=id?S.tools.find(x=>x.id===id):null;
   if(!t){ const lq=q.toLowerCase();
     const cands=S.tools.filter(x=>(x.code+' '+x.name+' '+x.no).toLowerCase().includes(lq)||(x.no||'').toLowerCase()===lq);
-    if(cands.length===1)t=cands[0]; else if(cands.length>1){stopScanner();showScanCandidates(cands);return;} }
+    if(cands.length===1)t=cands[0]; else if(cands.length>1){stopScanner();$('#scanStart').style.display='';$('#scanStop').style.display='none';showScanCandidates(cands);return;} }
   if(!t){ $('#scanResult').innerHTML='<div class="panel empty">ไม่พบเครื่อง — ลองพิมพ์รหัส/NO ใหม่</div>'; return; }
   stopScanner(); $('#scanStart').style.display=''; $('#scanStop').style.display='none';
   showScanTool(t);
 }
 function showScanCandidates(cands){
-  $('#scanResult').innerHTML=`<div class="panel"><h3>พบหลายตัว — เลือก</h3>${cands.slice(0,8).map(t=>`<div onclick="showScanToolById('${t.id}')" style="cursor:pointer;padding:9px;border:0.5px solid var(--line);border-radius:8px;margin-bottom:6px"><b>${esc(t.code)}</b> ${coBadge(t.company)} · ${esc(t.name).slice(0,32)}</div>`).join('')}</div>`;
+  $('#scanResult').innerHTML=`<div class="panel"><h3>พบหลายตัว — เลือก</h3>${cands.slice(0,8).map(t=>`<div onclick="showScanToolById('${t.id}')" style="cursor:pointer;padding:9px;border:0.5px solid var(--line);border-radius:8px;margin-bottom:6px"><b>${esc(t.code)}</b> ${coBadge(t.company)} · ${esc((t.name||'').slice(0,32))}</div>`).join('')}</div>`;
 }
 function showScanToolById(id){const t=S.tools.find(x=>x.id===id);if(t)showScanTool(t);}
 function showScanTool(t){
@@ -2253,7 +2258,7 @@ function scanDone(t,msg){ scanTool=null;
   $('#scanResult').innerHTML=`<div class="panel" style="text-align:center;border-left:4px solid #16a34a">
     <div style="font-size:40px">✅</div>
     <div style="font-size:16px;font-weight:600">${esc(msg)}</div>
-    <div class="muted">${esc(t.code)} · ${esc(t.name).slice(0,30)}</div>
+    <div class="muted">${esc(t.code)} · ${esc((t.name||'').slice(0,30))}</div>
     <div class="muted" style="font-size:12px;margin-top:6px">บันทึกโดย ${esc((ME&&ME.email)||'')} · ${esc(today())}</div>
     <button class="btn primary" style="margin-top:12px" onclick="scanNext()">📷 สแกนตัวต่อไป</button>
   </div>`;
@@ -2389,7 +2394,7 @@ function renderLabels(){
     lblFiltered=inv.filter(t=>(!q||(t.code+' '+t.name+' '+t.no+' '+t.cat).toLowerCase().includes(q))&&(!lblOnlyUntagged||!t.tagged));
     const pg=pgSlice('labels',lblFiltered);
     $('#ltbl').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th></th><th>รหัส</th><th>บ.</th><th>ชื่อ</th><th>NO</th><th class="center">ติด TAG</th><th></th></tr></thead><tbody>${
-      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selLabel.has(t.id)?'checked':''} onchange="togLabel('${t.id}',this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.name).slice(0,40)}</td><td>${esc(t.no)}</td><td class="center"><input type="checkbox" ${t.tagged?'checked':''} onchange="toggleTag('${t.id}',this.checked)" title="${t.tagged&&t.taggedAt?('ติดเมื่อ '+esc(fmtDateTH(t.taggedAt))):'ติ๊กเมื่อแกะติด TAG/QR เครื่องนี้แล้ว'}">${t.tagged?' <span style="color:#16a34a">✓</span>':''}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:4px 8px" onclick="copyNfcUrl('${t.id}')">📋 URL</button> <button class="btn" style="padding:4px 8px" onclick="downloadLabel('${t.id}')">⬇️ ป้าย</button></td></tr>`).join('')||'<tr><td colspan=7 class="empty">ไม่พบ</td></tr>'
+      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selLabel.has(t.id)?'checked':''} onchange="togLabel('${t.id}',this.checked)"></td><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc((t.name||'').slice(0,40))}</td><td>${esc(t.no)}</td><td class="center"><input type="checkbox" ${t.tagged?'checked':''} onchange="toggleTag('${t.id}',this.checked)" title="${t.tagged&&t.taggedAt?('ติดเมื่อ '+esc(fmtDateTH(t.taggedAt))):'ติ๊กเมื่อแกะติด TAG/QR เครื่องนี้แล้ว'}">${t.tagged?' <span style="color:#16a34a">✓</span>':''}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:4px 8px" onclick="copyNfcUrl('${t.id}')">📋 URL</button> <button class="btn" style="padding:4px 8px" onclick="downloadLabel('${t.id}')">⬇️ ป้าย</button></td></tr>`).join('')||'<tr><td colspan=7 class="empty">ไม่พบ</td></tr>'
     }</tbody></table></div>${pg.html}`;
     $('#lcount').textContent='เลือก '+selLabel.size;};
   PG_REDRAW['labels']=draw;
@@ -2414,6 +2419,7 @@ function printLabels(){
     cells+=`<div class="lbl"><img src="${u}"></div>`;}
   const sm=LBLSIZE==='small', cols=sm?4:3, iw=sm?'40mm':'50mm', ih=sm?'20mm':'30mm', gap=sm?'4mm':'5mm', sz=sm?'4×2':'5×3';
   const w=window.open('','_blank');
+  if(!w){toast('เบราว์เซอร์บล็อกป๊อปอัป — อนุญาตป๊อปอัปของเว็บนี้แล้วลองใหม่');return;}
   w.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ป้ายเต็ม (${tools.length} ดวง)</title>
     <style>*{box-sizing:border-box;margin:0;padding:0}
       body{font-family:"Noto Sans Thai",Tahoma,sans-serif;padding:8mm;color:#111}
@@ -2493,7 +2499,7 @@ async function renderUsers(){
         <td><b style="font-size:12.5px">${esc(p.email||p.id.slice(0,8))}</b></td>
         <td><select id="ur_${p.id}"><option value="pending" ${p.role==='pending'?'selected':''}>⏳ รออนุมัติ (ยังไม่ให้สิทธิ์)</option><option value="staff" ${p.role==='staff'?'selected':''}>พนักงาน (staff)</option><option value="site" ${p.role==='site'?'selected':''}>ผู้ดูแลหน้างาน (สแกนย้ายไซต์อย่างเดียว)</option><option value="admin" ${p.role==='admin'?'selected':''}>ผู้ดูแล (admin — เห็นทุกบริษัท)</option></select></td>
         <td><select id="uc_${p.id}"><option value="" ${!p.company?'selected':''}>— ยังไม่กำหนด (ยังเข้าไม่ได้)</option><option value="PAC" ${p.company==='PAC'?'selected':''}>PAC</option><option value="LOTUS" ${p.company==='LOTUS'?'selected':''}>LOTUS</option></select></td>
-        <td><button class="btn primary" style="padding:6px 14px" onclick="saveUser('${p.id}')">บันทึก</button> ${p.id!==ME.id?`<button class="btn" style="background:#fee2e2;color:#b91c1c;padding:6px 12px" onclick="delUser('${p.id}','${esc(p.email||'')}')">ลบ</button>`:`<span class="muted" style="font-size:12px">(คุณ)</span>`}</td>
+        <td><button class="btn primary" style="padding:6px 14px" onclick="saveUser('${p.id}')">บันทึก</button> ${p.id!==ME.id?`<button class="btn" style="background:#fee2e2;color:#b91c1c;padding:6px 12px" onclick="delUser('${p.id}','${esc(jsq(p.email||''))}')">ลบ</button>`:`<span class="muted" style="font-size:12px">(คุณ)</span>`}</td>
       </tr>`).join('')
     }</tbody></table>
     <p class="muted" style="margin-top:12px;font-size:13px">💡 พนักงานใหม่: ให้กด "สมัครบัญชีใหม่" ที่หน้าเว็บก่อน → ชื่อจะมาโผล่ที่นี่ → คุณตั้งบริษัทให้ → เขาถึงจะเห็นข้อมูล</p>
