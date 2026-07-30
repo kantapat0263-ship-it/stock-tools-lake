@@ -478,32 +478,37 @@ $('#reset').onclick=e=>{e.preventDefault();if(confirm('ออกจากระ�
 
 /* ============ DASHBOARD ============ */
 function renderDash(){
-  const total=S.tools.filter(inView).length, freeN=count('ว่าง'), borrowN=count('ถูกยืม'), repairN=count('ส่งซ่อม');
-  const pendingSlips=S.slips.filter(s=>s.status!=='รับคืนครบ'&&(!FILTER||s.company===FILTER));
-  const pct=n=>total?Math.round(n/total*100):0;
-  const cards=[
-    ['🧰','เครื่องมือทั้งหมด',total,'#0f172a',''],
-    ['🟢','ว่าง',freeN,'#16a34a',pct(freeN)+'%'],
-    ['🔵','ถูกยืม',borrowN,'#2563eb',pct(borrowN)+'%'],
-    ['⚙️','ส่งซ่อม',repairN,'#64748b',pct(repairN)+'%'],
-    ['📄','ใบค้างรับคืน',pendingSlips.length,'#dc2626','']
-  ].map(c=>`<div class="card"><div class="lab"><span>${c[0]}</span>${c[1]}</div><div class="big" style="color:${c[3]}">${c[2]}</div><div class="pct">${c[4]}</div></div>`).join('');
-
-  const life=[['🟢','ว่าง'],['🔵','ถูกยืม'],['🟠','รอซ่อม'],['⚙️','ส่งซ่อม'],['📥','รับคืน'],['✅','พร้อมเบิก']];
-  const strip=life.map((s,idx)=>`<div class="st"><div class="b">${s[0]}</div><small>${s[1]}</small></div>${idx<life.length-1?'<span class="ar">→</span>':''}`).join('');
-
-  // donut
-  const segs=[['ว่าง',freeN],['ถูกยืม',borrowN],['ส่งซ่อม',repairN],['รอส่งซ่อม',count('รอส่งซ่อม')],['ชำรุด',count('ชำรุด')],['ยังไม่ตรวจนับ',count('ยังไม่ตรวจนับ')]];
-  const donut=mkDonut(segs,total);
-
-  // pending repair table
-  const ptbl=pendingSlips.slice(0,6).map(s=>`<tr><td><b>${esc(s.no)}</b></td><td>${esc(s.vendor)||'-'}</td><td>${esc(s.sent)}</td><td>${esc(s.status)}</td><td class="center">${esc(s.count)}</td></tr>`).join('')||'<tr><td colspan=5 class="empty">ไม่มี</td></tr>';
-
-  // borrowed list
-  const btbl=S.tools.filter(t=>t.status==='ถูกยืม').slice(0,6).map(t=>`<tr><td><b>${esc(t.no)}</b></td><td>${esc((t.name||'').slice(0,34))}</td><td>${esc(t.loc)||'-'}</td></tr>`).join('')||'<tr><td colspan=3 class="empty">ไม่มี</td></tr>';
-
-  // recent activity
-  const recent=[...S.movements.filter(inViewMov)].slice(-8).reverse().map(m=>`<li><div class="ti">${({'เบิก':'📤','คืน':'📥','ส่งซ่อม':'⚙️','รับคืนจากซ่อม':'✅','แจ้งชำรุด':'⚠️','ย้ายไซต์':'🔀'}[m.type]||'•')}</div><div><b>${esc(m.type)}</b> ${esc(m.code||m.note||'')}<div class="sub muted">${esc(m.date)} ${m.actor?'· '+esc(m.actor):''} ${m.project?'· '+esc(m.project):''}</div></div></li>`).join('');
+  // ===== วิเคราะห์ (แสดงทั้ง 2 บริษัทเสมอ ไม่ขึ้นกับตัวกรอง) =====
+  const T=S.tools, M=S.movements, byId={};
+  T.forEach(t=>byId[t.id]=t);
+  const cnt=co=>T.filter(t=>t.company===co).length;
+  const val=co=>T.filter(t=>t.company===co).reduce((s,t)=>s+(+t.price||0),0);
+  const pricedN=co=>T.filter(t=>t.company===co&&t.price).length;
+  const money=n=>n?('฿'+Math.round(n).toLocaleString('th-TH')):'—';
+  const dbar=(label,v,max,color)=>`<div class="hbar"><span class="hbl" title="${esc(label)}">${esc(label)}</span><span class="hbt"><i style="width:${max?Math.round(v/max*100):0}%;background:${color}"></i></span><b>${v}</b></div>`;
+  // การยืมข้ามบริษัท (ตลอดกาล): ผู้เบิก vs เจ้าของเครื่อง
+  const issued=M.filter(m=>m.type==='เบิก'&&!m.isDraft);
+  const ownerOf=m=>(byId[m.tool_id]&&byId[m.tool_id].company)||m.ownerCompany||'';
+  const xAll=(a,b)=>issued.filter(m=>m.company===a&&ownerOf(m)===b).length;
+  const xHeld=crossBorrows();
+  const heldN=(a,b)=>xHeld.filter(x=>x.by===a&&x.t.company===b).length;
+  // ซ่อมบ่อยสุด (รายเครื่อง)
+  const topRep=[...T].filter(t=>+t.repairs>0).sort((a,b)=>+b.repairs-+a.repairs).slice(0,8);
+  const repMax=topRep.length?+topRep[0].repairs:1;
+  // หมวดยอดนิยม (นับจากการเบิก)
+  const catC={}; issued.forEach(m=>{const c=(byId[m.tool_id]&&byId[m.tool_id].cat)||m.cat||'(ไม่ระบุ)';catC[c]=(catC[c]||0)+1;});
+  const topCat=Object.entries(catC).sort((a,b)=>b[1]-a[1]).slice(0,7); const catMax=topCat.length?topCat[0][1]:1;
+  // แนวโน้ม 6 เดือน
+  const _now=new Date(), months=[];
+  for(let i=5;i>=0;i--){const d=new Date(_now.getFullYear(),_now.getMonth()-i,1);months.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));}
+  const moD={}; months.forEach(k=>moD[k]={'เบิก':0,'คืน':0,'ส่งซ่อม':0});
+  M.forEach(m=>{if(m.isDraft)return;const k=(m.date||'').slice(0,7);if(moD[k]&&moD[k][m.type]!==undefined)moD[k][m.type]++;});
+  const moMax=Math.max(1,...months.flatMap(k=>[moD[k]['เบิก'],moD[k]['คืน'],moD[k]['ส่งซ่อม']]));
+  const moTH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const moLabel=k=>moTH[+k.slice(5)-1];
+  // ไซต์ถือเครื่องเยอะสุดตอนนี้
+  const siteC={}; T.filter(t=>t.status==='ถูกยืม').forEach(t=>{const s=((t.loc||'').split(' / ')[0]||'').trim()||'(ไม่ระบุ)';siteC[s]=(siteC[s]||0)+1;});
+  const topSite=Object.entries(siteC).sort((a,b)=>b[1]-a[1]).slice(0,6); const siteMax=topSite.length?topSite[0][1]:1;
 
   const _xb=crossBorrows().filter(x=>!FILTER||x.t.company===FILTER||x.by===FILTER);
   const _lent=(ME&&ME.company)?_xb.filter(x=>x.t.company===ME.company):_xb;
@@ -518,13 +523,6 @@ function renderDash(){
     <h3 style="margin:0 0 6px">📍 เครื่องค้างที่ไซต์เกิน 30 วัน — ยังไม่คืน (${_late.length})</h3>
     <table><thead><tr><th>รหัส</th><th>บ.</th><th>อยู่ที่</th><th class="center">ค้างมา</th></tr></thead><tbody>${_late.slice(0,8).map(t=>{const d=Math.floor((Date.now()-new Date(t.dispatchedAt||t.updated))/86400000);return `<tr><td><b>${esc(t.code)}</b></td><td>${coBadge(t.company)}</td><td>${esc(t.loc)||'-'}</td><td class="center"><b>${d} วัน</b></td></tr>`;}).join('')}</tbody></table>
   </div>`:'';
-  const _mvcut=ymd(new Date(Date.now()-7*86400000));
-  const _moves=S.movements.filter(m=>m.type==='ย้ายไซต์'&&inViewMov(m)&&(m.date||'')>=_mvcut).reverse().slice(0,10);
-  const moveAlert=_moves.length?`<div class="panel" style="border-left:4px solid #7c3aed;background:#faf5ff">
-    <h3 style="margin:0 0 6px">🔀 การโยกเครื่องล่าสุด (7 วันล่าสุด) — ${_moves.length} รายการ <span class="muted" style="font-weight:400;font-size:12px">· รวมที่หน้างานสแกนย้ายเอง</span></h3>
-    <table><thead><tr><th>เครื่อง</th><th>บ.</th><th>ย้ายไป</th><th>โดย</th><th>เมื่อ</th></tr></thead><tbody>${
-      _moves.map(m=>`<tr><td><b>${esc(m.code||m.no||'-')}</b></td><td>${coBadge(m.company)}</td><td><b>${esc(m.project)||'-'}</b></td><td>${esc(m.actor||m.recordedBy||'-')}</td><td>${esc(fmtDateTH(m.date))||'-'}</td></tr>`).join('')}</tbody></table>
-  </div>`:'';
   const _dorm=dormantTools();
   const dormAlert=_dorm.length?`<div class="panel" style="border-left:4px solid #64748b;background:#f8fafc">
     <h3 style="margin:0">⏳ เครื่องไม่เคลื่อนไหวเกิน 1 ปี (${_dorm.length})
@@ -534,37 +532,67 @@ function renderDash(){
   $('#view').innerHTML=`
     ${pendAlert}
     ${dormAlert}
-    ${moveAlert}
     ${notif}
-    <div class="cards">${cards}</div>
-    <div class="life">${strip}</div>
-    <div class="grid3">
-      <div class="panel"><h3>การกระจายตามสถานะ</h3>${donut}</div>
-      <div class="panel"><h3>เครื่องส่งซ่อมค้างอยู่ <a onclick="go('receive')">ไปรับคืน →</a></h3>
-        <table><thead><tr><th>ใบ</th><th>ช่าง</th><th>ส่งเมื่อ</th><th>สถานะ</th><th class="center">จำนวน</th></tr></thead><tbody>${ptbl}</tbody></table></div>
-      <div class="panel"><h3>กิจกรรมล่าสุด</h3><ul class="tl">${recent}</ul></div>
+    <div style="font-size:11px;letter-spacing:.5px;color:#64748b;text-transform:uppercase;font-weight:600;margin:2px 0 10px">📊 ภาพรวมวิเคราะห์ · ทั้ง 2 บริษัท</div>
+    <div class="dvs">
+      <div class="dvcard" style="border-top:4px solid #16a34a">
+        <div class="dvco">🟢 LOTUS</div><div class="dvn" style="color:#16a34a">${cnt('LOTUS')}</div>
+        <div class="dvs2">เครื่องในระบบ · มูลค่าที่กรอก <b>${money(val('LOTUS'))}</b> <span class="muted">(${pricedN('LOTUS')} ตัว)</span></div>
+      </div>
+      <div class="dvmid">VS</div>
+      <div class="dvcard" style="border-top:4px solid #2563eb">
+        <div class="dvco">🔵 P-ADVANCE</div><div class="dvn" style="color:#2563eb">${cnt('PAC')}</div>
+        <div class="dvs2">เครื่องในระบบ · มูลค่าที่กรอก <b>${money(val('PAC'))}</b> <span class="muted">(${pricedN('PAC')} ตัว)</span></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h3 style="margin:0 0 10px">⚔️ ใครยืมของใคร (ตลอดกาล)</h3>
+      <div class="steal2">
+        <div class="stealb"><b>PAC → ยืมของ LOTUS</b><span class="sbig" style="color:#dc2626">${xAll('PAC','LOTUS')} ครั้ง</span><small>ตอนนี้ยังค้างที่ PAC <b>${heldN('PAC','LOTUS')}</b> เครื่อง</small></div>
+        <div class="stealb"><b>LOTUS → ยืมของ PAC</b><span class="sbig" style="color:#16a34a">${xAll('LOTUS','PAC')} ครั้ง</span><small>ค้างที่ LOTUS <b>${heldN('LOTUS','PAC')}</b> เครื่อง</small></div>
+      </div>
     </div>
     <div class="grid2">
-      <div class="panel"><h3>เครื่องที่ถูกยืมอยู่ <a onclick="go('borrow')">ไปเบิก-คืน →</a></h3>
-        <table><thead><tr><th>NO</th><th>ชื่อ</th><th>อยู่ที่</th></tr></thead><tbody>${btbl}</tbody></table></div>
-      <div class="panel"><h3>ทางลัด</h3>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn primary" onclick="go('repair')">📤 ส่งซ่อม</button>
-          <button class="btn green" onclick="go('borrow')">🔄 เบิก-ยืม</button>
-          <button class="btn" onclick="go('receive')">📥 รับคืนจากซ่อม</button>
-          <button class="btn" onclick="go('tools')">🧰 ทะเบียน</button>
-        </div>
-        <p class="muted" style="margin-top:16px;font-size:13px">เลขใบส่งซ่อมถัดไป: ${FILTER?('<b>'+String((S.nextSlipByCo&&S.nextSlipByCo[FILTER])||1).padStart(3,'0')+'</b>'):['PAC','LOTUS'].map(co=>co+' <b>'+String((S.nextSlipByCo&&S.nextSlipByCo[co])||1).padStart(3,'0')+'</b>').join(' · ')}</p>
+      <div class="panel"><h3>🔧 เครื่องที่ซ่อมบ่อยสุด <span class="muted" style="font-weight:400;font-size:12px">· ครั้งซ่อม</span></h3>
+        ${topRep.map((t,i)=>dbar(((t.name||'').slice(0,22)||t.code)+' · '+t.no, +t.repairs, repMax, i<2?'#dc2626':i<4?'#ea580c':'#f59e0b')).join('')||'<div class="empty">ยังไม่มีข้อมูลซ่อม</div>'}
       </div>
-    </div>`;
+      <div class="panel"><h3>📦 หมวดที่ถูกเบิกบ่อยสุด <span class="muted" style="font-weight:400;font-size:12px">· ครั้งเบิก</span></h3>
+        ${topCat.map(([c,n],i)=>dbar(c,n,catMax,i===0?'#2563eb':i<3?'#3b82f6':'#60a5fa')).join('')||'<div class="empty">ยังไม่มีข้อมูลเบิก</div>'}
+      </div>
+    </div>
+    <div class="panel">
+      <h3>📈 แนวโน้มรายเดือน <span class="muted" style="font-weight:400;font-size:12px">· เบิก · คืน · ส่งซ่อม (6 เดือน)</span></h3>
+      <div class="months">${months.map(k=>`<div class="mo"><div class="cols"><i style="height:${Math.round(moD[k]['เบิก']/moMax*100)}%;background:#2563eb" title="เบิก ${moD[k]['เบิก']}"></i><i style="height:${Math.round(moD[k]['คืน']/moMax*100)}%;background:#16a34a" title="คืน ${moD[k]['คืน']}"></i><i style="height:${Math.round(moD[k]['ส่งซ่อม']/moMax*100)}%;background:#64748b" title="ส่งซ่อม ${moD[k]['ส่งซ่อม']}"></i></div><span>${moLabel(k)}</span></div>`).join('')}</div>
+      <div class="mleg"><span><i style="background:#2563eb"></i>เบิก</span><span><i style="background:#16a34a"></i>คืน</span><span><i style="background:#64748b"></i>ส่งซ่อม</span></div>
+    </div>
+    <div class="panel">
+      <h3>📍 ไซต์ที่ถือเครื่องเยอะสุดตอนนี้ <span class="muted" style="font-weight:400;font-size:12px">· Top 6</span></h3>
+      ${topSite.map(([s,n])=>dbar(s,n,siteMax,'#7c3aed')).join('')||'<div class="empty">ยังไม่มีเครื่องถูกยืม</div>'}
+    </div>
+    <style>
+    .dvs{display:flex;gap:0;margin-bottom:14px}
+    .dvcard{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;text-align:center}
+    .dvco{font-weight:700;font-size:14px}.dvn{font-size:42px;font-weight:800;line-height:1.1;margin:2px 0}
+    .dvs2{font-size:11.5px;color:#64748b}
+    .dvmid{display:flex;align-items:center;font-weight:800;color:#94a3b8;padding:0 14px}
+    .steal2{display:flex;gap:12px}
+    .stealb{flex:1;background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:3px}
+    .stealb .sbig{font-size:24px;font-weight:800}.stealb small{font-size:11.5px;color:#64748b}
+    .hbar{display:flex;align-items:center;gap:9px;margin-bottom:7px;font-size:12px}
+    .hbl{width:190px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .hbt{flex:1;background:#eef2f6;border-radius:6px;height:15px;overflow:hidden}
+    .hbt i{display:block;height:100%;border-radius:6px;min-width:2px}
+    .hbar b{width:28px;text-align:right}
+    .months{display:flex;align-items:flex-end;justify-content:space-around;height:110px;gap:6px;margin-top:8px}
+    .months .mo{flex:1;display:flex;flex-direction:column;align-items:center;height:100%}
+    .months .cols{flex:1;display:flex;align-items:flex-end;gap:3px;justify-content:center}
+    .months .cols i{width:11px;border-radius:3px 3px 0 0;min-height:2px}
+    .months .mo span{font-size:11px;color:#64748b;margin-top:4px}
+    .mleg{display:flex;gap:16px;justify-content:center;margin-top:10px;font-size:11.5px;color:#64748b}
+    .mleg span{display:flex;align-items:center;gap:5px}.mleg i{width:11px;height:11px;border-radius:3px;display:inline-block}
+    @media(max-width:640px){.dvs{flex-direction:column;gap:8px}.steal2{flex-direction:column}.hbl{width:130px}}
+    </style>`;
 }
-function mkDonut(segs,total){
-  let acc=0;const R=70,C=2*Math.PI*R;const colors=segs.map(s=>STC[s[0]]||'#94a3b8');
-  const circles=segs.map((s,i)=>{const frac=total?s[1]/total:0;const dash=frac*C;const el=`<circle r="${R}" cx="90" cy="90" fill="none" stroke="${colors[i]}" stroke-width="26" stroke-dasharray="${dash} ${C-dash}" stroke-dashoffset="${-acc*C}" transform="rotate(-90 90 90)"/>`;acc+=frac;return el;}).join('');
-  const leg=segs.map((s,i)=>`<div style="display:flex;align-items:center;gap:8px;margin:5px 0;font-size:13px"><span class="dot" style="background:${colors[i]}"></span>${esc(s[0])} <b style="margin-left:auto">${s[1]}</b></div>`).join('');
-  return `<div style="display:flex;align-items:center;gap:18px"><svg width="180" height="180" viewBox="0 0 180 180">${circles}<text x="90" y="86" text-anchor="middle" font-size="26" font-weight="800">${total}</text><text x="90" y="106" text-anchor="middle" font-size="12" fill="#64748b">รายการ</text></svg><div style="flex:1">${leg}</div></div>`;
-}
-
 /* ============ TOOLS (ทะเบียน) ============ */
 function renderTools(){
   const cats=S.lookups.categories;
