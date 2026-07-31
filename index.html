@@ -483,7 +483,8 @@ function renderDash(){
   T.forEach(t=>byId[t.id]=t);
   const cnt=co=>T.filter(t=>t.company===co).length;
   const val=co=>T.filter(t=>t.company===co).reduce((s,t)=>s+(+t.price||0),0);
-  const pricedN=co=>T.filter(t=>t.company===co&&t.price).length;
+  const realN=co=>T.filter(t=>t.company===co&&t.price&&!t.priceEst).length;
+  const estN=co=>T.filter(t=>t.company===co&&t.priceEst).length;
   const money=n=>n?('฿'+Math.round(n).toLocaleString('th-TH')):'—';
   const dbar=(label,v,max,color)=>`<div class="hbar"><span class="hbl" title="${esc(label)}">${esc(label)}</span><span class="hbt"><i style="width:${max?Math.round(v/max*100):0}%;background:${color}"></i></span><b>${v}</b></div>`;
   // การยืมข้ามบริษัท (ตลอดกาล): ผู้เบิก vs เจ้าของเครื่อง
@@ -538,12 +539,12 @@ function renderDash(){
     <div class="dvs">
       <div class="dvcard" style="border-top:4px solid #16a34a">
         <div class="dvco">🟢 LOTUS</div><div class="dvn" style="color:#16a34a">${cnt('LOTUS')}</div>
-        <div class="dvs2">เครื่องในระบบ · มูลค่าที่กรอก <b>${money(val('LOTUS'))}</b> <span class="muted">(${pricedN('LOTUS')} ตัว)</span></div>
+        <div class="dvs2">เครื่องในระบบ · มูลค่ารวม <b>${money(val('LOTUS'))}</b> <span class="muted">(จริง ${realN('LOTUS')} · ≈ ประมาณ ${estN('LOTUS')})</span></div>
       </div>
       <div class="dvmid">VS</div>
       <div class="dvcard" style="border-top:4px solid #2563eb">
         <div class="dvco">🔵 P-ADVANCE</div><div class="dvn" style="color:#2563eb">${cnt('PAC')}</div>
-        <div class="dvs2">เครื่องในระบบ · มูลค่าที่กรอก <b>${money(val('PAC'))}</b> <span class="muted">(${pricedN('PAC')} ตัว)</span></div>
+        <div class="dvs2">เครื่องในระบบ · มูลค่ารวม <b>${money(val('PAC'))}</b> <span class="muted">(จริง ${realN('PAC')} · ≈ ประมาณ ${estN('PAC')})</span></div>
       </div>
     </div>
     <div class="panel">
