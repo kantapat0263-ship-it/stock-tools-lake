@@ -509,11 +509,16 @@ function renderDash(){
   const moMax=Math.max(1,...months.flatMap(k=>[moD[k]['เบิก'],moD[k]['คืน'],moD[k]['ส่งซ่อม']]));
   const moTH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   const moLabel=k=>moTH[+k.slice(5)-1];
-  // ไซต์: จำนวนเครื่อง + งบ (มูลค่ารวมเฉพาะเครื่องที่กรอกราคา) ที่ถืออยู่ตอนนี้
-  const siteC={},siteV={};
-  T.filter(t=>t.status==='ถูกยืม').forEach(t=>{const s=((t.loc||'').split(' / ')[0]||'').trim()||'(ไม่ระบุ)';siteC[s]=(siteC[s]||0)+1;siteV[s]=(siteV[s]||0)+(+t.price||0);});
+  // ไซต์ (ปัจจุบัน): จำนวนเครื่องที่ถืออยู่ตอนนี้
+  const siteC={};
+  T.filter(t=>t.status==='ถูกยืม').forEach(t=>{const s=((t.loc||'').split(' / ')[0]||'').trim()||'(ไม่ระบุ)';siteC[s]=(siteC[s]||0)+1;});
   const topSite=Object.entries(siteC).sort((a,b)=>b[1]-a[1]).slice(0,6); const siteMax=topSite.length?topSite[0][1]:1;
-  const topSiteV=Object.entries(siteV).filter(([s,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,6); const siteVMax=topSiteV.length?topSiteV[0][1]:1;
+  // งบสะสมรายไซต์: มูลค่าเครื่อง (นับตัวไม่ซ้ำ) ที่เคย "เบิก" ไปไซต์นั้นตลอดโครงการ
+  const priceOf={}; [...T,...(S.disposed||[])].forEach(t=>{priceOf[t.id]=+t.price||0;});
+  const siteSet={};
+  M.filter(m=>m.type==='เบิก'&&!m.isDraft).forEach(m=>{const s=(m.project||'').trim()||'(ไม่ระบุ)';(siteSet[s]=siteSet[s]||new Set()).add(m.tool_id);});
+  const topSiteV=Object.entries(siteSet).map(([s,ids])=>{let v=0;ids.forEach(id=>v+=(priceOf[id]||0));return [s,v];}).filter(([s,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const siteVMax=topSiteV.length?topSiteV[0][1]:1;
 
   const _xb=crossBorrows().filter(x=>!FILTER||x.t.company===FILTER||x.by===FILTER);
   const _lent=(ME&&ME.company)?_xb.filter(x=>x.t.company===ME.company):_xb;
@@ -563,8 +568,9 @@ function renderDash(){
       </div>
     </div>
     <div class="grid2">
-      <div class="panel"><h3>💰 งบเครื่องมือรายไซต์ <span class="muted" style="font-weight:400;font-size:12px">· มูลค่าเฉพาะที่กรอกราคา</span></h3>
-        ${topSiteV.map(([s,v])=>`<div class="hbar"><span class="hbl" title="${esc(s)}">${esc(s)}</span><span class="hbt"><i style="width:${Math.round(v/siteVMax*100)}%;background:#0891b2"></i></span><b style="width:auto;white-space:nowrap">${money(v)}</b></div>`).join('')||'<div class="empty">ยังไม่มีเครื่องที่กรอกราคาอยู่ไซต์</div>'}
+      <div class="panel"><h3>💰 งบเครื่องมือรายไซต์ (สะสม) <span class="muted" style="font-weight:400;font-size:12px">· มูลค่าเครื่องที่เคยเบิกไป · นับตัวไม่ซ้ำ</span></h3>
+        ${topSiteV.map(([s,v])=>`<div class="hbar"><span class="hbl" title="${esc(s)}">${esc(s)}</span><span class="hbt"><i style="width:${Math.round(v/siteVMax*100)}%;background:#0891b2"></i></span><b style="width:auto;white-space:nowrap">${money(v)}</b></div>`).join('')||'<div class="empty">ยังไม่มีข้อมูลการเบิก</div>'}
+        <div class="muted" style="font-size:11px;margin-top:6px">* เครื่องที่ใช้หลายไซต์นับทุกไซต์ · รวมราคาประมาณ</div>
       </div>
       <div class="panel"><h3>📍 ไซต์ที่ถือเครื่องเยอะสุด <span class="muted" style="font-weight:400;font-size:12px">· จำนวน · Top 6</span></h3>
         ${topSite.map(([s,n])=>dbar(s,n,siteMax,'#7c3aed')).join('')||'<div class="empty">ยังไม่มีเครื่องถูกยืม</div>'}
