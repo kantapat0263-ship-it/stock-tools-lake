@@ -311,7 +311,7 @@ function count(st){return S.tools.filter(t=>t.status===st&&inView(t)).length;}
 /* ============ toast ============ */
 let tmo;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tmo);tmo=setTimeout(()=>t.classList.remove('on'),2200);}
 /* ---- data layer (Supabase) ---- */
-function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||''),createdAt:(r.created_at||''),tagged:!!r.tagged,taggedAt:(r.tagged_at||''),model:r.model||'',imageUrl:r.image_url||'',disposed:!!r.disposed,disposedAt:(r.disposed_at||''),disposalNote:r.disposal_note||''};}
+function rowToTool(r){return {id:r.id,company:r.company,cat:r.category||'',no:r.no||'',code:((r.category||'')+' '+(r.no||'')).trim(),name:r.name||'',brand:r.brand||'',sn:r.serial||'',status:r.status||'ว่าง',loc:r.location||'',note:r.note||'',updated:(r.updated_at||'').slice(0,10),repairs:'0',purchaseDate:(r.purchase_date||''),price:(r.price!=null?String(r.price):''),priceEst:!!r.price_estimated,warranty:r.warranty||'',receiptPending:!!r.receipt_pending,pendingDest:r.pending_dest||'',dispatchedAt:(r.dispatched_at||''),createdAt:(r.created_at||''),tagged:!!r.tagged,taggedAt:(r.tagged_at||''),model:r.model||'',imageUrl:r.image_url||'',disposed:!!r.disposed,disposedAt:(r.disposed_at||''),disposalNote:r.disposal_note||''};}
 function modelKey(t){return (t&&t.brand&&t.model)?((t.brand+' '+t.model).toUpperCase().replace(/[^A-Z0-9]+/g,'')):'';}
 let MODELIMG={};
 function toolImgUrl(t){return t.imageUrl||MODELIMG[modelKey(t)]||(modelKey(t)?('/m/'+modelKey(t)+'.png'):'');}
@@ -1041,7 +1041,7 @@ function toolFormFields(t){t=t||{};const _cl=S.lookups.categories||[];const _sl=
     </div>
     <div class="flexrow">
       <div class="field"><label>วันที่ซื้อ</label><input id="ed_pdate" type="date" value="${esc(t.purchaseDate)}"></div>
-      <div class="field"><label>ราคา (บาท)</label><input id="ed_price" type="text" inputmode="decimal" value="${esc(commaFmt(t.price))}" oninput="this.value=commaFmt(this.value)"></div>
+      <div class="field"><label>ราคา (บาท)${(t.priceEst&&t.price)?' <span style="font-size:11px;color:#0891b2">· ตอนนี้เป็นราคาประมาณ (พิมพ์ราคาจริงทับได้)</span>':''}</label><input id="ed_price" type="text" inputmode="decimal" value="${esc(commaFmt(t.price))}" oninput="this.value=commaFmt(this.value)"><div style="margin-top:5px"><button type="button" class="btn" style="padding:4px 10px;font-size:12px" onclick="setPriceForModel('${t.id}')">📋 ใช้ราคานี้กับทุกเครื่องรุ่นเดียวกันที่ยังไม่มีราคาจริง</button></div></div>
       <div class="field"><label>ประกัน</label><input id="ed_warranty" value="${esc(t.warranty)}" placeholder="เช่น ถึง 2027 / 1 ปี"></div>
     </div>
     <div class="field"><label>หมายเหตุ</label><input id="ed_note" value="${esc(t.note)}"></div>
@@ -1102,7 +1102,7 @@ function toolDetail(i){
       <div class="flexrow"><div class="field"><label>หมวด</label><div>${esc(t.cat)}</div></div><div class="field"><label>NO</label><div>${esc(t.no)}</div></div></div>
       <div class="flexrow"><div class="field"><label>S/N</label><div>${esc(t.sn)||'-'}</div></div><div class="field"><label>สถานะ</label><div>${chip(t.status)}</div></div></div>
       <div class="field"><label>อยู่ที่/ผู้ถือ</label><div>${esc(t.loc)||'-'}</div></div>
-      <div class="flexrow"><div class="field"><label>วันที่ซื้อ</label><div>${esc(t.purchaseDate)||'-'}</div></div><div class="field"><label>ราคา</label><div>${esc(t.price)||'-'}</div></div><div class="field"><label>ประกัน</label><div>${esc(t.warranty)||'-'}</div></div></div>
+      <div class="flexrow"><div class="field"><label>วันที่ซื้อ</label><div>${esc(t.purchaseDate)||'-'}</div></div><div class="field"><label>ราคา</label><div>${esc(t.price)||'-'}${(t.priceEst&&t.price)?' <span style="font-size:11px;color:#0891b2;background:#ecfeff;border:1px solid #a5f3fc;border-radius:5px;padding:1px 5px">≈ ประมาณ</span>':''}</div></div><div class="field"><label>ประกัน</label><div>${esc(t.warranty)||'-'}</div></div></div>
       ${histHtml}
       <div class="flexrow" style="margin-top:14px"><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
   }
@@ -1119,13 +1119,28 @@ async function saveTool(i){const t=S.tools[i];
   const nv={company,cat,no,name:$('#ed_name').value.trim(),brand:$('#ed_brand').value.trim(),model:$('#ed_model').value.trim(),sn:$('#ed_sn').value.trim(),status:$('#ed_st').value,loc:(_ss&&_ss!=='ออฟฟิต')?(_ss+(_pp?(' / '+_pp):'')):'ออฟฟิต',note:$('#ed_note').value.trim(),purchaseDate:$('#ed_pdate').value,price:$('#ed_price').value,warranty:$('#ed_warranty').value.trim()};
   const L={company:'บริษัท',cat:'หมวด',no:'NO',name:'ชื่อ',brand:'ยี่ห้อ',model:'รุ่น',sn:'S/N',status:'สถานะ',loc:'อยู่ที่',note:'หมายเหตุ',purchaseDate:'วันที่ซื้อ',price:'ราคา',warranty:'ประกัน'};
   const ch=Object.keys(L).filter(k=>String(t[k]||'')!==String(nv[k]||'')).map(k=>`${L[k]}: ${t[k]||'-'}→${nv[k]||'-'}`);
-  const {error}=await sb.from('tools').update({company:company,category:cat,no:no,name:nv.name,brand:nv.brand,model:nv.model,serial:nv.sn,status:nv.status,location:nv.loc,note:nv.note,purchase_date:nv.purchaseDate||null,price:parsePrice(nv.price),warranty:nv.warranty,updated_at:new Date().toISOString()}).eq('id',t.id);
+  const _np=parsePrice(nv.price), _op=(t.price===''||t.price==null)?null:+t.price;
+  const _pe=(_np!==null&&_np===_op)?!!t.priceEst:false; // ราคาเปลี่ยน/ล้าง = ราคาจริง (ปลดธงประมาณ)
+  const {error}=await sb.from('tools').update({company:company,category:cat,no:no,name:nv.name,brand:nv.brand,model:nv.model,serial:nv.sn,status:nv.status,location:nv.loc,note:nv.note,purchase_date:nv.purchaseDate||null,price:_np,price_estimated:_pe,warranty:nv.warranty,updated_at:new Date().toISOString()}).eq('id',t.id);
   if(error){toast('บันทึกไม่ได้: '+error.message);return;}
   await ensureLookup('categories',cat,company);
   await logAudit('แก้ไข',company,code,ch.length?ch.join(' · '):'แก้ไข (ไม่มีอะไรเปลี่ยน)');
   closeModal();toast('บันทึกแล้ว');await loadAll();
   if(CUR==='tools'&&PG_REDRAW['tools']){const box=document.querySelector('#ttbl .listbox');const y=box?box.scrollTop:0;PG_REDRAW['tools']();requestAnimationFrame(()=>{const box2=document.querySelector('#ttbl .listbox');if(box2)box2.scrollTop=y;});}
   else go('tools');}
+async function setPriceForModel(id){
+  const t=S.tools.find(x=>x.id===id); if(!t){toast('ไม่พบเครื่อง');return;}
+  const p=parsePrice($('#ed_price').value); if(p===null){toast('กรอกราคาก่อน แล้วค่อยกดปุ่มนี้');return;}
+  const norm=x=>x.model?((x.brand||'')+'|'+x.model):((x.cat||'')+'|'+(x.name||''));
+  const key=norm(t);
+  const sibs=S.tools.filter(x=>x.company===t.company&&x.id!==t.id&&norm(x)===key&&(!x.price||x.priceEst));
+  if(!sibs.length){toast('ไม่มีเครื่องรุ่นเดียวกันที่ยังว่าง/เป็นราคาประมาณ');return;}
+  if(!confirm(`ใช้ราคา ฿${p.toLocaleString('th-TH')} กับเครื่อง "${t.model||t.name}" อีก ${sibs.length} ตัว (เฉพาะที่ยังไม่มีราคาจริง)?\n\n• ตัวนี้ = ราคาจริง\n• อีก ${sibs.length} ตัว = ราคาประมาณ (แก้ทีหลังได้)`))return;
+  const now=new Date().toISOString();
+  await sb.from('tools').update({price:p,price_estimated:false,updated_at:now}).eq('id',t.id);
+  for(const s of sibs)await sb.from('tools').update({price:p,price_estimated:true,updated_at:now}).eq('id',s.id);
+  closeModal();toast(`ตั้งราคาให้รุ่นนี้ ${sibs.length+1} ตัวแล้ว`);await loadAll();go('tools');
+}
 async function delTool(i){const t=S.tools[i];
   if(!canEditCo(t.company)){toast('ลบได้เฉพาะบริษัทตัวเอง');return;}
   if(!confirm(`ลบเครื่อง "${t.name}" (${t.code})?\nจะไปอยู่ "ถังขยะ" กู้คืนได้ภายหลัง`))return;
