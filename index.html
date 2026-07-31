@@ -492,9 +492,11 @@ function renderDash(){
   const xAll=(a,b)=>issued.filter(m=>m.company===a&&ownerOf(m)===b).length;
   const xHeld=crossBorrows();
   const heldN=(a,b)=>xHeld.filter(x=>x.by===a&&x.t.company===b).length;
-  // ซ่อมบ่อยสุด (รายเครื่อง)
-  const topRep=[...T].filter(t=>+t.repairs>0).sort((a,b)=>+b.repairs-+a.repairs).slice(0,8);
-  const repMax=topRep.length?+topRep[0].repairs:1;
+  // ซ่อมบ่อยสุด (รายรุ่น = ยี่ห้อ+รุ่น, ถ้าไม่มีรุ่นใช้หมวด) + เฉลี่ยต่อเครื่อง
+  const repM={};
+  T.forEach(t=>{const lbl=(t.model?((t.brand?t.brand+' ':'')+t.model):(t.cat||'(ไม่ระบุ)'));const g=repM[lbl]||(repM[lbl]={rep:0,units:0});g.units++;g.rep+=(+t.repairs||0);});
+  const topModel=Object.entries(repM).filter(([k,v])=>v.rep>0).sort((a,b)=>b[1].rep-a[1].rep).slice(0,8);
+  const repMax=topModel.length?topModel[0][1].rep:1;
   // หมวดยอดนิยม (นับจากการเบิก)
   const catC={}; issued.forEach(m=>{const c=(byId[m.tool_id]&&byId[m.tool_id].cat)||m.cat||'(ไม่ระบุ)';catC[c]=(catC[c]||0)+1;});
   const topCat=Object.entries(catC).sort((a,b)=>b[1]-a[1]).slice(0,7); const catMax=topCat.length?topCat[0][1]:1;
@@ -506,9 +508,11 @@ function renderDash(){
   const moMax=Math.max(1,...months.flatMap(k=>[moD[k]['เบิก'],moD[k]['คืน'],moD[k]['ส่งซ่อม']]));
   const moTH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   const moLabel=k=>moTH[+k.slice(5)-1];
-  // ไซต์ถือเครื่องเยอะสุดตอนนี้
-  const siteC={}; T.filter(t=>t.status==='ถูกยืม').forEach(t=>{const s=((t.loc||'').split(' / ')[0]||'').trim()||'(ไม่ระบุ)';siteC[s]=(siteC[s]||0)+1;});
+  // ไซต์: จำนวนเครื่อง + งบ (มูลค่ารวมเฉพาะเครื่องที่กรอกราคา) ที่ถืออยู่ตอนนี้
+  const siteC={},siteV={};
+  T.filter(t=>t.status==='ถูกยืม').forEach(t=>{const s=((t.loc||'').split(' / ')[0]||'').trim()||'(ไม่ระบุ)';siteC[s]=(siteC[s]||0)+1;siteV[s]=(siteV[s]||0)+(+t.price||0);});
   const topSite=Object.entries(siteC).sort((a,b)=>b[1]-a[1]).slice(0,6); const siteMax=topSite.length?topSite[0][1]:1;
+  const topSiteV=Object.entries(siteV).filter(([s,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,6); const siteVMax=topSiteV.length?topSiteV[0][1]:1;
 
   const _xb=crossBorrows().filter(x=>!FILTER||x.t.company===FILTER||x.by===FILTER);
   const _lent=(ME&&ME.company)?_xb.filter(x=>x.t.company===ME.company):_xb;
@@ -530,9 +534,6 @@ function renderDash(){
     <p class="muted" style="margin:6px 0 0;font-size:12.5px">🔴 ถูกยืมค้างไซต์ ${_dorm.filter(x=>x.t.status==='ถูกยืม').length} (เสี่ยงหาย) · 🟠 ว่างนอนสโตร์ ${_dorm.filter(x=>x.t.status==='ว่าง').length} (พิจารณาขายซาก) · ⚙️ ค้างซ่อม ${_dorm.filter(x=>x.t.status==='ส่งซ่อม').length}</p>
   </div>`:'';
   $('#view').innerHTML=`
-    ${pendAlert}
-    ${dormAlert}
-    ${notif}
     <div style="font-size:11px;letter-spacing:.5px;color:#64748b;text-transform:uppercase;font-weight:600;margin:2px 0 10px">📊 ภาพรวมวิเคราะห์ · ทั้ง 2 บริษัท</div>
     <div class="dvs">
       <div class="dvcard" style="border-top:4px solid #16a34a">
@@ -553,11 +554,19 @@ function renderDash(){
       </div>
     </div>
     <div class="grid2">
-      <div class="panel"><h3>🔧 เครื่องที่ซ่อมบ่อยสุด <span class="muted" style="font-weight:400;font-size:12px">· ครั้งซ่อม</span></h3>
-        ${topRep.map((t,i)=>dbar(((t.name||'').slice(0,22)||t.code)+' · '+t.no, +t.repairs, repMax, i<2?'#dc2626':i<4?'#ea580c':'#f59e0b')).join('')||'<div class="empty">ยังไม่มีข้อมูลซ่อม</div>'}
+      <div class="panel"><h3>🔧 รุ่นที่ซ่อมบ่อยสุด <span class="muted" style="font-weight:400;font-size:12px">· รวมครั้ง · เฉลี่ย/เครื่อง</span></h3>
+        ${topModel.map(([lbl,v],i)=>`<div class="hbar"><span class="hbl" title="${esc(lbl)}">${esc(lbl)}</span><span class="hbt"><i style="width:${Math.round(v.rep/repMax*100)}%;background:${i<2?'#dc2626':i<4?'#ea580c':'#f59e0b'}"></i></span><b style="width:auto;white-space:nowrap">${v.rep}<small style="font-weight:400;color:#94a3b8"> · ${(v.rep/v.units).toFixed(1)}/ตัว</small></b></div>`).join('')||'<div class="empty">ยังไม่มีข้อมูลซ่อม</div>'}
       </div>
       <div class="panel"><h3>📦 หมวดที่ถูกเบิกบ่อยสุด <span class="muted" style="font-weight:400;font-size:12px">· ครั้งเบิก</span></h3>
         ${topCat.map(([c,n],i)=>dbar(c,n,catMax,i===0?'#2563eb':i<3?'#3b82f6':'#60a5fa')).join('')||'<div class="empty">ยังไม่มีข้อมูลเบิก</div>'}
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h3>💰 งบเครื่องมือรายไซต์ <span class="muted" style="font-weight:400;font-size:12px">· มูลค่าเฉพาะที่กรอกราคา</span></h3>
+        ${topSiteV.map(([s,v])=>`<div class="hbar"><span class="hbl" title="${esc(s)}">${esc(s)}</span><span class="hbt"><i style="width:${Math.round(v/siteVMax*100)}%;background:#0891b2"></i></span><b style="width:auto;white-space:nowrap">${money(v)}</b></div>`).join('')||'<div class="empty">ยังไม่มีเครื่องที่กรอกราคาอยู่ไซต์</div>'}
+      </div>
+      <div class="panel"><h3>📍 ไซต์ที่ถือเครื่องเยอะสุด <span class="muted" style="font-weight:400;font-size:12px">· จำนวน · Top 6</span></h3>
+        ${topSite.map(([s,n])=>dbar(s,n,siteMax,'#7c3aed')).join('')||'<div class="empty">ยังไม่มีเครื่องถูกยืม</div>'}
       </div>
     </div>
     <div class="panel">
@@ -565,10 +574,10 @@ function renderDash(){
       <div class="months">${months.map(k=>`<div class="mo"><div class="cols"><i style="height:${Math.round(moD[k]['เบิก']/moMax*100)}%;background:#2563eb" title="เบิก ${moD[k]['เบิก']}"></i><i style="height:${Math.round(moD[k]['คืน']/moMax*100)}%;background:#16a34a" title="คืน ${moD[k]['คืน']}"></i><i style="height:${Math.round(moD[k]['ส่งซ่อม']/moMax*100)}%;background:#64748b" title="ส่งซ่อม ${moD[k]['ส่งซ่อม']}"></i></div><span>${moLabel(k)}</span></div>`).join('')}</div>
       <div class="mleg"><span><i style="background:#2563eb"></i>เบิก</span><span><i style="background:#16a34a"></i>คืน</span><span><i style="background:#64748b"></i>ส่งซ่อม</span></div>
     </div>
-    <div class="panel">
-      <h3>📍 ไซต์ที่ถือเครื่องเยอะสุดตอนนี้ <span class="muted" style="font-weight:400;font-size:12px">· Top 6</span></h3>
-      ${topSite.map(([s,n])=>dbar(s,n,siteMax,'#7c3aed')).join('')||'<div class="empty">ยังไม่มีเครื่องถูกยืม</div>'}
-    </div>
+    ${(pendAlert||dormAlert||notif)?'<div style="font-size:11px;letter-spacing:.5px;color:#64748b;text-transform:uppercase;font-weight:600;margin:18px 0 10px;border-top:1px solid var(--line);padding-top:14px">⚠️ ต้องจับตา</div>':''}
+    ${pendAlert}
+    ${dormAlert}
+    ${notif}
     <style>
     .dvs{display:flex;gap:0;margin-bottom:14px}
     .dvcard{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;text-align:center}
