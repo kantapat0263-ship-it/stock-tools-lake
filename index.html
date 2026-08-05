@@ -2289,6 +2289,7 @@ function showScanTool(t){
     actions=`<span class="muted" style="font-size:13px">เครื่องนี้อยู่ออฟฟิตแล้ว — ไม่ต้องรับคืน</span>`;
   }else{
     statusLine=`<span style="background:#e2e8f0;color:#475569;padding:3px 10px;border-radius:8px;font-size:13px">${esc(t.status)}</span>`;
+    if(t.status==='รอส่งซ่อม'&&inRepairDraft(t))actions=`<span class="muted" style="font-size:13px">📝 อยู่ในใบร่างซ่อมแล้ว — ออกใบจริงที่ ประวัติ → ใบร่าง</span>`;
   }
   $('#scanResult').innerHTML=`<div class="panel" style="border-left:4px solid var(--blue)">
     <div style="display:flex;align-items:center;gap:8px"><b style="font-size:18px">${esc(t.code)}</b> ${coBadge(t.company)}</div>
