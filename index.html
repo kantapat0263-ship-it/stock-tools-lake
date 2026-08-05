@@ -2302,15 +2302,25 @@ async function scanWrite(t,upd,mv,msg){
 async function scanReceiveSite(){ const t=scanTool; if(!t)return;
   await scanWrite(t,{status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null},{type:'คืน',project:'ออฟฟิต',actor:(ME&&ME.email)||''},'📥 รับคืน '+t.code+' เข้าออฟฟิตแล้ว');
 }
-async function scanReceiveBrokenPC(){ const t=scanTool; if(!t)return;
-  const _r=window.prompt('อาการ/สาเหตุ (ไม่บังคับ — กด OK เพื่อเก็บเข้าร่าง):','');
-  if(_r===null)return; const reason=_r.trim();
+function scanReceiveBrokenPC(){ const t=scanTool; if(!t)return;
+  openModal(`<h3>🔧 รับคืนเครื่องเสีย → เข้าร่างใบซ่อม</h3>
+    <p class="muted" style="font-size:13px">${esc(t.code)} · ${esc((t.name||'').slice(0,40))} · จาก ${esc(t.loc)||'-'}</p>
+    <div style="background:#f0fdf4;border-left:3px solid #16a34a;padding:8px 11px;border-radius:8px;font-size:12.5px;margin:8px 0">ระบบจะบันทึก <b>"คืนจากไซต์"</b> ตามวันที่เลือก (ใบเบิกติ๊กคืน — เคลียร์ว่าไซต์คืนแล้ว) แล้วเก็บเครื่องเข้า<b>ร่างใบซ่อม</b>ต่อทันที</div>
+    <div class="flexrow"><div class="field"><label>วันที่คืนจริงจากไซต์ (ย้อนหลังได้)</label><input type="date" id="sbk_date" value="${today()}"></div></div>
+    <div class="field"><label>อาการ / สาเหตุ (ไม่บังคับ)</label><input id="sbk_reason" placeholder="เช่น สายขาด เปิดไม่ติด"></div>
+    <div class="flexrow" style="margin-top:14px"><button class="btn primary" onclick="doScanReceiveBrokenPC()">💾 บันทึก คืน + เข้าร่างซ่อม</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
+}
+async function doScanReceiveBrokenPC(){ const t=scanTool; if(!t)return;
+  const rdate=$('#sbk_date').value||today(), reason=$('#sbk_reason').value.trim();
   const site=((t.loc||'').split('/')[0]||'').trim();
   const co=(ME&&ME.role==='admin')?t.company:COMPANY;
+  // 1) หลักฐานคืนจากไซต์ (ปิดรายการในใบเบิก — ไซต์ไม่ค้างแล้ว)
+  await sb.from('movements').insert({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:rdate,type:'คืน',project:'ออฟฟิต',actor:(ME&&ME.email)||'',note:'คืนจากไซต์ (เครื่องเสีย)'+(site?' — '+site:'')});
+  // 2) เก็บเข้าร่างใบซ่อม
   await sb.from('tools').update({status:'ส่งซ่อม',location:'ร้านซ่อม',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:new Date().toISOString()}).eq('id',t.id);
   await sb.from('movements').insert({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:today(),type:'ส่งซ่อม',actor:'',counterparty:'',reason,project:(site&&site!=='ออฟฟิต')?site:null,is_draft:true});
-  toast('🔧 '+t.code+' เก็บเข้าร่างใบซ่อมแล้ว — ออกใบจริงที่ ประวัติ → ใบร่าง');
-  await loadAll(); scanDone(t,'เก็บเข้าร่างใบซ่อมแล้ว');
+  closeModal(); toast('🔧 '+t.code+' บันทึกคืน ('+fmtDateTH(rdate)+') + เข้าร่างใบซ่อมแล้ว');
+  await loadAll(); scanDone(t,'คืนจากไซต์ + เข้าร่างใบซ่อมแล้ว');
 }
 async function scanReceiveRepair(){ const t=scanTool; if(!t)return;
   const m=[...S.movements].reverse().find(x=>x.tool_id===t.id&&x.type==='ส่งซ่อม'); const slipN=m?m.slipNo:null;
