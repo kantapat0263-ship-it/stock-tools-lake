@@ -2272,7 +2272,8 @@ function showScanTool(t){
   let statusLine='', actions='';
   if(t.status==='ถูกยืม'){
     statusLine=`<span style="background:#dbeafe;color:#1d4ed8;padding:3px 10px;border-radius:8px;font-size:13px">📍 อยู่ ${esc(t.loc)||'ไซต์งาน'}</span>`;
-    actions=`<button class="btn green" onclick="scanReceiveSite()">📥 รับคืนเข้าออฟฟิต</button>`;
+    actions=`<button class="btn green" onclick="scanReceiveSite()">📥 เครื่องดี → รับคืนเข้าออฟฟิต (ว่าง)</button>
+      <button class="btn" style="background:#fef3c7;color:#92400e" onclick="scanReceiveBrokenPC()">🔧 เครื่องเสีย → เก็บเข้าร่างใบซ่อม</button>`;
   }else if(t.status==='ส่งซ่อม'){
     statusLine=`<span style="background:#e2e8f0;color:#475569;padding:3px 10px;border-radius:8px;font-size:13px">⚙️ อยู่ร้านซ่อม</span>`;
     actions=`<button class="btn green" onclick="scanReceiveRepair()">📥 รับคืนจากซ่อม</button>`;
@@ -2300,6 +2301,16 @@ async function scanWrite(t,upd,mv,msg){
 }
 async function scanReceiveSite(){ const t=scanTool; if(!t)return;
   await scanWrite(t,{status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null},{type:'คืน',project:'ออฟฟิต',actor:(ME&&ME.email)||''},'📥 รับคืน '+t.code+' เข้าออฟฟิตแล้ว');
+}
+async function scanReceiveBrokenPC(){ const t=scanTool; if(!t)return;
+  const _r=window.prompt('อาการ/สาเหตุ (ไม่บังคับ — กด OK เพื่อเก็บเข้าร่าง):','');
+  if(_r===null)return; const reason=_r.trim();
+  const site=((t.loc||'').split('/')[0]||'').trim();
+  const co=(ME&&ME.role==='admin')?t.company:COMPANY;
+  await sb.from('tools').update({status:'ส่งซ่อม',location:'ร้านซ่อม',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:new Date().toISOString()}).eq('id',t.id);
+  await sb.from('movements').insert({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:today(),type:'ส่งซ่อม',actor:'',counterparty:'',reason,project:(site&&site!=='ออฟฟิต')?site:null,is_draft:true});
+  toast('🔧 '+t.code+' เก็บเข้าร่างใบซ่อมแล้ว — ออกใบจริงที่ ประวัติ → ใบร่าง');
+  await loadAll(); scanDone(t,'เก็บเข้าร่างใบซ่อมแล้ว');
 }
 async function scanReceiveRepair(){ const t=scanTool; if(!t)return;
   const m=[...S.movements].reverse().find(x=>x.tool_id===t.id&&x.type==='ส่งซ่อม'); const slipN=m?m.slipNo:null;
