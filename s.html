@@ -222,10 +222,12 @@ async function actReceiveSite(){
 async function actReceiveBroken(){
   const reason=noteVal()||'',prev=snapTool(TOOL),co=(ME.role==='admin')?TOOL.company:ME.company;
   const site=((TOOL.location||'').split('/')[0]||'').trim();
+  // หลักฐานคืนจากไซต์ก่อน (ใบเบิกติ๊กคืน — ไซต์ไม่ค้าง) แล้วค่อยเข้าร่างซ่อม
+  const {data:insR}=await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'คืน',project:'ออฟฟิต',actor:(ME.fullName||ME.email),note:'คืนจากไซต์ (เครื่องเสีย)'+(site&&site!=='ออฟฟิต'?' — '+site:'')}).select('id').maybeSingle();
   await sb.from('tools').update({status:'ส่งซ่อม',location:'ร้านซ่อม',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:now()}).eq('id',TOOL.id);
   const {data:ins}=await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'ส่งซ่อม',actor:'',counterparty:'',reason,project:(site&&site!=='ออฟฟิต')?site:null,is_draft:true}).select('id').maybeSingle();
-  LAST={label:'เก็บเข้าร่างใบซ่อม',toolId:TOOL.id,name:(TOOL.no||TOOL.name||''),prevTool:prev,movId:ins&&ins.id,slip:null};
-  afterAction('🔧 เก็บเข้าร่างใบซ่อมแล้ว — ออกใบจริงที่ออฟฟิศ (ประวัติ → ใบร่าง)');
+  LAST={label:'เก็บเข้าร่างใบซ่อม',toolId:TOOL.id,name:(TOOL.no||TOOL.name||''),prevTool:prev,movId:ins&&ins.id,movId2:insR&&insR.id,slip:null};
+  afterAction('🔧 บันทึกคืนจากไซต์ + เก็บเข้าร่างใบซ่อมแล้ว — ออกใบจริงที่ออฟฟิศ');
 }
 async function actReceiveRepair(){
   const note=noteVal(),prev=snapTool(TOOL),co=(ME.role==='admin')?TOOL.company:ME.company;
@@ -279,6 +281,7 @@ async function undoLast(){
   const L=LAST; LAST=null;
   await sb.from('tools').update(Object.assign({updated_at:now()},L.prevTool)).eq('id',L.toolId);
   if(L.movId)await sb.from('movements').delete().eq('id',L.movId);
+  if(L.movId2)await sb.from('movements').delete().eq('id',L.movId2);
   if(L.slip)await sb.from('repair_slips').update(L.slip.prev).eq('company',L.slip.company).eq('slip_no',L.slip.slip_no);
   toast('↩️ ยกเลิกรายการแล้ว — คืนสถานะเดิม');
   location.replace('/s.html?t='+L.toolId);
