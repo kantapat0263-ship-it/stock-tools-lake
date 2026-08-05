@@ -1209,7 +1209,7 @@ let selRepair=new Set(),rRsn={},rPj={};
 function renderRepair(){
   selRepair=new Set();rRsn={};rPj={};
   const dCo=rDraft?rDraft.company:COMPANY;
-  const eligible=S.tools.filter(t=>['ว่าง','ชำรุด','รอส่งซ่อม'].includes(t.status)&&inView(t));
+  const eligible=S.tools.filter(t=>['ว่าง','ชำรุด','รอส่งซ่อม'].includes(t.status)&&inView(t)&&!inRepairDraft(t));
   $('#view').innerHTML=`
    <div class="panel" id="rform" style="display:none;position:sticky;top:10px;z-index:5;box-shadow:0 6px 16px rgba(0,0,0,.10)">
     ${rDraft?`<div class="note" style="margin:0 0 8px;background:#fef9c3;border:1px solid #fde047;padding:7px 11px;border-radius:8px;font-size:13px">📝 กำลังเพิ่มเครื่องเข้า<b>ใบร่างซ่อม</b>: ${coBadge(rDraft.company)} ร้าน ${esc(rDraft.vendor)||'-'} · กด "เพิ่มเข้าใบร่างนี้" &nbsp;<button type="button" class="btn" style="padding:1px 9px" onclick="rDraft=null;renderRepair()">ออกจากโหมดร่าง</button></div>`:''}
@@ -1289,7 +1289,8 @@ async function saveRepairDraft(){
   const co=($('#r_co')?$('#r_co').value:COMPANY)||COMPANY;
   const date=$('#r_date').value,vendor=$('#r_vendor').value.trim(),sender=$('#r_sender').value.trim();
   const sel=[...selRepair].map(ix=>S.tools[ix]);
-  for(const t of sel){await sb.from('tools').update({status:'ส่งซ่อม',location:vendor||'ร้านซ่อม',updated_at:new Date().toISOString()}).eq('id',t.id);}
+  // เข้าร่าง = ยังไม่ได้ส่งจริง → "รอส่งซ่อม" อยู่ออฟฟิต (จะเป็น "ส่งซ่อม" ตอนออกใบจริง)
+  for(const t of sel){await sb.from('tools').update({status:'รอส่งซ่อม',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',t.id);}
   await sb.from('movements').insert(sel.map(t=>({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'ส่งซ่อม',actor:sender,counterparty:vendor,reason:(rRsn[t.i]||'').trim(),project:(rPj[t.i]||'').trim()||null,is_draft:true})));
   await ensureLookup('vendors',vendor);await ensureLookup('people',sender);
   rDraft={company:co,vendor,sender,date};
@@ -1859,10 +1860,14 @@ async function cancelDraft(i){
     if(t.status==='ถูกยืม')await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:new Date().toISOString()}).eq('id',t.id);}
   toast(`ยกเลิกใบร่างแล้ว — ${b.tools.length} เครื่องกลับเป็นว่าง`);await loadAll();go('history');
 }
+function inRepairDraft(t){ // เครื่องกำลังอยู่ในใบร่างซ่อม (ส่งซ่อมล่าสุดยังเป็นร่าง)
+  const mv=S.movements.filter(m=>m.tool_id===t.id&&m.type==='ส่งซ่อม').sort((a,b)=>String((a.date||'')+(a.createdAt||'')).localeCompare(String((b.date||'')+(b.createdAt||'')))).pop();
+  return !!(mv&&mv.isDraft);
+}
 function repairDrafts(){
   const groups={};
   S.tools.forEach(t=>{
-    if(t.status!=='ส่งซ่อม')return;
+    if(t.status!=='รอส่งซ่อม'&&t.status!=='ส่งซ่อม')return; // ส่งซ่อม = ร่างเก่าก่อนเปลี่ยนกติกา
     const mv=S.movements.filter(m=>m.tool_id===t.id&&m.type==='ส่งซ่อม').sort((a,b)=>String((a.date||'')+(a.createdAt||'')).localeCompare(String((b.date||'')+(b.createdAt||'')))).pop();
     if(!mv||!mv.isDraft)return;
     const co=mv.company,date=mv.date,vendor=mv.vendor,sender=mv.actor;
@@ -1886,6 +1891,8 @@ async function issueRepairDraft(i){
   const sres=await sb.from('repair_slips').insert({company:b.company,slip_no:slipN,sent_date:b.date||null,vendor:b.vendor,project:'',sender:b.sender,status:'ส่งแล้ว'});
   if(sres.error){toast('ออกใบไม่ได้: '+sres.error.message);return;}
   for(const mid of b.movIds){if(mid)await sb.from('movements').update({slip_no:slipN,is_draft:false}).eq('id',mid);}
+  // ออกใบจริงแล้ว → เครื่องออกไปร้านซ่อมจริง
+  for(const t of b.tools)await sb.from('tools').update({status:'ส่งซ่อม',location:b.vendor||'ร้านซ่อม',updated_at:new Date().toISOString()}).eq('id',t.id);
   rDraft=null;
   const items=b.tools.map(t=>({t,reason:t.reason||'',project:t.project||''}));
   $('#printArea').innerHTML=repairDocHtml(String(slipN).padStart(3,'0'),b.date,b.vendor,b.sender,items,b.company);printNow(true);
@@ -1896,7 +1903,7 @@ async function cancelRepairDraft(i){
   if(!confirm(`ยกเลิกใบร่างซ่อม ${b.company} ร้าน ${b.vendor||'-'} (${b.tools.length} เครื่อง)?\nเครื่องทั้งหมดจะกลับเป็น "ว่าง"`))return;
   for(let j=0;j<b.tools.length;j++){const t=b.tools[j],mid=b.movIds[j];
     if(mid)await sb.from('movements').update({deleted:true}).eq('id',mid);
-    if(t.status==='ส่งซ่อม')await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',t.id);}
+    if(t.status==='ส่งซ่อม'||t.status==='รอส่งซ่อม')await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',t.id);}
   toast(`ยกเลิกใบร่างซ่อมแล้ว — ${b.tools.length} เครื่องกลับเป็นว่าง`);await loadAll();go('history');
 }
 function editRepairDraftForm(i){
@@ -1924,7 +1931,7 @@ async function saveRepairDraftEdit(i){
     const rm=document.querySelector(`[data-rrm="${j}"]`);
     if(rm&&rm.checked){
       if(mid)await sb.from('movements').update({deleted:true}).eq('id',mid);
-      if(t.status==='ส่งซ่อม')await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',t.id);
+      if(t.status==='ส่งซ่อม'||t.status==='รอส่งซ่อม')await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',t.id);
       continue;}
     const rs=document.querySelector(`[data-rrs="${j}"]`),rp=document.querySelector(`[data-rrp="${j}"]`);
     if(mid)await sb.from('movements').update({occurred_on:date||null,counterparty:vendor,actor:sender,reason:(rs?rs.value.trim():'')||'',project:(rp?rp.value.trim():'')||null}).eq('id',mid);
@@ -2124,7 +2131,7 @@ function slipDetail(slipNo,co){
 function editSlipForm(slipNo,co){
   const s=S.slips.find(x=>x.slip_no===slipNo&&x.company===co); if(!s){toast('ไม่พบใบ');return;}
   const sent=S.movements.filter(m=>m.slipNo===slipNo&&m.company===co&&m.type==='ส่งซ่อม');
-  const elig=S.tools.filter(t=>['ว่าง','ชำรุด','รอส่งซ่อม'].includes(t.status)&&inView(t));
+  const elig=S.tools.filter(t=>['ว่าง','ชำรุด','รอส่งซ่อม'].includes(t.status)&&inView(t)&&!inRepairDraft(t));
   window._es={slipNo,co,movs:sent};
   const ven=S.lookups.vendors.slice(); if(s.vendor&&!ven.includes(s.vendor))ven.unshift(s.vendor);
   const peo=S.lookups.people.slice(); if(s.sender&&!peo.includes(s.sender))peo.unshift(s.sender);
@@ -2316,8 +2323,8 @@ async function doScanReceiveBrokenPC(){ const t=scanTool; if(!t)return;
   const co=(ME&&ME.role==='admin')?t.company:COMPANY;
   // 1) หลักฐานคืนจากไซต์ (ปิดรายการในใบเบิก — ไซต์ไม่ค้างแล้ว)
   await sb.from('movements').insert({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:rdate,type:'คืน',project:'ออฟฟิต',actor:(ME&&ME.email)||'',note:'คืนจากไซต์ (เครื่องเสีย)'+(site?' — '+site:'')});
-  // 2) เก็บเข้าร่างใบซ่อม
-  await sb.from('tools').update({status:'ส่งซ่อม',location:'ร้านซ่อม',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:new Date().toISOString()}).eq('id',t.id);
+  // 2) เก็บเข้าร่างใบซ่อม — ยังไม่ส่งจริง → "รอส่งซ่อม" อยู่ออฟฟิต
+  await sb.from('tools').update({status:'รอส่งซ่อม',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:new Date().toISOString()}).eq('id',t.id);
   await sb.from('movements').insert({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:today(),type:'ส่งซ่อม',actor:'',counterparty:'',reason,project:(site&&site!=='ออฟฟิต')?site:null,is_draft:true});
   closeModal(); toast('🔧 '+t.code+' บันทึกคืน ('+fmtDateTH(rdate)+') + เข้าร่างใบซ่อมแล้ว');
   await loadAll(); scanDone(t,'คืนจากไซต์ + เข้าร่างใบซ่อมแล้ว');
