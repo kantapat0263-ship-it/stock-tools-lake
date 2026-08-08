@@ -1642,8 +1642,10 @@ async function saveDraft(){
   if(!who||!proj){toast('กรุณากรอก ผู้เบิก + โครงการ/ไซต์ ให้ครบ');return;}
   const items=[...selBor].map(ix=>Object.assign({},S.tools[ix],{pr:(borPR[ix]||'').trim(),note:(borNote[ix]||'').trim()}));
   for(const t of items){
-    await sb.from('tools').update({status:'ถูกยืม',location:(proj||'')+(who?' / '+who:''),receipt_pending:true,pending_dest:proj,dispatched_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',t.id);
-    await sb.from('movements').insert({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'เบิก',project:proj,actor:who,pr_no:t.pr||null,note:t.note||null,is_draft:true});
+    const u=await sb.from('tools').update({status:'ถูกยืม',location:(proj||'')+(who?' / '+who:''),receipt_pending:true,pending_dest:proj,dispatched_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',t.id);
+    if(u.error){toast('❌ เก็บร่างไม่สำเร็จ (อัปเดตเครื่อง '+esc(t.no||t.code)+'): '+u.error.message);return;}
+    const ins=await sb.from('movements').insert({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'เบิก',project:proj,actor:who,pr_no:t.pr||null,note:t.note||null,is_draft:true});
+    if(ins.error){toast('❌ เก็บร่างไม่สำเร็จ (บันทึกรายการ '+esc(t.no||t.code)+'): '+ins.error.message);return;}
   }
   await ensureLookup('people',who);await ensureLookup('projects',proj);
   borDraft={company:co,who,project:proj,date};
