@@ -621,29 +621,34 @@ function renderTools(){
       <select id="fst"><option value="">ทุกสถานะ</option>${Object.keys(STC).map(s=>`<option>${s}</option>`).join('')}</select>
       <select id="fsite"><option value="">ทุกไซต์</option>${sites.map(s=>`<option>${esc(s)}</option>`).join('')}</select>
       <select id="fsort"><option value="">เรียง: ปกติ</option><option value="new" selected>🆕 เพิ่มล่าสุด</option><option value="old">เพิ่มเก่าสุด</option></select>
+      <button class="btn" id="fnoprice" title="แสดงเฉพาะเครื่องที่ยังไม่ได้ใส่ราคา">💰 ยังไม่ใส่ราคา</button>
       <button class="btn primary" onclick="addTool()">➕ เพิ่มเครื่องใหม่</button>
       <span class="muted" id="tcount"></span>
     </div>
     <div id="ttbl"></div>
    </div>`;
+  let noPriceOnly=false;
   const draw=()=>{
     const q=$('#tq').value.trim().toLowerCase(),fc=$('#fcat').value,fs=$('#fst').value,so=$('#fsort').value,fsite=$('#fsite').value;
     let rows=S.tools.filter(t=>{
       if(!inView(t))return false;
       if(fc&&t.cat!==fc)return false; if(fs&&t.status!==fs)return false; if(fsite&&siteOf(t)!==fsite)return false;
+      if(noPriceOnly&&t.price)return false;
       if(q){const h=(t.code+' '+t.name+' '+t.no+' '+t.sn+' '+t.model+' '+t.brand).toLowerCase();if(!h.includes(q))return false;}
       return true;});
     if(so==='new')rows=[...rows].sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
     else if(so==='old')rows=[...rows].sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt)));
-    $('#tcount').textContent=`${rows.length} เครื่อง`;
+    const npAll=S.tools.filter(t=>inView(t)&&!t.price).length;
+    $('#tcount').innerHTML=`${rows.length} เครื่อง${npAll?` · <span style="color:#d97706">💰 ยังไม่ใส่ราคา ${npAll} ตัว</span>`:''}`;
     const pg=pgSlice('tools',rows);
     $('#ttbl').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th></th><th>บริษัท</th><th>ชื่อ</th><th>ยี่ห้อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th><th>ที่อยู่</th></tr></thead><tbody>${
-      pg.rows.map(t=>`<tr style="cursor:pointer" onclick="toolDetail(${t.i})"><td class="thumbcell">${toolThumb(t)}</td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.brand)||'-'}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td><td>${esc((t.loc||'').split(' / ')[0])||'-'}</td></tr>`).join('')||'<tr><td colspan=10 class="empty">ไม่พบ</td></tr>'
+      pg.rows.map(t=>`<tr style="cursor:pointer" onclick="toolDetail(${t.i})"><td class="thumbcell">${toolThumb(t)}</td><td>${coBadge(t.company)}</td><td>${esc(t.name)}${!t.price?' <span title="ยังไม่ได้ใส่ราคา" style="color:#d97706;background:#fffbeb;border:1px solid #fde68a;border-radius:5px;padding:0 5px;font-size:10.5px;white-space:nowrap">฿ ยังไม่ใส่</span>':(t.priceEst?' <span title="ราคาประมาณ" style="color:#0891b2;font-size:11px">≈</span>':'')}</td><td>${esc(t.brand)||'-'}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td><td>${esc((t.loc||'').split(' / ')[0])||'-'}</td></tr>`).join('')||'<tr><td colspan=10 class="empty">ไม่พบ</td></tr>'
     }</tbody></table></div>${pg.html}`;
   };
   PG_REDRAW['tools']=draw;
   const td=()=>{pgReset('tools');draw();};
-  $('#tq').oninput=td;$('#fcat').onchange=td;$('#fst').onchange=td;$('#fsite').onchange=td;$('#fsort').onchange=td;draw();
+  $('#tq').oninput=td;$('#fcat').onchange=td;$('#fst').onchange=td;$('#fsite').onchange=td;$('#fsort').onchange=td;
+  $('#fnoprice').onclick=()=>{noPriceOnly=!noPriceOnly;$('#fnoprice').classList.toggle('primary',noPriceOnly);td();};draw();
 }
 /* ============ ของตามไซต์ ============ */
 function siteOf(t){if(t.status!=='ถูกยืม')return '';const s=(t.pendingDest||(t.loc||'').split('/')[0]||'').trim();return (s&&s!=='ออฟฟิต')?s:'';}
