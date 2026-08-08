@@ -1,5 +1,5 @@
 // Service worker — LOTUS GROUP STOCK (network-first; HTML ดึงสดเสมอ, cache shell ไว้ใช้ตอนออฟไลน์)
-const CACHE = 'lg-stock-v3';
+const CACHE = 'lg-stock-v4';
 const SHELL = ['/', '/index.html', '/s.html', '/guide.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
