@@ -519,6 +519,19 @@ function renderDash(){
   M.filter(m=>m.type==='เบิก'&&!m.isDraft).forEach(m=>{const s=(m.project||'').trim()||'(ไม่ระบุ)';(siteSet[s]=siteSet[s]||new Set()).add(m.tool_id);});
   const topSiteV=Object.entries(siteSet).map(([s,ids])=>{let v=0;ids.forEach(id=>v+=(priceOf[id]||0));return [s,v];}).filter(([s,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const siteVMax=topSiteV.length?topSiteV[0][1]:1;
+  // ประหยัดงบจากยืมข้ามบริษัท: มูลค่าเครื่องของอีกฝั่งที่หยิบไปใช้ (นับตัวไม่ซ้ำ = แทนการซื้อ)
+  const sideTools={'PAC':new Set(),'LOTUS':new Set()}, siteSav={};
+  issued.forEach(m=>{const own=ownerOf(m),bor=m.company; if(!own||!bor||own===bor||!sideTools[bor])return;
+    sideTools[bor].add(m.tool_id);
+    const s=(m.project||'').trim()||'(ไม่ระบุ)', k=bor+''+s;
+    (siteSav[k]=siteSav[k]||{bor,site:s,tools:new Set()}).tools.add(m.tool_id);});
+  const _sumSet=set=>{let v=0;set.forEach(id=>v+=(priceOf[id]||0));return v;};
+  const sideSav=co=>({n:sideTools[co].size,thb:_sumSet(sideTools[co])});
+  const pacSav=sideSav('PAC'), lotSav=sideSav('LOTUS'), groupSav=pacSav.thb+lotSav.thb;
+  const savSites=Object.values(siteSav).map(o=>({bor:o.bor,site:o.site,n:o.tools.size,thb:_sumSet(o.tools)})).sort((a,b)=>b.thb-a.thb);
+  window._savSites=savSites;
+  const topSavOf=co=>savSites.filter(s=>s.bor===co)[0];
+  const bht=n=>'~฿'+Math.round(n).toLocaleString('th-TH');
 
   const _xb=crossBorrows().filter(x=>!FILTER||x.t.company===FILTER||x.by===FILTER);
   const _lent=(ME&&ME.company)?_xb.filter(x=>x.t.company===ME.company):_xb;
@@ -553,10 +566,14 @@ function renderDash(){
       </div>
     </div>
     <div class="panel">
-      <h3 style="margin:0 0 10px">⚔️ ใครยืมของใคร (ตลอดกาล)</h3>
+      <h3 style="margin:0 0 10px">⚔️ ใครยืมของใคร (ตลอดกาล) <span class="muted" style="font-weight:400;font-size:12px">· แชร์ของช่วยกัน = ประหยัดค่าซื้อ</span></h3>
       <div class="steal2">
-        <div class="stealb"><b>PAC → ยืมของ LOTUS</b><span class="sbig" style="color:#dc2626">${xAll('PAC','LOTUS')} ครั้ง</span><small>ตอนนี้ยังค้างที่ PAC <b>${heldN('PAC','LOTUS')}</b> เครื่อง</small></div>
-        <div class="stealb"><b>LOTUS → ยืมของ PAC</b><span class="sbig" style="color:#16a34a">${xAll('LOTUS','PAC')} ครั้ง</span><small>ค้างที่ LOTUS <b>${heldN('LOTUS','PAC')}</b> เครื่อง</small></div>
+        <div class="stealb"><b>PAC → ยืมของ LOTUS</b><span class="sbig" style="color:#dc2626">${xAll('PAC','LOTUS')} ครั้ง</span><small>ค้างที่ PAC <b>${heldN('PAC','LOTUS')}</b> เครื่อง<br>💸 ประหยัด <b style="color:#0891b2">${bht(pacSav.thb)}</b> (${pacSav.n} เครื่อง)${topSavOf('PAC')?`<br><span class="muted">เด่น: ${esc(topSavOf('PAC').site)} ${bht(topSavOf('PAC').thb)}</span>`:''}</small></div>
+        <div class="stealb"><b>LOTUS → ยืมของ PAC</b><span class="sbig" style="color:#16a34a">${xAll('LOTUS','PAC')} ครั้ง</span><small>ค้างที่ LOTUS <b>${heldN('LOTUS','PAC')}</b> เครื่อง<br>💸 ประหยัด <b style="color:#0891b2">${bht(lotSav.thb)}</b> (${lotSav.n} เครื่อง)${topSavOf('LOTUS')?`<br><span class="muted">เด่น: ${esc(topSavOf('LOTUS').site)} ${bht(topSavOf('LOTUS').thb)}</span>`:''}</small></div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:11px;padding-top:11px;border-top:1px solid var(--line);flex-wrap:wrap;gap:8px">
+        <div style="font-size:13px">🤝 แชร์เครื่องมือกัน ทั้งกลุ่มประหยัดค่าซื้อ <b style="color:#0891b2;font-size:16px">${bht(groupSav)}</b></div>
+        <button class="btn" style="padding:4px 12px;font-size:12px" onclick="savingsSiteModal()">📍 ดูรายไซต์ ›</button>
       </div>
     </div>
     <div class="grid2">
@@ -608,6 +625,15 @@ function renderDash(){
     .mleg span{display:flex;align-items:center;gap:5px}.mleg i{width:11px;height:11px;border-radius:3px;display:inline-block}
     @media(max-width:640px){.dvs{flex-direction:column;gap:8px}.steal2{flex-direction:column}.hbl{width:130px}}
     </style>`;
+}
+function savingsSiteModal(){
+  const rows=window._savSites||[];
+  openModal(`<h3>💸 ประหยัดงบรายไซต์ (จากยืมข้ามบริษัท)</h3>
+    <p class="muted" style="font-size:12.5px;line-height:1.6">มูลค่าเครื่องของ<b>อีกบริษัท</b>ที่ไซต์นั้นหยิบไปใช้ = ค่าซื้อที่ประหยัดได้ (นับตัวไม่ซ้ำต่อไซต์ · ราคาส่วนใหญ่เป็นค่าประมาณ)<br>* เครื่องที่ใช้หลายไซต์นับทุกไซต์ ผลรวมทุกไซต์จึงมากกว่ายอดสุทธิของบริษัท</p>
+    <div class="listbox" style="max-height:56vh;overflow:auto"><table class="locktbl"><thead><tr><th>ไซต์</th><th>ผู้ยืม</th><th class="center">เครื่อง</th><th class="right">ประหยัด</th></tr></thead><tbody>${
+      rows.map(r=>`<tr><td>${esc(r.site)}</td><td>${coBadge(r.bor)}</td><td class="center">${r.n}</td><td class="right"><b style="color:#0891b2">~฿${Math.round(r.thb).toLocaleString('th-TH')}</b></td></tr>`).join('')||'<tr><td colspan=4 class="empty">ยังไม่มีการยืมข้ามบริษัท</td></tr>'
+    }</tbody></table></div>
+    <div class="flexrow" style="margin-top:14px"><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`,true);
 }
 /* ============ TOOLS (ทะเบียน) ============ */
 function renderTools(){
