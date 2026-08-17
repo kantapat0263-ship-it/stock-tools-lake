@@ -1061,7 +1061,13 @@ async function deleteCat(i){
 }
 function commaFmt(v){v=String(v==null?'':v).replace(/[^\d.]/g,'');if(v==='')return '';const p=v.split('.');let i=(p[0]||'').replace(/\B(?=(\d{3})+(?!\d))/g,',');return p.length>1?i+'.'+p.slice(1).join('').slice(0,2):i;}
 function parsePrice(v){v=String(v==null?'':v).replace(/,/g,'').trim();return v===''?null:Number(v);}
-function toolFormFields(t){t=t||{};const _cl=S.lookups.categories||[];const _sl=S.lookups.projects||[];const _cs=((t.loc||'').split('/')[0]||'').trim();return `
+function toolFormFields(t){t=t||{};const _cl=S.lookups.categories||[];const _sl=S.lookups.projects||[];const _cs=((t.loc||'').split('/')[0]||'').trim();
+  let _pbtn='';
+  if(t&&t.id){
+    if(t.price)_pbtn=`<button type="button" class="btn" style="padding:4px 10px;font-size:12px" onclick="setPriceForModel('${t.id}')">📤 ใช้ราคานี้กับทุกเครื่องรุ่นเดียวกันที่ยังไม่มีราคาจริง</button>`;
+    else{const _mp=modelPrice(t); _pbtn=_mp?`<button type="button" class="btn primary" style="padding:4px 10px;font-size:12px" onclick="pullPriceFromModel('${t.id}')">📥 ดึงราคารุ่นนี้มาใส่ (~฿${_mp.thb.toLocaleString('th-TH')})${_mp.real?'':' · ประมาณ'}</button> <span class="muted" style="font-size:11px">จาก ${_mp.n} ตัวรุ่นเดียวกัน</span>`:'<span class="muted" style="font-size:11px">— รุ่นนี้ยังไม่มีราคาในระบบ พิมพ์ราคาเอง —</span>';}
+  }
+  return `
     <div class="field"><label>บริษัทเจ้าของ *</label><select id="ed_company">${['PAC','LOTUS'].map(c=>`<option value="${c}" ${(t.company||COMPANY)===c?'selected':''}>${c==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)'}</option>`).join('')}</select></div>
     <div class="flexrow">
       <div class="field"><label>หมวด (ประเภท) *</label><div style="display:flex;gap:6px"><select id="ed_cat" style="flex:1"><option value="">— เลือกหมวด —</option>${_cl.map(c=>`<option ${c===t.cat?'selected':''}>${esc(c)}</option>`).join('')}${(t.cat&&!_cl.includes(t.cat))?`<option selected>${esc(t.cat)}</option>`:''}</select><button type="button" class="btn" style="padding:0 12px" onclick="addCatInline()" title="เพิ่มหมวดใหม่">➕</button></div></div>
@@ -1079,7 +1085,7 @@ function toolFormFields(t){t=t||{};const _cl=S.lookups.categories||[];const _sl=
     </div>
     <div class="flexrow">
       <div class="field"><label>วันที่ซื้อ</label><input id="ed_pdate" type="date" value="${esc(t.purchaseDate)}"></div>
-      <div class="field"><label>ราคา (บาท)${(t.priceEst&&t.price)?' <span style="font-size:11px;color:#0891b2">· ตอนนี้เป็นราคาประมาณ (พิมพ์ราคาจริงทับได้)</span>':''}</label><input id="ed_price" type="text" inputmode="decimal" value="${esc(commaFmt(t.price))}" oninput="this.value=commaFmt(this.value)"><div style="margin-top:5px"><button type="button" class="btn" style="padding:4px 10px;font-size:12px" onclick="setPriceForModel('${t.id}')">📋 ใช้ราคานี้กับทุกเครื่องรุ่นเดียวกันที่ยังไม่มีราคาจริง</button></div></div>
+      <div class="field"><label>ราคา (บาท)${(t.priceEst&&t.price)?' <span style="font-size:11px;color:#0891b2">· ตอนนี้เป็นราคาประมาณ (พิมพ์ราคาจริงทับได้)</span>':''}</label><input id="ed_price" type="text" inputmode="decimal" value="${esc(commaFmt(t.price))}" oninput="this.value=commaFmt(this.value)"><div style="margin-top:5px">${_pbtn}</div></div>
       <div class="field"><label>ประกัน</label><input id="ed_warranty" value="${esc(t.warranty)}" placeholder="เช่น ถึง 2027 / 1 ปี"></div>
     </div>
     <div class="field"><label>หมายเหตุ</label><input id="ed_note" value="${esc(t.note)}"></div>
@@ -1130,6 +1136,7 @@ function toolDetail(i){
     <h3 style="font-size:14px;margin-top:14px">📝 ประวัติแก้ไขทะเบียน</h3>
     <ul class="tl">${audits.map(a=>`<li><div class="ti">📝</div><div><b>${esc(a.action)}</b> ${esc(a.detail||'')}<div class="sub muted">${esc(fmtDTH(a.occurred_at))} · ${esc(a.user_email||'')}</div></div></li>`).join('')||'<li class="muted">ยังไม่มีการแก้ไข</li>'}</ul>`;
   if(editable){
+    window._pulledPrice=null;
     openModal(`<h3>แก้ไขเครื่องมือ</h3><p class="muted">${esc(t.code)} · ${coBadge(t.company)} · ส่งซ่อมมาแล้ว ${esc(t.repairs)||0} ครั้ง</p>
       ${toolImgHtml(t)}${toolFormFields(t)}${histHtml}
       <div class="flexrow" style="margin-top:18px"><button class="btn primary" onclick="saveTool(${i})">💾 บันทึก</button><button class="btn" style="background:#fef3c7;color:#92400e" onclick="disposeTool(${i})">🗄️ ตัดจำหน่าย/ขายซาก</button><button class="btn" style="background:#fee2e2;color:#b91c1c" onclick="delTool(${i})">🗑️ ลบ</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
@@ -1158,7 +1165,12 @@ async function saveTool(i){const t=S.tools[i];
   const L={company:'บริษัท',cat:'หมวด',no:'NO',name:'ชื่อ',brand:'ยี่ห้อ',model:'รุ่น',sn:'S/N',status:'สถานะ',loc:'อยู่ที่',note:'หมายเหตุ',purchaseDate:'วันที่ซื้อ',price:'ราคา',warranty:'ประกัน'};
   const ch=Object.keys(L).filter(k=>String(t[k]||'')!==String(nv[k]||'')).map(k=>`${L[k]}: ${t[k]||'-'}→${nv[k]||'-'}`);
   const _np=parsePrice(nv.price), _op=(t.price===''||t.price==null)?null:+t.price;
-  const _pe=(_np!==null&&_np===_op)?!!t.priceEst:false; // ราคาเปลี่ยน/ล้าง = ราคาจริง (ปลดธงประมาณ)
+  let _pe;
+  if(_np===null)_pe=false;                          // ล้างราคา
+  else if(_np===_op)_pe=!!t.priceEst;               // ไม่เปลี่ยน — คงธงเดิม
+  else if(_np===window._pulledPrice)_pe=true;        // ดึงจากรุ่นเดียวกัน = ราคาประมาณ
+  else _pe=false;                                    // พิมพ์ราคาจริงเอง = ปลดธง
+  window._pulledPrice=null;
   const {error}=await sb.from('tools').update({company:company,category:cat,no:no,name:nv.name,brand:nv.brand,model:nv.model,serial:nv.sn,status:nv.status,location:nv.loc,note:nv.note,purchase_date:nv.purchaseDate||null,price:_np,price_estimated:_pe,warranty:nv.warranty,updated_at:new Date().toISOString()}).eq('id',t.id);
   if(error){toast('บันทึกไม่ได้: '+error.message);return;}
   await ensureLookup('categories',cat,company);
@@ -1178,6 +1190,25 @@ async function setPriceForModel(id){
   await sb.from('tools').update({price:p,price_estimated:false,updated_at:now}).eq('id',t.id);
   for(const s of sibs)await sb.from('tools').update({price:p,price_estimated:true,updated_at:now}).eq('id',s.id);
   closeModal();toast(`ตั้งราคาให้รุ่นนี้ ${sibs.length+1} ตัวแล้ว`);await loadAll();go('tools');
+}
+function modelPrice(t){ // ราค่ากลางของรุ่นเดียวกันที่มีราคาแล้ว (ราคาจริงมาก่อนประมาณ) — สำหรับ "ดึง" มาใส่
+  if(!t||!t.company)return null;
+  const norm=x=>x.model?((x.brand||'')+'|'+x.model):((x.cat||'')+'|'+(x.name||''));
+  const key=norm(t);
+  const sibs=(S.tools||[]).filter(x=>x.id!==t.id&&x.company===t.company&&norm(x)===key&&x.price);
+  if(!sibs.length)return null;
+  const reals=sibs.filter(x=>!x.priceEst);
+  const pool=(reals.length?reals:sibs).map(x=>+x.price).filter(v=>v>0).sort((a,b)=>a-b);
+  if(!pool.length)return null;
+  const mid=Math.floor(pool.length/2), med=pool.length%2?pool[mid]:Math.round((pool[mid-1]+pool[mid])/2);
+  return {thb:med,n:sibs.length,real:reals.length>0};
+}
+function pullPriceFromModel(id){
+  const t=S.tools.find(x=>x.id===id); if(!t){toast('ไม่พบเครื่อง');return;}
+  const mp=modelPrice(t); if(!mp){toast('ไม่มีราคารุ่นเดียวกันในระบบ');return;}
+  const el=$('#ed_price'); if(el)el.value=commaFmt(String(mp.thb));
+  window._pulledPrice=mp.thb;
+  toast(`📥 ดึงราคา ~฿${mp.thb.toLocaleString('th-TH')} มาแล้ว — กด "บันทึก" เพื่อยืนยัน (จะเป็นราคาประมาณ · แก้จริงทีหลังได้)`);
 }
 async function delTool(i){const t=S.tools[i];
   if(!canEditCo(t.company)){toast('ลบได้เฉพาะบริษัทตัวเอง');return;}
