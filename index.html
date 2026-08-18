@@ -304,6 +304,7 @@ const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 
 /* ============ status helpers ============ */
 const STC={'ว่าง':'#16a34a','ถูกยืม':'#2563eb','ส่งซ่อม':'#64748b','รอส่งซ่อม':'#d97706','ชำรุด':'#dc2626','ยังไม่ตรวจนับ':'#7c3aed'};
+const SYMPTOMS=['มอเตอร์ไหม้','ลูกปืน/เพลา','แปรงถ่าน','สวิตช์/เปิดไม่ติด','สายไฟ/ปลั๊ก','ไม่มีแรง/ไม่กระแทก','แบตเตอรี่/แท่นชาร์จ','ตัวถัง/เกียร์/กลไก','อื่นๆ'];
 function chip(st){const c=STC[st]||'#94a3b8';const bg={'#16a34a':'#dcfce7','#2563eb':'#dbeafe','#64748b':'#f1f5f9','#d97706':'#fef3c7','#dc2626':'#fee2e2','#7c3aed':'#ede9fe'}[c]||'#f1f5f9';
   return `<span class="chip" style="background:${bg};color:${c}"><span class="dot" style="background:${c}"></span>${esc(st||'-')}</span>`;}
 function count(st){return S.tools.filter(t=>t.status===st&&inView(t)).length;}
@@ -320,7 +321,7 @@ function toolThumb(t){const url=toolImgUrl(t);
 function toolImgHtml(t){const url=toolImgUrl(t);if(!url)return '';
   return `<div style="text-align:center;margin:2px 0 12px"><img src="${esc(url)}" alt="" style="max-width:100%;max-height:150px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;padding:4px" onerror="this.parentNode.style.display='none'"></div>`;}
 function rowToSlip(s){return {id:s.id,slip_no:s.slip_no,no:String(s.slip_no).padStart(3,'0'),sent:(s.sent_date||''),vendor:s.vendor||'',project:s.project||'',sender:s.sender||'',status:s.status||'ส่งแล้ว',received:(s.received_date||''),receiver:s.receiver||'',note:s.note||'',count:'0',company:s.company};}
-function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||'',borrowNo:(m.borrow_no!=null?m.borrow_no:null),prNo:(m.pr_no||''),isDraft:!!m.is_draft,receiver:(m.receiver||'')};}
+function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',symptom:m.symptom||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||'',borrowNo:(m.borrow_no!=null?m.borrow_no:null),prNo:(m.pr_no||''),isDraft:!!m.is_draft,receiver:(m.receiver||'')};}
 async function fetchAllMov(){
   const all=[];const PAGE=1000;let from=0;
   for(;;){
@@ -577,7 +578,7 @@ function renderDash(){
       </div>
     </div>
     <div class="grid2">
-      <div class="panel"><h3>🔧 รุ่นที่ซ่อมบ่อยสุด <span class="muted" style="font-weight:400;font-size:12px">· รวมครั้ง · เฉลี่ย/เครื่อง</span></h3>
+      <div class="panel"><h3>🔧 รุ่นที่ซ่อมบ่อยสุด <span class="muted" style="font-weight:400;font-size:12px">· รวมครั้ง · เฉลี่ย/เครื่อง</span> <a onclick="symptomModal()" style="cursor:pointer;font-size:12px;font-weight:400">🩺 ดูอาการ ›</a></h3>
         ${topModel.map(([lbl,v],i)=>`<div class="hbar"><span class="hbl" title="${esc(lbl)}">${esc(lbl)}</span><span class="hbt"><i style="width:${Math.round(v.rep/repMax*100)}%;background:${i<2?'#dc2626':i<4?'#ea580c':'#f59e0b'}"></i></span><b style="width:auto;white-space:nowrap">${v.rep}<small style="font-weight:400;color:#94a3b8"> · ${(v.rep/v.units).toFixed(1)}/ตัว</small></b></div>`).join('')||'<div class="empty">ยังไม่มีข้อมูลซ่อม</div>'}
       </div>
       <div class="panel"><h3>📦 หมวดที่ถูกเบิกบ่อยสุด <span class="muted" style="font-weight:400;font-size:12px">· ครั้งเบิก</span></h3>
@@ -633,6 +634,24 @@ function savingsSiteModal(){
     <div class="listbox" style="max-height:56vh;overflow:auto"><table class="locktbl"><thead><tr><th>ไซต์</th><th>ผู้ยืม</th><th class="center">เครื่อง</th><th class="right">ประหยัด</th></tr></thead><tbody>${
       rows.map(r=>`<tr><td>${esc(r.site)}</td><td>${coBadge(r.bor)}</td><td class="center">${r.n}</td><td class="right"><b style="color:#0891b2">~฿${Math.round(r.thb).toLocaleString('th-TH')}</b></td></tr>`).join('')||'<tr><td colspan=4 class="empty">ยังไม่มีการยืมข้ามบริษัท</td></tr>'
     }</tbody></table></div>
+    <div class="flexrow" style="margin-top:14px"><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`,true);
+}
+function symptomModal(){
+  const byId={}; (S.tools||[]).forEach(t=>byId[t.id]=t); (S.disposed||[]).forEach(t=>byId[t.id]=t);
+  const mlabel=t=>t?(t.model?((t.brand?t.brand+' ':'')+t.model):(t.cat||'(ไม่ระบุ)')):'(ไม่ระบุ)';
+  const SC2={'มอเตอร์ไหม้':'#dc2626','ลูกปืน/เพลา':'#ea580c','แปรงถ่าน':'#d97706','สวิตช์/เปิดไม่ติด':'#7c3aed','สายไฟ/ปลั๊ก':'#0891b2','ไม่มีแรง/ไม่กระแทก':'#2563eb','แบตเตอรี่/แท่นชาร์จ':'#16a34a','ตัวถัง/เกียร์/กลไก':'#64748b','อื่นๆ':'#94a3b8'};
+  const agg={};
+  S.movements.filter(m=>m.type==='ส่งซ่อม'&&!m.deleted).forEach(m=>{
+    const mk=mlabel(byId[m.tool_id]); const g=agg[mk]||(agg[mk]={total:0,sym:{},cls:0});
+    g.total++; if(m.symptom){g.sym[m.symptom]=(g.sym[m.symptom]||0)+1;g.cls++;}});
+  const rows=Object.entries(agg).filter(([k,v])=>v.total>=2&&v.cls>0).sort((a,b)=>b[1].total-a[1].total).slice(0,25);
+  const body=rows.map(([mk,v])=>{
+    const bars=Object.entries(v.sym).sort((a,b)=>b[1]-a[1]).map(([s,n])=>`<span style="display:inline-flex;align-items:center;gap:3px;margin:0 9px 3px 0;font-size:12px;white-space:nowrap"><span style="width:9px;height:9px;border-radius:2px;background:${SC2[s]||'#94a3b8'};display:inline-block"></span>${esc(s)} <b>${n}</b></span>`).join('');
+    return `<tr><td><b>${esc(mk)}</b></td><td class="center">${v.total}</td><td>${bars}${v.total>v.cls?` <span class="muted" style="font-size:11px">· ไม่ระบุ ${v.total-v.cls}</span>`:''}</td></tr>`;
+  }).join('')||'<tr><td colspan=3 class="empty">ยังไม่มีการกรอกกลุ่มอาการ</td></tr>';
+  openModal(`<h3>🩺 อาการเสียรายรุ่น</h3>
+    <p class="muted" style="font-size:12.5px;line-height:1.6">รุ่นไหนพังจุดไหนซ้ำๆ → ใช้เลือกซื้อ / สต๊อกอะไหล่ · แสดงเฉพาะรุ่นที่มีการระบุกลุ่มอาการอย่างน้อย 1 ครั้ง (ของเก่าจับกลุ่มจากข้อความให้อัตโนมัติ · ที่กรอกใหม่จะครบขึ้นเรื่อยๆ)</p>
+    <div class="listbox" style="max-height:60vh;overflow:auto"><table class="locktbl"><thead><tr><th>รุ่น</th><th class="center">ซ่อมรวม</th><th>กลุ่มอาการ</th></tr></thead><tbody>${body}</tbody></table></div>
     <div class="flexrow" style="margin-top:14px"><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`,true);
 }
 /* ============ TOOLS (ทะเบียน) ============ */
@@ -1267,9 +1286,9 @@ async function saveNewTool(){
   closeModal();toast('เพิ่มเครื่อง '+company+' แล้ว: '+code);await loadAll();go('tools');}
 
 /* ============ REPAIR (ส่งซ่อม) ============ */
-let selRepair=new Set(),rRsn={},rPj={};
+let selRepair=new Set(),rRsn={},rPj={},rSg={};
 function renderRepair(){
-  selRepair=new Set();rRsn={};rPj={};
+  selRepair=new Set();rRsn={};rPj={};rSg={};
   const dCo=rDraft?rDraft.company:COMPANY;
   const eligible=S.tools.filter(t=>['ว่าง','ชำรุด','รอส่งซ่อม'].includes(t.status)&&inView(t)&&!inRepairDraft(t));
   $('#view').innerHTML=`
@@ -1315,7 +1334,7 @@ function togRepair(i,on){on?selRepair.add(i):selRepair.delete(i);
   $('#rform').style.display=selRepair.size?'block':'none';
   $('#rcount').textContent=`เลือก ${selRepair.size} เครื่อง`;
   $('#rsel').innerHTML='<table><thead><tr><th>เครื่อง</th><th>NO</th><th>โครงการ (มาจากไซต์ไหน)</th><th>อาการ/สาเหตุ</th></tr></thead><tbody>'+
-    [...selRepair].map(ix=>{const t=S.tools[ix];return `<tr><td>${esc((t.name||'').slice(0,26))}</td><td>${esc(t.no)}</td><td><input data-rpj="${ix}" list="dl_rpj" value="${esc(rPj[ix]||'')}" oninput="rPj[${ix}]=this.value" placeholder="ไซต์/โครงการ" style="width:100%;min-width:110px"></td><td><input data-rsn="${ix}" value="${esc(rRsn[ix]||'')}" oninput="rRsn[${ix}]=this.value" placeholder="เช่น ลูกปืนแตก" style="width:100%;min-width:110px"></td></tr>`;}).join('')+'</tbody></table>';
+    [...selRepair].map(ix=>{const t=S.tools[ix];return `<tr><td>${esc((t.name||'').slice(0,26))}</td><td>${esc(t.no)}</td><td><input data-rpj="${ix}" list="dl_rpj" value="${esc(rPj[ix]||'')}" oninput="rPj[${ix}]=this.value" placeholder="ไซต์/โครงการ" style="width:100%;min-width:110px"></td><td><select data-rsg="${ix}" onchange="rSg[${ix}]=this.value" style="width:100%;min-width:135px;margin-bottom:3px"><option value="">— เลือกกลุ่มอาการ —</option>${SYMPTOMS.map(s=>`<option ${rSg[ix]===s?'selected':''}>${s}</option>`).join('')}</select><input data-rsn="${ix}" value="${esc(rRsn[ix]||'')}" oninput="rRsn[${ix}]=this.value" placeholder="รายละเอียดเพิ่ม (ไม่บังคับ)" style="width:100%;min-width:110px"></td></tr>`;}).join('')+'</tbody></table>';
 }
 function previewRepair(){
   if(!selRepair.size)return;
@@ -1323,7 +1342,7 @@ function previewRepair(){
   const date=$('#r_date').value,vendor=$('#r_vendor').value.trim(),sender=$('#r_sender').value.trim();
   const sel=[...selRepair].map(ix=>S.tools[ix]);
   const slipN=(S.nextSlipByCo&&S.nextSlipByCo[co])||1, slip=String(slipN).padStart(3,'0');
-  const items=sel.map(t=>({t,reason:(rRsn[t.i]||'').trim(),project:(rPj[t.i]||'').trim()}));
+  const items=sel.map(t=>({t,reason:(rRsn[t.i]||'').trim(),symptom:(rSg[t.i]||'')||null,project:(rPj[t.i]||'').trim()}));
   pendingRepair={slipN,slip,date,vendor,sender,items,co};
   openModal(`<h3>👁️ ตัวอย่างใบส่งซ่อม #${slip} ${coBadge(co)}</h3><p class="muted">ดูก่อน — <b>ยังไม่บันทึก</b> · จะบันทึกจริงตอนกด "พิมพ์ + บันทึก"</p>
     ${docBox(repairDocHtml(slip,date,vendor,sender,items,co))}
@@ -1339,7 +1358,7 @@ async function commitRepair(){
   const sres=await sb.from('repair_slips').insert({company:ISS,slip_no:slipN,sent_date:date||null,vendor,project:'',sender,status:'ส่งแล้ว'});
   if(sres.error){toast('บันทึกไม่ได้: '+sres.error.message);return;}
   for(const it of items){await sb.from('tools').update({status:'ส่งซ่อม',location:vendor||'ร้านซ่อม',updated_at:new Date().toISOString()}).eq('id',it.t.id);}
-  await sb.from('movements').insert(items.map(it=>({company:ISS,owner_company:it.t.company,recorded_by:(ME&&ME.email)||'',tool_id:it.t.id,occurred_on:date||null,type:'ส่งซ่อม',slip_no:slipN,actor:sender,counterparty:vendor,reason:it.reason,project:it.project||null})));
+  await sb.from('movements').insert(items.map(it=>({company:ISS,owner_company:it.t.company,recorded_by:(ME&&ME.email)||'',tool_id:it.t.id,occurred_on:date||null,type:'ส่งซ่อม',slip_no:slipN,actor:sender,counterparty:vendor,reason:it.reason,symptom:it.symptom||null,project:it.project||null})));
   await ensureLookup('vendors',vendor);await ensureLookup('people',sender);
   pendingRepair=null;closeModal();
   $('#printArea').innerHTML=repairDocHtml(slip,date,vendor,sender,items,ISS);printNow(true);
@@ -1353,7 +1372,7 @@ async function saveRepairDraft(){
   const sel=[...selRepair].map(ix=>S.tools[ix]);
   // เข้าร่าง = ยังไม่ได้ส่งจริง → "รอส่งซ่อม" อยู่ออฟฟิต (จะเป็น "ส่งซ่อม" ตอนออกใบจริง)
   for(const t of sel){await sb.from('tools').update({status:'รอส่งซ่อม',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',t.id);}
-  await sb.from('movements').insert(sel.map(t=>({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'ส่งซ่อม',actor:sender,counterparty:vendor,reason:(rRsn[t.i]||'').trim(),project:(rPj[t.i]||'').trim()||null,is_draft:true})));
+  await sb.from('movements').insert(sel.map(t=>({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'ส่งซ่อม',actor:sender,counterparty:vendor,reason:(rRsn[t.i]||'').trim(),symptom:(rSg[t.i]||'')||null,project:(rPj[t.i]||'').trim()||null,is_draft:true})));
   await ensureLookup('vendors',vendor);await ensureLookup('people',sender);
   rDraft={company:co,vendor,sender,date};
   toast(`เก็บเข้าใบร่างซ่อมแล้ว ${sel.length} เครื่อง · ออกใบจริงได้ที่ ประวัติ → ใบร่าง`);await loadAll();renderRepair();
@@ -2379,18 +2398,18 @@ function scanReceiveBrokenPC(){ const t=scanTool; if(!t)return;
     <p class="muted" style="font-size:13px">${esc(t.code)} · ${esc((t.name||'').slice(0,40))} · จาก ${esc(t.loc)||'-'}</p>
     <div style="background:#f0fdf4;border-left:3px solid #16a34a;padding:8px 11px;border-radius:8px;font-size:12.5px;margin:8px 0">ระบบจะบันทึก <b>"คืนจากไซต์"</b> ตามวันที่เลือก (ใบเบิกติ๊กคืน — เคลียร์ว่าไซต์คืนแล้ว) แล้วเก็บเครื่องเข้า<b>ร่างใบซ่อม</b>ต่อทันที</div>
     <div class="flexrow"><div class="field"><label>วันที่คืนจริงจากไซต์ (ย้อนหลังได้)</label><input type="date" id="sbk_date" value="${today()}"></div></div>
-    <div class="field"><label>อาการ / สาเหตุ (ไม่บังคับ)</label><input id="sbk_reason" placeholder="เช่น สายขาด เปิดไม่ติด"></div>
+    <div class="flexrow"><div class="field"><label>กลุ่มอาการ</label><select id="sbk_sym"><option value="">— เลือก —</option>${SYMPTOMS.map(s=>`<option>${s}</option>`).join('')}</select></div><div class="field"><label>รายละเอียดเพิ่ม (ไม่บังคับ)</label><input id="sbk_reason" placeholder="เช่น สายขาด"></div></div>
     <div class="flexrow" style="margin-top:14px"><button class="btn primary" onclick="doScanReceiveBrokenPC()">💾 บันทึก คืน + เข้าร่างซ่อม</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
 }
 async function doScanReceiveBrokenPC(){ const t=scanTool; if(!t)return;
-  const rdate=$('#sbk_date').value||today(), reason=$('#sbk_reason').value.trim();
+  const rdate=$('#sbk_date').value||today(), reason=$('#sbk_reason').value.trim(), sym=($('#sbk_sym')?$('#sbk_sym').value:'')||null;
   const site=((t.loc||'').split('/')[0]||'').trim();
   const co=(ME&&ME.role==='admin')?t.company:COMPANY;
   // 1) หลักฐานคืนจากไซต์ (ปิดรายการในใบเบิก — ไซต์ไม่ค้างแล้ว)
   await sb.from('movements').insert({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:rdate,type:'คืน',project:'ออฟฟิต',actor:(ME&&ME.email)||'',note:'คืนจากไซต์ (เครื่องเสีย)'+(site?' — '+site:'')});
   // 2) เก็บเข้าร่างใบซ่อม — ยังไม่ส่งจริง → "รอส่งซ่อม" อยู่ออฟฟิต
   await sb.from('tools').update({status:'รอส่งซ่อม',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:new Date().toISOString()}).eq('id',t.id);
-  await sb.from('movements').insert({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:today(),type:'ส่งซ่อม',actor:'',counterparty:'',reason,project:(site&&site!=='ออฟฟิต')?site:null,is_draft:true});
+  await sb.from('movements').insert({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:today(),type:'ส่งซ่อม',actor:'',counterparty:'',reason,symptom:sym,project:(site&&site!=='ออฟฟิต')?site:null,is_draft:true});
   closeModal(); toast('🔧 '+t.code+' บันทึกคืน ('+fmtDateTH(rdate)+') + เข้าร่างใบซ่อมแล้ว');
   await loadAll(); scanDone(t,'คืนจากไซต์ + เข้าร่างใบซ่อมแล้ว');
 }
