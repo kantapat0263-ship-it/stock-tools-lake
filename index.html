@@ -1642,11 +1642,15 @@ function itemDesc(t){const n=(t.name||'').trim(),c=(t.cat||'').trim();return (c&
 function slipName(t){ // ชื่อสำหรับใบส่ง: ตัดยี่ห้อ/รุ่นที่ฝังในชื่อออก (ใบมีคอลัมน์แยกอยู่แล้ว — กันซ้ำซ้อน) · ไม่แตะข้อมูลจริง
   let n=(t.name||'').trim(); if(!n)return (t.cat||'');
   const rxesc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  [t.brand,t.model].forEach(x=>{x=(x||'').trim();if(!x)return;
-    n=n.replace(new RegExp('["“”\'(]*'+rxesc(x)+'["“”\')]*','gi'),' ');});
+  [t.brand,t.model].forEach(x=>{x=(x||'').trim();if(!x||x.length<2)return;
+    const flex=x.split('').map(rxesc).join('\\s*'); // ยืดหยุ่นเว้นวรรค: "9556HP" จับ "9556 HP" ได้
+    n=n.replace(new RegExp('["“”\'(]*'+flex+'["“”\')]*','gi'),' ');});
   n=n.replace(/รุ่น\s*[:.]?\s*(?=\s|$)/g,' ').replace(/ยี่ห้อ\s*(?=\s|$)/g,' ')
      .replace(/\(\s*\)/g,' ').replace(/["“”]{2,}/g,' ')
-     .replace(/\s{2,}/g,' ').trim().replace(/[\s,\/\-–]+$/,'').trim();
+     .replace(/\s+["“”]\s*$/,'').replace(/^["“”]\s+/,'')
+     .replace(/\s+([,\/])/g,'$1').replace(/([,\/])\s*(?=[,\/]|$)/g,'')
+     .replace(/^[\s,\/\-–]+/,'').replace(/[\s,\/\-–]+$/,'')
+     .replace(/\s{2,}/g,' ').trim();
   return n.length>=4?n:(((t.cat||'')+(n?' '+n:'')).trim()||t.name);
 }
 function fullDesc(t){ // ชื่อเต็มสำหรับใบที่ไม่มีคอลัมน์ยี่ห้อ/รุ่นแยก (ใบส่งซ่อม): ชื่อสะอาด + ยี่ห้อ + รุ่น รวมช่องเดียว ไม่ซ้ำ
