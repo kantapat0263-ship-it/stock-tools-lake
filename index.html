@@ -1639,6 +1639,16 @@ async function doBorrow(){
 }
 let pendingBorrow=null;
 function itemDesc(t){const n=(t.name||'').trim(),c=(t.cat||'').trim();return (c&&n&&n.length<=12)?(c+' '+n):(n||c);}
+function slipName(t){ // ชื่อสำหรับใบส่ง: ตัดยี่ห้อ/รุ่นที่ฝังในชื่อออก (ใบมีคอลัมน์แยกอยู่แล้ว — กันซ้ำซ้อน) · ไม่แตะข้อมูลจริง
+  let n=(t.name||'').trim(); if(!n)return (t.cat||'');
+  const rxesc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  [t.brand,t.model].forEach(x=>{x=(x||'').trim();if(!x)return;
+    n=n.replace(new RegExp('["“”\'(]*'+rxesc(x)+'["“”\')]*','gi'),' ');});
+  n=n.replace(/รุ่น\s*[:.]?\s*(?=\s|$)/g,' ').replace(/ยี่ห้อ\s*(?=\s|$)/g,' ')
+     .replace(/\(\s*\)/g,' ').replace(/["“”]{2,}/g,' ')
+     .replace(/\s{2,}/g,' ').trim().replace(/[\s,\/\-–]+$/,'').trim();
+  return n.length>=4?n:(((t.cat||'')+(n?' '+n:'')).trim()||t.name);
+}
 function fmtDateTH(iso){if(!iso)return '';const p=String(iso).slice(0,10).split('-');if(p.length<3)return String(iso);const M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const d=parseInt(p[2],10),mo=parseInt(p[1],10),y=parseInt(p[0],10);if(!d||!mo||!y||mo>12)return String(iso);return d+' '+M[mo-1]+' '+(y+543);}
 function printNow(landscape){
   let st=document.getElementById('pgstyle');
@@ -1655,7 +1665,7 @@ function borrowDocHtml(items,who,proj,date,no,issueCo){
   function copy(p,stamp){
     let rows='';
     for(let r=0;r<PER;r++){const gi=p*PER+r,it=items[gi];
-      rows+=`<tr><td class="c">${gi+1}</td><td>${it?esc(itemDesc(it)):''}</td><td>${it?esc(it.brand||''):''}</td><td>${it?esc(it.model||''):''}</td><td class="c">${it?esc(it.sn):''}</td><td class="c">${it?esc(it.no):''}</td><td class="c">${it?esc(it.pr||''):''}</td><td>${it?esc(it.note||''):''}</td></tr>`;}
+      rows+=`<tr><td class="c">${gi+1}</td><td>${it?esc(slipName(it)):''}</td><td>${it?esc(it.brand||''):''}</td><td>${it?esc(it.model||''):''}</td><td class="c">${it?esc(it.sn):''}</td><td class="c">${it?esc(it.no):''}</td><td class="c">${it?esc(it.pr||''):''}</td><td>${it?esc(it.note||''):''}</td></tr>`;}
     return `<div class="bcopy">
       <div class="bhd">
         <div class="blogo">${LOGO[CO]?`<img src="${LOGO[CO]}" alt="${esc(CO)}">`:esc(CO)}</div>
