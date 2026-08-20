@@ -1405,7 +1405,7 @@ function repairDocHtml(slip,date,vendor,sender,items,issueCo){
     for(let r=0;r<PER;r++){const gi=p*PER+r, it=items[gi];
       rows+=`<tr>
         <td class="c">${gi+1}</td>
-        <td>${it?esc(itemDesc(it.t)):''}</td>
+        <td>${it?esc(fullDesc(it.t)):''}</td>
         <td class="c">${it?esc(it.t.sn):''}</td>
         <td class="c">${it?esc(it.t.no):''}</td>
         <td>${it?esc(it.project||''):''}</td>
@@ -1648,6 +1648,10 @@ function slipName(t){ // ชื่อสำหรับใบส่ง: ตั�
      .replace(/\(\s*\)/g,' ').replace(/["“”]{2,}/g,' ')
      .replace(/\s{2,}/g,' ').trim().replace(/[\s,\/\-–]+$/,'').trim();
   return n.length>=4?n:(((t.cat||'')+(n?' '+n:'')).trim()||t.name);
+}
+function fullDesc(t){ // ชื่อเต็มสำหรับใบที่ไม่มีคอลัมน์ยี่ห้อ/รุ่นแยก (ใบส่งซ่อม): ชื่อสะอาด + ยี่ห้อ + รุ่น รวมช่องเดียว ไม่ซ้ำ
+  const base=slipName(t),b=(t.brand||'').trim(),m=(t.model||'').trim();
+  return [base,b,m].filter(Boolean).join(' ').replace(/\s{2,}/g,' ').trim()||(t.name||'').trim();
 }
 function fmtDateTH(iso){if(!iso)return '';const p=String(iso).slice(0,10).split('-');if(p.length<3)return String(iso);const M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];const d=parseInt(p[2],10),mo=parseInt(p[1],10),y=parseInt(p[0],10);if(!d||!mo||!y||mo>12)return String(iso);return d+' '+M[mo-1]+' '+(y+543);}
 function printNow(landscape){
