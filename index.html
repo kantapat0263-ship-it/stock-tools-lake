@@ -1774,22 +1774,40 @@ function dormantModal(){
     const rows=all.filter(x=>x.t.status===st);
     if(!rows.length)return '';
     return `<h3 style="font-size:14px;margin:16px 0 6px">${icon} ${st} (${rows.length}) <span class="muted" style="font-weight:400;font-size:12px">— ${hint}</span></h3>
-      <table><thead><tr><th>รหัส</th><th>ชื่อ</th><th>บ.</th><th>อยู่ที่</th><th class="center">นิ่งมา</th></tr></thead><tbody>${
-      rows.map(x=>`<tr style="cursor:pointer" onclick="toolDetail(${x.t.i})"><td><b>${esc(x.t.code)}</b></td><td>${esc((x.t.name||'').slice(0,26))}</td><td>${coBadge(x.t.company)}</td><td>${esc((x.t.loc||'').split(' / ')[0])||'-'}</td><td class="center"><b>${days(x.last)}</b> วัน</td></tr>`).join('')}</tbody></table>`;
+      <table><thead><tr><th>รหัส</th><th>ชื่อ</th><th>บ.</th><th>อยู่ที่</th><th class="center">นิ่งมา</th><th></th></tr></thead><tbody>${
+      rows.map(x=>`<tr style="cursor:pointer" onclick="toolDetail(${x.t.i})"><td><b>${esc(x.t.code)}</b></td><td>${esc(slipName(x.t)).slice(0,26)}</td><td>${coBadge(x.t.company)}</td><td>${esc((x.t.loc||'').split(' / ')[0])||'-'}</td><td class="center"><b>${days(x.last)}</b> วัน</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:3px 8px;font-size:11px" onclick="event.stopPropagation();markCounted('${x.t.id}')">✓ เจอแล้ว</button> <button class="btn" style="padding:3px 8px;font-size:11px;background:#fee2e2;color:#b91c1c" onclick="event.stopPropagation();disposeLost('${x.t.id}')">🗄️ ตัดสูญหาย</button></td></tr>`).join('')}</tbody></table>`;
   };
   const other=all.filter(x=>!['ถูกยืม','ว่าง','ส่งซ่อม'].includes(x.t.status));
   openModal(`<h3>⏳ เครื่องไม่เคลื่อนไหวเกิน 1 ปี (${all.length})</h3>
-    <p class="muted" style="font-size:12.5px">นับจากการเคลื่อนไหวล่าสุดของแต่ละเครื่อง · แตะแถวเพื่อเปิดจัดการ (ตัดจำหน่าย/แก้ไข)</p>
+    <p class="muted" style="font-size:12.5px">นับจากการเคลื่อนไหวล่าสุด · เจอตัวจริงกด <b>✓ เจอแล้ว</b> (บันทึกตรวจนับ→หลุดลิสต์) · หาไม่เจอกด <b>🗄️ ตัดสูญหาย</b> (กู้คืนได้) · แตะแถวเปิดรายละเอียด</p>
+    ${all.length?'':'<div class="empty" style="padding:20px">🎉 เคลียร์หมดแล้ว — ไม่มีเครื่องนิ่งเกิน 1 ปี</div>'}
     ${grp('ถูกยืม','🔴','ค้างไซต์นานผิดปกติ — ทวงถาม / แจ้งหาย')}
     ${grp('ว่าง','🟠','นอนสโตร์ไม่ถูกใช้ — ตรวจนับจริง / ขายซาก')}
     ${grp('ส่งซ่อม','⚙️','ค้างร้านซ่อมข้ามปี — ตามร้าน / ชำแหละซาก')}
     ${[...new Set(other.map(x=>x.t.status))].map(st=>grp(st,'•','')).join('')}
     <div class="flexrow" style="margin-top:14px"><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`,true);
 }
+async function markCounted(id){
+  const t=S.tools.find(x=>x.id===id); if(!t){toast('ไม่พบเครื่อง');return;}
+  if(!confirm(`ยืนยันว่าเจอตัวจริง "${t.code}" แล้ว?\nจะบันทึกการตรวจนับวันนี้ → หลุดจากลิสต์เครื่องนิ่ง (ไม่เปลี่ยนสถานะ)`))return;
+  const {error}=await sb.from('movements').insert({company:t.company,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:today(),type:'ตรวจนับ',actor:(ME&&ME.fullName)||(ME&&ME.email)||'',note:'ยืนยันมีตัวจริง (จากลิสต์เครื่องนิ่ง)'});
+  if(error){toast('บันทึกไม่ได้: '+error.message);return;}
+  toast('✓ ตรวจนับ '+t.code+' แล้ว');await loadAll();dormantModal();
+}
+async function disposeLost(id){
+  const t=S.tools.find(x=>x.id===id); if(!t){toast('ไม่พบเครื่อง');return;}
+  if(!canEditCo(t.company)){toast('ทำได้เฉพาะบริษัทตัวเอง');return;}
+  if(!confirm(`ตัด "${t.code}" ออกเป็น "สูญหาย"?\nจะย้ายไปหน้าตัดจำหน่าย (กู้คืนได้ถ้าเจอทีหลัง)`))return;
+  const d=today();
+  const {error}=await sb.from('tools').update({disposed:true,disposed_at:d,disposal_note:'สูญหาย (นิ่งเกิน 1 ปี)',updated_at:new Date().toISOString()}).eq('id',t.id);
+  if(error){toast('ตัดไม่ได้: '+error.message);return;}
+  await logAudit('ตัดจำหน่าย',t.company,t.code,'สูญหาย (นิ่งเกิน 1 ปี) ('+d+')');
+  toast('🗄️ ตัดสูญหาย '+t.code+' แล้ว');await loadAll();dormantModal();
+}
 function crossBorrows(){const all=[];S.tools.forEach(t=>{if(t.status!=='ถูกยืม')return;const m=lastBorrowMov(t.id);const by=m?m.company:null;if(!by||by===t.company)return;all.push({t,by});});return all;}
 
 /* ============ HISTORY (3 แท็บ) ============ */
-const TYPE_ICON={'เบิก':'📤','คืน':'📥','ส่งซ่อม':'⚙️','รับคืนจากซ่อม':'✅','แจ้งชำรุด':'⚠️','ย้ายไซต์':'🔀'};
+const TYPE_ICON={'เบิก':'📤','คืน':'📥','ส่งซ่อม':'⚙️','รับคืนจากซ่อม':'✅','แจ้งชำรุด':'⚠️','ย้ายไซต์':'🔀','ตรวจนับ':'🔎'};
 let histTab='recent', histDraw=null;
 function inViewMov(m){return !FILTER||m.company===FILTER||m.ownerCompany===FILTER;}
 function fmtTime(iso){if(!iso)return '';const d=new Date(iso);if(isNaN(d))return '';return d.toLocaleTimeString('en-GB',{timeZone:'Asia/Bangkok',hour:'2-digit',minute:'2-digit',hour12:false});}
