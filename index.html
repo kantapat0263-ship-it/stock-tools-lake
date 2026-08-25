@@ -234,7 +234,7 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
       <button data-v="repair"><span class="ic">📤</span> ส่งซ่อม</button>
       <button data-v="receive"><span class="ic">📥</span> รับคืนจากซ่อม</button>
       <button data-v="history"><span class="ic">📜</span> ประวัติ</button>
-      <button data-v="report"><span class="ic">📈</span> รายงาน</button>
+      <button data-v="report"><span class="ic">📈</span> รายงาน <span id="repbadge" style="display:none;background:#dc2626;color:#fff;border-radius:9px;padding:0 6px;font-size:11px;font-weight:700;margin-left:4px"></span></button>
       <button data-v="scan"><span class="ic">📷</span> สแกน (มือถือ)</button>
       <button data-v="labels"><span class="ic">🏷️</span> ป้าย QR</button>
       <button data-v="sites"><span class="ic">🗂️</span> จัดการไซต์งาน</button>
@@ -466,7 +466,7 @@ const TITLES={dash:['ภาพรวม','ยินดีต้อนรับ �
 function go(v){
   if(v==='guide'){window.open('guide.html','_blank');return;}
   if(CUR==='scan'&&v!=='scan'&&window._scanner)stopScanner();
-  CUR=v; borDraft=null; rDraft=null;
+  CUR=v; borDraft=null; rDraft=null; selRep=new Set(); try{updateRepBadge();}catch(e){}
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
   $('#ttl').textContent=TITLES[v][0];$('#tsub').textContent=TITLES[v][1];
   ({dash:renderDash,tools:renderTools,borrow:renderBorrow,bysite:renderBySite,scan:renderScan,repair:renderRepair,receive:renderReceive,history:renderHistory,report:renderReport,labels:renderLabels,sites:renderSites,cats:renderCats,contacts:renderContacts,trash:renderTrash,disposed:renderDisposed,audit:renderAudit,users:renderUsers}[v])();
@@ -667,6 +667,7 @@ function renderTools(){
       <select id="fsite"><option value="">ทุกไซต์</option>${sites.map(s=>`<option>${esc(s)}</option>`).join('')}</select>
       <select id="fsort"><option value="">เรียง: ปกติ</option><option value="new" selected>🆕 เพิ่มล่าสุด</option><option value="old">เพิ่มเก่าสุด</option></select>
       <button class="btn" id="fnoprice" title="แสดงเฉพาะเครื่องที่ยังไม่ได้ใส่ราคา">💰 ยังไม่ใส่ราคา</button>
+      <button class="btn" onclick="sendToReport()" title="ติ๊กช่องหน้าแถวแล้วกดปุ่มนี้ → ไปสร้างรายงานที่เมนูรายงาน">📸 ส่งรายงาน (<span id="selrepn">0</span>)</button>
       <button class="btn primary" onclick="addTool()">➕ เพิ่มเครื่องใหม่</button>
       <span class="muted" id="tcount"></span>
     </div>
@@ -686,8 +687,8 @@ function renderTools(){
     const npAll=S.tools.filter(t=>inView(t)&&!t.price).length;
     $('#tcount').innerHTML=`${rows.length} เครื่อง${npAll?` · <span style="color:#d97706">💰 ยังไม่ใส่ราคา ${npAll} ตัว</span>`:''}`;
     const pg=pgSlice('tools',rows);
-    $('#ttbl').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th></th><th>บริษัท</th><th>ชื่อ</th><th>ยี่ห้อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th><th>ที่อยู่</th></tr></thead><tbody>${
-      pg.rows.map(t=>`<tr style="cursor:pointer" onclick="toolDetail(${t.i})"><td class="thumbcell">${toolThumb(t)}</td><td>${coBadge(t.company)}</td><td>${esc(slipName(t))}${!t.price?' <span title="ยังไม่ได้ใส่ราคา" style="color:#d97706;background:#fffbeb;border:1px solid #fde68a;border-radius:5px;padding:0 5px;font-size:10.5px;white-space:nowrap">฿ ยังไม่ใส่</span>':(t.priceEst?' <span title="ราคาประมาณ" style="color:#0891b2;font-size:11px">≈</span>':'')}</td><td>${esc(t.brand)||'-'}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td><td>${esc((t.loc||'').split(' / ')[0])||'-'}</td></tr>`).join('')||'<tr><td colspan=10 class="empty">ไม่พบ</td></tr>'
+    $('#ttbl').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th title="ติ๊กเพื่อส่งเข้ารายงาน">📸</th><th></th><th>บริษัท</th><th>ชื่อ</th><th>ยี่ห้อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th><th>ที่อยู่</th></tr></thead><tbody>${
+      pg.rows.map(t=>`<tr style="cursor:pointer" onclick="toolDetail(${t.i})"><td onclick="event.stopPropagation()"><input type="checkbox" ${selRep.has(t.id)?'checked':''} ${repQueue.has(t.id)?'disabled title="อยู่ในคิวรายงานแล้ว"':''} onchange="togRep('${t.id}',this.checked)">${repQueue.has(t.id)?'<span title="อยู่ในคิวรายงานแล้ว" style="font-size:10px">📸</span>':''}</td><td class="thumbcell">${toolThumb(t)}</td><td>${coBadge(t.company)}</td><td>${esc(slipName(t))}${!t.price?' <span title="ยังไม่ได้ใส่ราคา" style="color:#d97706;background:#fffbeb;border:1px solid #fde68a;border-radius:5px;padding:0 5px;font-size:10.5px;white-space:nowrap">฿ ยังไม่ใส่</span>':(t.priceEst?' <span title="ราคาประมาณ" style="color:#0891b2;font-size:11px">≈</span>':'')}</td><td>${esc(t.brand)||'-'}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td><td>${esc((t.loc||'').split(' / ')[0])||'-'}</td></tr>`).join('')||'<tr><td colspan=11 class="empty">ไม่พบ</td></tr>'
     }</tbody></table></div>${pg.html}`;
   };
   PG_REDRAW['tools']=draw;
@@ -2354,8 +2355,16 @@ function renderReport(){
         มูลค่ารวม (เฉพาะเครื่องที่กรอกราคา): <b>${totalPrice.toLocaleString('th-TH')} บาท</b>
       </p>
     </div>
+    ${repQueue.size?`<div class="panel" style="border-left:4px solid #16a34a;background:#f0fdf4">
+      <h3>📸 คิวรายงาน (${repQueue.size} เครื่อง) <span class="muted" style="font-weight:400;font-size:12px">— ส่งมาจากหน้าทะเบียน</span></h3>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">${[...repQueue].map(id=>{const t=S.tools.find(x=>x.id===id);return t?`<span style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:3px 10px;font-size:12px;display:inline-flex;align-items:center;gap:6px"><b>${esc(t.no)}</b> ${esc(slipName(t)).slice(0,18)} <a onclick="removeRepQueue('${id}')" style="cursor:pointer;color:#dc2626;font-weight:700">✕</a></span>`:'';}).join('')}</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn primary" onclick="bossReportFromQueue()">📋 สร้างรายงาน (${repQueue.size})</button>
+        <button class="btn ghost" onclick="clearRepQueue()">ล้างคิว</button>
+      </div>
+    </div>`:''}
     <div class="panel" style="border-left:4px solid #0891b2">
-      <h3>📸 รายงานติดตามรายเครื่อง <span class="muted" style="font-weight:400;font-size:12.5px">— วางลิสต์ NO/รหัส แล้วออกรายงานให้ผู้บริหาร (บันทึกเป็นรูป PNG ได้)</span></h3>
+      <h3>📸 รายงานติดตามรายเครื่อง <span class="muted" style="font-weight:400;font-size:12.5px">— วางลิสต์ NO/รหัส แล้วออกรายงานให้ผู้บริหาร (บันทึกเป็นรูป PNG ได้) · หรือติ๊กเลือกจากหน้าทะเบียนแล้วกด "📸 ส่งรายงาน"</span></h3>
       <textarea id="brq" rows="4" placeholder="L-GR4-001&#10;L-HD3-014&#10;P-TC-001 ..." style="width:100%;font-family:monospace;font-size:13px;padding:8px;border:1px solid var(--line);border-radius:8px;resize:vertical;box-sizing:border-box"></textarea>
       <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button class="btn primary" onclick="bossReport()">📋 สร้างรายงาน</button>
@@ -2380,6 +2389,14 @@ function bossReport(){
   const found=[],miss=[];
   toks.forEach(k=>{const t=idx[k];t?found.push(t):miss.push(k);});
   if(!found.length){toast('ไม่พบเครื่องตามลิสต์เลย');return;}
+  bossReportRender(found,miss);
+}
+function bossReportFromQueue(){
+  const found=[...repQueue].map(id=>S.tools.find(t=>t.id===id)).filter(Boolean);
+  if(!found.length){toast('คิวรายงานว่าง — ติ๊กเลือกจากหน้าทะเบียนก่อน');return;}
+  bossReportRender(found,[]);
+}
+function bossReportRender(found,miss){
   const dd=s=>s?fmtDateTH(s):'-';
   const days=(a,b)=>{const d=Math.round((new Date(b)-new Date(a))/86400000);return isNaN(d)?null:d;};
   const rows=found.map(t=>{
@@ -2571,6 +2588,20 @@ function scanDone(t,msg){ scanTool=null;
 /* ============ QR LABELS (ป้าย QR — เฟส 1) ============ */
 const QR_BASE='https://stock-tools-lake.vercel.app/s.html?t=';
 let selLabel=new Set(), lblFiltered=[], lblOnlyUntagged=false, LBLSIZE='big';
+/* ---- คิวรายงาน (ตะกร้า: ติ๊กจากทะเบียน → สร้างที่เมนูรายงาน) ---- */
+let repQueue=new Set(); try{repQueue=new Set(JSON.parse(localStorage.getItem('repQueue')||'[]'));}catch(e){}
+let selRep=new Set();
+function saveRepQueue(){try{localStorage.setItem('repQueue',JSON.stringify([...repQueue]));}catch(e){} updateRepBadge();}
+function updateRepBadge(){const b=$('#repbadge');if(!b)return;const n=repQueue.size;b.textContent=n;b.style.display=n?'inline-block':'none';}
+function togRep(id,on){on?selRep.add(id):selRep.delete(id);const c=$('#selrepn');if(c)c.textContent=selRep.size;}
+function sendToReport(){
+  if(!selRep.size){toast('ติ๊กเลือกเครื่องก่อน (ช่องหน้าแถว)');return;}
+  selRep.forEach(id=>repQueue.add(id)); const n=selRep.size; selRep=new Set();
+  saveRepQueue(); if(PG_REDRAW['tools'])PG_REDRAW['tools']();
+  toast('📸 ส่งเข้ารายงานแล้ว '+n+' เครื่อง — รวมในคิว '+repQueue.size+' (ดูที่เมนูรายงาน)');
+}
+function removeRepQueue(id){repQueue.delete(id);saveRepQueue();if(CUR==='report')go('report');}
+function clearRepQueue(){repQueue=new Set();saveRepQueue();if(CUR==='report')go('report');}
 async function toggleTag(id,on){
   const t=S.tools.find(x=>x.id===id); if(!t)return;
   t.tagged=on; t.taggedAt=on?new Date().toISOString():'';
