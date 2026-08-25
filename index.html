@@ -2354,6 +2354,14 @@ function renderReport(){
         มูลค่ารวม (เฉพาะเครื่องที่กรอกราคา): <b>${totalPrice.toLocaleString('th-TH')} บาท</b>
       </p>
     </div>
+    <div class="panel" style="border-left:4px solid #0891b2">
+      <h3>📸 รายงานติดตามรายเครื่อง <span class="muted" style="font-weight:400;font-size:12.5px">— วางลิสต์ NO/รหัส แล้วออกรายงานให้ผู้บริหาร (บันทึกเป็นรูป PNG ได้)</span></h3>
+      <textarea id="brq" rows="4" placeholder="L-GR4-001&#10;L-HD3-014&#10;P-TC-001 ..." style="width:100%;font-family:monospace;font-size:13px;padding:8px;border:1px solid var(--line);border-radius:8px;resize:vertical;box-sizing:border-box"></textarea>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn primary" onclick="bossReport()">📋 สร้างรายงาน</button>
+        <span class="muted" style="font-size:12px">ตอบครบ: เบิกไปไซต์ไหน · ถึงหน้างานจริงไหม · คืนเมื่อไหร่ · ส่งซ่อมเมื่อไหร่ · กลับมาจริงไหม · ซ่อมนานกี่วัน</span>
+      </div>
+    </div>
     <div class="panel"><h3>📥 ดาวน์โหลดเป็นไฟล์ (เปิดด้วย Excel ได้เลย)</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
         <button class="btn primary" onclick="exportTools()">⬇️ ทะเบียนเครื่องมือ (.csv)</button>
@@ -2363,6 +2371,80 @@ function renderReport(){
     </div>`;
 }
 
+/* ---- รายงานติดตามรายเครื่อง (ผู้บริหาร) ---- */
+function bossReport(){
+  const raw=($('#brq').value||'').trim(); if(!raw){toast('วางลิสต์ NO/รหัส ก่อน');return;}
+  const norm=s=>String(s||'').trim().toUpperCase().replace(/\s+/g,'');
+  const idx={}; S.tools.forEach(t=>{const k=norm(t.no);if(k&&!(k in idx))idx[k]=t;const c=norm(t.code);if(c&&!(c in idx))idx[c]=t;});
+  const toks=[...new Set(raw.split(/[\s,;]+/).map(norm).filter(Boolean))];
+  const found=[],miss=[];
+  toks.forEach(k=>{const t=idx[k];t?found.push(t):miss.push(k);});
+  if(!found.length){toast('ไม่พบเครื่องตามลิสต์เลย');return;}
+  const dd=s=>s?fmtDateTH(s):'-';
+  const days=(a,b)=>{const d=Math.round((new Date(b)-new Date(a))/86400000);return isNaN(d)?null:d;};
+  const rows=found.map(t=>{
+    const mvs=S.movements.filter(m=>m.tool_id===t.id).sort((a,b)=>String((a.date||'')+(a.createdAt||'')).localeCompare(String((b.date||'')+(b.createdAt||''))));
+    const bi=mvs.map(m=>m.type).lastIndexOf('เบิก');
+    const b=bi>=0?mvs[bi]:null;
+    let conf=null,ret=null;
+    if(b)for(let j=bi+1;j<mvs.length;j++){const ty=mvs[j].type;
+      if(ty==='ยืนยันรับ'&&!conf)conf=mvs[j];
+      if((ty==='คืน'||ty==='รับคืนจากซ่อม')&&!ret)ret=mvs[j];}
+    const ri=mvs.map(m=>m.type).lastIndexOf('ส่งซ่อม');
+    const r=ri>=0?mvs[ri]:null;
+    let back=null;
+    if(r)for(let j=ri+1;j<mvs.length;j++){if(mvs[j].type==='รับคืนจากซ่อม'){back=mvs[j];break;}}
+    const repDays=r?days(r.date,back?back.date:today()):null;
+    return {t,b,conf,ret,r,back,repDays};
+  });
+  const cell=(main,sub)=>`<div style="font-weight:600">${main}</div>${sub?`<div style="font-size:10.5px;color:#64748b">${sub}</div>`:''}`;
+  const ok=s=>`<span style="color:#15803d;font-weight:700">✓ ${s}</span>`, no=s=>`<span style="color:#b91c1c;font-weight:700">✗ ${s}</span>`, wait=s=>`<span style="color:#b45309;font-weight:700">⏳ ${s}</span>`;
+  const TD='border:1px solid #cbd5e1;padding:7px 8px;vertical-align:top;';
+  const dash='<span style="color:#94a3b8">—</span>';
+  const body=rows.map((x,i)=>{
+    const t=x.t;
+    return `<tr style="page-break-inside:avoid">
+      <td style="${TD}text-align:center">${i+1}</td>
+      <td style="${TD}">${cell(esc(slipName(t)), esc([t.brand,t.model].filter(Boolean).join(' ')))}<div style="font-size:10.5px;color:#0f172a"><b>${esc(t.no)}</b>${t.sn?' · S/N '+esc(t.sn):''}</div></td>
+      <td style="${TD}">${x.b?cell(esc(x.b.project||'-'),dd(x.b.date)+(x.b.actor?' · '+esc(x.b.actor):'')):dash}</td>
+      <td style="${TD}text-align:center">${!x.b?dash:(x.conf?ok(dd(x.conf.date))+`<div style="font-size:10px;color:#64748b">${esc(x.conf.actor||'')}</div>`:(x.b.receiver?ok('ผู้รับ: '+esc(x.b.receiver))+'<div style="font-size:10px;color:#64748b">(กรอกมือ)</div>':no('ไม่มียืนยัน')))}</td>
+      <td style="${TD}text-align:center">${!x.b?dash:(x.ret?ok(dd(x.ret.date)):(t.status==='ถูกยืม'?wait('ยังอยู่ไซต์'):dash))}</td>
+      <td style="${TD}text-align:center">${x.r?dd(x.r.date)+(x.r.isDraft?'<div style="font-size:10px;color:#b45309">(ร่าง-ยังไม่ส่งจริง)</div>':''):'<span style="color:#94a3b8">ไม่เคยส่ง</span>'}</td>
+      <td style="${TD}text-align:center">${!x.r?dash:(x.back?ok(dd(x.back.date)):(x.r.isDraft?wait('รอส่ง'):no('ยังอยู่ร้าน')))}</td>
+      <td style="${TD}text-align:center;font-weight:700">${x.repDays!=null?x.repDays+' วัน'+(x.back?'':'<div style="font-size:10px;font-weight:400;color:#b45309">(ยังไม่จบ)</div>'):'—'}</td>
+      <td style="${TD}text-align:center">${chip(t.status)}</td>
+    </tr>`;}).join('');
+  const html=`<div id="bossrep" style="background:#fff;color:#0f172a;padding:26px 28px;width:1160px;font-family:'Noto Sans Thai',Tahoma,sans-serif">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #0f172a;padding-bottom:10px">
+      <div><div style="font-size:21px;font-weight:800">📋 รายงานติดตามเครื่องมือ</div>
+        <div style="font-size:12px;color:#64748b">LOTUS GROUP STOCK · ${found.length} เครื่อง${miss.length?' · หาไม่เจอ '+miss.length+' รายการ':''}</div></div>
+      <div style="font-size:12px;color:#64748b;text-align:right">ข้อมูล ณ วันที่ ${esc(fmtDateTH(today()))}</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:12px">
+      <thead><tr style="background:#f1f5f9">${['ลำดับ','เครื่องมือ','เบิกไปไซต์','ถึงหน้างานจริง?','คืนเมื่อ','ส่งซ่อมเมื่อ','กลับจากซ่อม?','ซ่อมนาน','สถานะตอนนี้'].map(h=>`<th style="border:1px solid #cbd5e1;padding:7px 8px;white-space:nowrap">${h}</th>`).join('')}</tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+    ${miss.length?`<div style="margin-top:9px;font-size:11.5px;color:#b91c1c">หาไม่เจอในทะเบียน: ${miss.map(esc).join(', ')}</div>`:''}
+  </div>`;
+  openModal(`<h3>📸 รายงานติดตามเครื่องมือ (${found.length})</h3>
+    <div style="overflow:auto;max-height:62vh;border:1px solid var(--line);border-radius:10px">${html}</div>
+    <div class="flexrow" style="margin-top:14px">
+      <button class="btn primary" onclick="bossReportPNG()">⬇️ บันทึกเป็นรูป PNG</button>
+      <button class="btn" onclick="(function(){$('#printArea').innerHTML=document.getElementById('bossrep').outerHTML;printNow(true);})()">🖨️ พิมพ์</button>
+      <button class="btn ghost" onclick="closeModal()">ปิด</button></div>`,true);
+}
+async function bossReportPNG(){
+  const el=document.getElementById('bossrep'); if(!el){toast('ไม่พบรายงาน');return;}
+  toast('กำลังสร้างรูป…');
+  if(!window.html2canvas){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);}).catch(()=>{});}
+  if(!window.html2canvas){toast('โหลดตัวแปลงรูปไม่ได้ — ลองใช้ปุ่มพิมพ์แทน');return;}
+  try{
+    const canvas=await html2canvas(el,{scale:2,backgroundColor:'#ffffff'});
+    const a=document.createElement('a');a.href=canvas.toDataURL('image/png');
+    a.download='รายงานติดตามเครื่องมือ_'+today()+'.png';document.body.appendChild(a);a.click();a.remove();
+    toast('✅ บันทึกรูปแล้ว');
+  }catch(e){toast('สร้างรูปไม่ได้: '+e.message);}
+}
 /* ============ SCAN (มือถือ — เฟส 2: ยืนยันรับ / ส่งคืน / แจ้งชำรุด) ============ */
 let scanTool=null;
 function stopScanner(){ if(window._scanner){try{window._scanner.stop().then(()=>{try{window._scanner.clear();}catch(e){}}).catch(()=>{});}catch(e){} window._scanner=null;} }
