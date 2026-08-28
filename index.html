@@ -1953,7 +1953,19 @@ function borrowSlipDetail(i){
       ${kv('คืนแล้ว',(b.tools.length-(b.out||0))+' / '+b.tools.length)}
     </div>
     <div class="listbox" style="max-height:44vh"><table class="locktbl"><thead><tr><th>ลำดับ</th><th>รายการ</th><th class="center">NO</th><th>PR</th><th>สถานะคืน</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="flexrow" style="margin-top:14px"><button class="btn primary" onclick="reprintBorrow(${i})">🖨️ พิมพ์ใบ</button><button class="btn" onclick="editBorrowBatchForm(${i})">✏️ แก้ไข</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+    <div class="flexrow" style="margin-top:14px"><button class="btn primary" onclick="reprintBorrow(${i})">🖨️ พิมพ์ใบ</button><button class="btn" onclick="editBorrowBatchForm(${i})">✏️ แก้ไข</button>${(b.no!=null&&!b.draft&&(b.out||0)===b.tools.length)?`<button class="btn" style="background:#fef3c7;color:#92400e" onclick="revertBorrowToDraft(${i})" title="ออกใบแล้วแต่ของยังไม่ได้ส่งออกไปจริง — ถอยทั้งใบกลับเข้าใบร่าง">↩️ ถอยกลับเป็นร่าง (ยังไม่ได้ส่งจริง)</button>`:''}<button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+}
+async function revertBorrowToDraft(i){
+  const b=(window._bb||[])[i]; if(!b){toast('ไม่พบใบเบิก');return;}
+  if(b.no==null||b.draft){toast('ใบนี้เป็นร่างอยู่แล้ว');return;}
+  if((b.out||0)!==b.tools.length){toast('ใบนี้มีเครื่องคืนแล้วบางส่วน — ถอยเป็นร่างไม่ได้');return;}
+  if(!confirm(`ถอยใบส่งไซต์ #${String(b.no).padStart(3,'0')} ${b.company} กลับเป็น "ใบร่าง"?\n\n• เครื่อง ${b.tools.length} ตัว + PR/หมายเหตุ กลับเข้าร่างครบ (ไม่ต้องคีย์ใหม่)\n• เลขใบ #${String(b.no).padStart(3,'0')} ถูกยกเลิก (ใบที่ปริ้นไว้ทิ้งได้ · ส่งจริงวันไหนออกเลขใหม่)`))return;
+  for(const mid of b.movIds){if(!mid)continue;
+    const r=await sb.from('movements').update({borrow_no:null,is_draft:true}).eq('id',mid);
+    if(r.error){toast('ถอยไม่ได้: '+r.error.message);return;}}
+  await logAudit('ถอยใบเป็นร่าง',b.company,'ใบส่งไซต์ #'+String(b.no).padStart(3,'0'),b.tools.length+' เครื่องกลับเข้าใบร่าง (ยังไม่ได้ส่งจริง)');
+  closeModal();toast(`↩️ ถอยใบ #${String(b.no).padStart(3,'0')} เป็นร่างแล้ว (${b.tools.length} เครื่อง) — ดูที่ ประวัติ → ใบร่าง`);
+  await loadAll();go('history');
 }
 function histDrafts(){
   const bb=draftBatches(); window._bb=bb;
