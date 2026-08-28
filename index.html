@@ -2261,7 +2261,26 @@ function slipDetail(slipNo,co){
       ${s.note?`<div style="grid-column:1/3"><span class="muted">หมายเหตุ:</span> ${esc(s.note)}</div>`:''}
     </div>
     <div style="max-height:42vh;overflow:auto"><table><thead><tr><th>#</th><th>รายการ / รหัส</th><th>NO</th><th>โครงการ</th><th>อาการ/สาเหตุ</th><th>รับคืน</th></tr></thead><tbody>${rows||'<tr><td colspan=6 class="empty">ไม่มีรายการ</td></tr>'}</tbody></table></div>
-    <div class="flexrow" style="margin-top:12px"><button class="btn primary" onclick="editSlipForm(${slipNo},'${esc(co)}')">✏️ แก้ไขใบ</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+    <div class="flexrow" style="margin-top:12px"><button class="btn primary" onclick="editSlipForm(${slipNo},'${esc(co)}')">✏️ แก้ไขใบ</button>${s.status==='ส่งแล้ว'?`<button class="btn" style="background:#fef3c7;color:#92400e" onclick="revertSlipToDraft(${slipNo},'${esc(co)}')" title="ออกใบแล้วแต่ยังไม่ได้เอาไปส่งจริง — ถอยทั้งใบกลับเข้าใบร่าง (เครื่อง+อาการครบ) รอส่งวันหลัง">↩️ ถอยกลับเป็นร่าง (ยังไม่ได้ส่งจริง)</button>`:''}<button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+}
+async function revertSlipToDraft(slipNo,co){
+  const s=S.slips.find(x=>x.slip_no===slipNo&&x.company===co); if(!s){toast('ไม่พบใบ');return;}
+  const ms=S.movements.filter(m=>m.slipNo===slipNo&&m.company===co&&m.type==='ส่งซ่อม');
+  if(!ms.length){toast('ใบนี้ไม่มีรายการเครื่อง');return;}
+  const hasBack=S.movements.some(m=>m.slipNo===slipNo&&m.company===co&&m.type==='รับคืนจากซ่อม');
+  if(hasBack){toast('ใบนี้มีการรับคืนแล้ว — ถอยเป็นร่างไม่ได้');return;}
+  if(!confirm(`ถอยใบส่งซ่อม #${String(slipNo).padStart(3,'0')} ${co} กลับเป็น "ใบร่าง"?\n\n• เครื่อง ${ms.length} ตัว + อาการที่กรอกไว้ กลับเข้าร่างครบ (ไม่ต้องคีย์ใหม่)\n• เครื่องเป็นสถานะ "รอส่งซ่อม" อยู่ออฟฟิต\n• เลขใบ #${String(slipNo).padStart(3,'0')} ถูกยกเลิก (ใบที่ปริ้นไว้ทิ้งได้ · ส่งจริงวันไหนออกเลขใหม่)`))return;
+  // movement เดิมกลับเป็นร่าง (คงอาการ/ร้าน/ผู้ส่ง/ไซต์เดิมทั้งหมด)
+  const r1=await sb.from('movements').update({slip_no:null,is_draft:true}).eq('company',co).eq('slip_no',slipNo).eq('type','ส่งซ่อม').eq('deleted',false);
+  if(r1.error){toast('ถอยไม่ได้: '+r1.error.message);return;}
+  // เครื่อง → รอส่งซ่อม @ ออฟฟิต
+  for(const m of ms){if(!m.tool_id)continue;const t=S.tools.find(x=>x.id===m.tool_id);
+    if(t&&t.status==='ส่งซ่อม')await sb.from('tools').update({status:'รอส่งซ่อม',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',m.tool_id);}
+  // ลบตัวใบ (เลขถูกยกเลิก — ระบบออกเลขใหม่เสมอ ไม่ชนกัน)
+  await sb.from('repair_slips').delete().eq('company',co).eq('slip_no',slipNo);
+  await logAudit('ถอยใบเป็นร่าง',co,'ใบซ่อม #'+String(slipNo).padStart(3,'0'),ms.length+' เครื่องกลับเข้าใบร่าง (ยังไม่ได้ส่งจริง)');
+  closeModal();toast(`↩️ ถอยใบ #${String(slipNo).padStart(3,'0')} เป็นร่างแล้ว (${ms.length} เครื่อง) — ดูที่ ประวัติ → ใบร่าง`);
+  await loadAll();go('history');
 }
 function editSlipForm(slipNo,co){
   const s=S.slips.find(x=>x.slip_no===slipNo&&x.company===co); if(!s){toast('ไม่พบใบ');return;}
