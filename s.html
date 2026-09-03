@@ -258,7 +258,7 @@ async function actMoveSite(){
   if(site===((TOOL.location||'').split('/')[0]||'').trim()){toast('เครื่องอยู่ไซต์นี้อยู่แล้ว');return;}
   const prev=snapTool(TOOL),co=TOOL.company;
   await sb.from('tools').update({location:site,pending_dest:site,dispatched_at:now(),updated_at:now()}).eq('id',TOOL.id);
-  const {data:ins}=await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'ย้ายไซต์',project:site,actor:ME.email}).select('id').maybeSingle();
+  const {data:ins}=await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'ย้ายไซต์',project:site,actor:(ME.fullName||ME.email)}).select('id').maybeSingle();
   LAST={label:'ย้ายไซต์',toolId:TOOL.id,name:(TOOL.no||TOOL.name||''),prevTool:prev,movId:ins&&ins.id,slip:null};
   afterAction('🔀 ย้ายไป '+site+' แล้ว');
 }
