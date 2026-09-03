@@ -1559,7 +1559,7 @@ function drawBorrow(){
     <div class="flexrow"><div class="field"><label>บริษัทที่ออกใบ (หัวกระดาษ) *</label><select id="b_co">${['PAC','LOTUS'].map(c=>`<option value="${c}" ${dCo===c?'selected':''}>${c==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)'}</option>`).join('')}</select></div><div class="field"><label>วันที่ *</label><input id="b_date" type="date" value="${borDraft?esc(borDraft.date):today()}"></div><div class="field"><label>ผู้เบิก *</label><input id="b_who" list="dl_p3" value="${borDraft?esc(borDraft.who):''}"></div><div class="field"><label>โครงการ/ไซต์ *</label><div style="display:flex;gap:6px"><select id="b_proj" style="flex:1"><option value="">— เลือกไซต์ —</option>${S.lookups.projects.map(p=>`<option ${borDraft&&borDraft.project===p?'selected':''}>${esc(p)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addSiteInline()" title="เพิ่มไซต์ใหม่">➕</button></div></div></div>`;
     btn='👁️ ดูใบส่งไซต์ (ยังไม่บันทึก)'; title='เลือกเครื่อง "ว่าง" ที่จะเบิกออกไซต์';
   } else if(mode==='move'){
-    form=`<div class="flexrow"><div class="field"><label>วันที่ *</label><input id="b_date" type="date" value="${today()}"></div><div class="field"><label>ผู้ที่เอาไป</label><input id="b_who" list="dl_p3"></div><div class="field"><label>ไซต์ใหม่ *</label><div style="display:flex;gap:6px"><select id="b_proj" style="flex:1"><option value="">— เลือกไซต์ —</option>${S.lookups.projects.map(p=>`<option>${esc(p)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addSiteInline()" title="เพิ่มไซต์ใหม่">➕</button></div></div></div>`;
+    form=`<div class="flexrow"><div class="field"><label>วันที่ *</label><input id="b_date" type="date" value="${today()}"></div><div class="field"><label>ผู้ที่เอาไป</label><input id="b_who" list="dl_p3"></div><div class="field"><label>จากไซต์ (ต้นทาง)</label><select id="b_from"><option value="">— ตามที่ระบบรู้ (ที่เครื่องอยู่ตอนนี้) —</option>${S.lookups.projects.map(p=>`<option>${esc(p)}</option>`).join('')}<option>ออฟฟิต</option></select></div><div class="field"><label>ไปไซต์ (ปลายทาง) *</label><div style="display:flex;gap:6px"><select id="b_proj" style="flex:1"><option value="">— เลือกไซต์ —</option>${S.lookups.projects.map(p=>`<option>${esc(p)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addSiteInline()" title="เพิ่มไซต์ใหม่">➕</button></div></div></div>`;
     btn='🔀 บันทึกย้ายไซต์'; title='เลือกเครื่องที่ "ถูกยืม" อยู่ → ย้ายไปไซต์ใหม่ (ไม่ต้องคืนก่อน)';
   } else {
     form=`<div class="field"><label>วันที่คืน *</label><input id="b_date" type="date" value="${today()}"></div>`;
@@ -1768,11 +1768,12 @@ async function doMove(withPrint){
   const date=$('#b_date').value, who=$('#b_who').value.trim(), proj=$('#b_proj').value.trim();
   if(!proj){toast('กรุณากรอก ไซต์ใหม่');return;}
   const sel=[...selBor].map(ix=>S.tools[ix]);
+  const fromSel=($('#b_from')?$('#b_from').value.trim():'');
   const items=[],ids=[];
   for(const t of sel){
-    const from=((t.loc||'').split(' / ')[0]||'').trim();
+    const from=fromSel||((t.loc||'').split(' / ')[0]||'').trim();
     await sb.from('tools').update({location:proj+(who?' / '+who:''),receipt_pending:true,pending_dest:proj,dispatched_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',t.id);
-    const {data:ins,error}=await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'ย้ายไซต์',project:proj,actor:who}).select('id').maybeSingle();
+    const {data:ins,error}=await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'ย้ายไซต์',project:proj,actor:who,from_project:(from||null)}).select('id').maybeSingle();
     if(error){toast('❌ บันทึกย้ายไม่สำเร็จ ('+esc(t.no||t.code)+'): '+error.message);return;}
     items.push(Object.assign({},t,{_from:from})); if(ins&&ins.id)ids.push(ins.id);
   }
