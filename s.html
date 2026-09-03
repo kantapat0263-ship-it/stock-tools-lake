@@ -128,7 +128,8 @@ function render(t,mv){
         ?`<div style="background:#dcfce7;color:#166534;padding:11px 13px;border-radius:11px;margin-bottom:11px;font-size:13.5px">✅ รับเข้าไซต์แล้ว · โดย <b>${esc(conf.actor||conf.recorded_by||'-')}</b>${conf.occurred_on?' · '+esc(fmtDate(conf.occurred_on)):''}</div>`
         :`<input id="rnote" class="inp" placeholder="โน้ต (ไม่บังคับ)" style="margin-bottom:9px"><button class="btn primary" onclick="actReceiveAtSite()">✅ รับเข้าไซต์ (ยืนยันของถึงแล้ว)</button>`)
         +`<div class="muted" style="font-size:13px;margin:13px 0 7px">🔀 หรือย้ายเครื่องนี้ไปไซต์ใหม่ — ตอนนี้อยู่ที่ <b>${esc(t.location)||'-'}</b></div>
-        <select id="movesite" class="inp" style="margin-bottom:9px"><option value="">— เลือกไซต์ปลายทาง —</option>${SITES.map(s=>`<option>${esc(s)}</option>`).join('')}</select>
+        <select id="movefrom" class="inp" style="margin-bottom:9px"><option value="">— จากไซต์ (ต้นทาง) —</option>${SITES.map(s=>`<option ${s===site?'selected':''}>${esc(s)}</option>`).join('')}<option ${site==='ออฟฟิต'?'selected':''}>ออฟฟิต</option></select>
+        <select id="movesite" class="inp" style="margin-bottom:9px"><option value="">— ไปไซต์ (ปลายทาง) —</option>${SITES.map(s=>`<option>${esc(s)}</option>`).join('')}</select>
         <button class="btn" style="background:var(--blue);color:#fff" onclick="actMoveSite()">🔀 ย้ายไปไซต์นี้</button>`;
     }else{
       actions=`<div class="muted" style="font-size:13px;text-align:center;padding:6px">— เครื่องนี้สถานะ ${esc(t.status)} · ย้ายได้เฉพาะเครื่องที่ "ถูกยืม" ออกไซต์อยู่ (เครื่องในออฟฟิศ ต้องเบิกที่ออฟฟิศ)</div>`;
@@ -254,11 +255,12 @@ async function actReceiveRepair(){
 }
 async function actMoveSite(){
   const sel=$('#movesite'),site=sel?sel.value.trim():'';
+  const fsel=$('#movefrom'),fromSite=fsel?fsel.value.trim():'';
   if(!site){toast('เลือกไซต์ปลายทางก่อน');return;}
   if(site===((TOOL.location||'').split('/')[0]||'').trim()){toast('เครื่องอยู่ไซต์นี้อยู่แล้ว');return;}
   const prev=snapTool(TOOL),co=TOOL.company;
   await sb.from('tools').update({location:site,pending_dest:site,dispatched_at:now(),updated_at:now()}).eq('id',TOOL.id);
-  const {data:ins}=await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'ย้ายไซต์',project:site,actor:(ME.fullName||ME.email)}).select('id').maybeSingle();
+  const {data:ins}=await sb.from('movements').insert({company:co,owner_company:TOOL.company,recorded_by:ME.email,tool_id:TOOL.id,occurred_on:today(),type:'ย้ายไซต์',project:site,actor:(ME.fullName||ME.email),from_project:(fromSite||((TOOL.location||'').split('/')[0]||'').trim()||null)}).select('id').maybeSingle();
   LAST={label:'ย้ายไซต์',toolId:TOOL.id,name:(TOOL.no||TOOL.name||''),prevTool:prev,movId:ins&&ins.id,slip:null};
   afterAction('🔀 ย้ายไป '+site+' แล้ว');
 }
