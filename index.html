@@ -321,7 +321,7 @@ function toolThumb(t){const url=toolImgUrl(t);
 function toolImgHtml(t){const url=toolImgUrl(t);if(!url)return '';
   return `<div style="text-align:center;margin:2px 0 12px"><img src="${esc(url)}" alt="" style="max-width:100%;max-height:150px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;padding:4px" onerror="this.parentNode.style.display='none'"></div>`;}
 function rowToSlip(s){return {id:s.id,slip_no:s.slip_no,no:String(s.slip_no).padStart(3,'0'),sent:(s.sent_date||''),vendor:s.vendor||'',project:s.project||'',sender:s.sender||'',status:s.status||'ส่งแล้ว',received:(s.received_date||''),receiver:s.receiver||'',note:s.note||'',count:'0',company:s.company};}
-function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',symptom:m.symptom||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||'',borrowNo:(m.borrow_no!=null?m.borrow_no:null),prNo:(m.pr_no||''),isDraft:!!m.is_draft,receiver:(m.receiver||''),moveNo:(m.move_no!=null?m.move_no:null)};}
+function rowToMov(m,byId){const t=m.tool_id?byId[m.tool_id]:null;return {id:m.id,tool_id:m.tool_id,slipNo:m.slip_no,date:(m.occurred_on||''),code:t?t.code:(m.label||''),cat:t?t.cat:'',no:t?t.no:'',type:m.type,slip:m.slip_no?String(m.slip_no).padStart(3,'0'):'',project:m.project||'',actor:m.actor||'',vendor:m.counterparty||'',reason:m.reason||'',symptom:m.symptom||'',doc:m.doc_no||'',note:m.note||'',label:m.label||'',company:m.company,createdAt:m.created_at||'',recordedBy:m.recorded_by||'',ownerCompany:m.owner_company||'',borrowNo:(m.borrow_no!=null?m.borrow_no:null),prNo:(m.pr_no||''),isDraft:!!m.is_draft,receiver:(m.receiver||''),moveNo:(m.move_no!=null?m.move_no:null),fromProject:(m.from_project||'')};}
 async function fetchAllMov(){
   const all=[];const PAGE=1000;let from=0;
   for(;;){
@@ -2001,7 +2001,8 @@ function moveBatches(){
     const g=groups[key]=groups[key]||{date,project:proj,who,company:co,no:(m.moveNo!=null?m.moveNo:null),tools:[],movIds:[]};
     const t=S.tools.find(x=>x.id===m.tool_id);
     const info=t?Object.assign({},t):{name:m.label||m.code||'',cat:'',no:'',code:m.code||'',company:co,brand:'',model:'',sn:''};
-    info._from=fromSite(m);
+    const autoFrom=fromSite(m);
+    info._fromAuto=autoFrom; info._fromManual=(m.fromProject||''); info._from=info._fromManual||autoFrom;
     g.tools.push(info); g.movIds.push(m.id);
   });
   return Object.values(groups).filter(g=>!FILTER||g.company===FILTER)
@@ -2030,9 +2031,14 @@ function histMoves(){
 function moveSlipDetail(i){
   const b=(window._mb||[])[i]; if(!b){toast('ไม่พบใบย้าย');return;}
   const froms=[...new Set(b.tools.map(t=>t._from).filter(Boolean))].map(esc).join(', ');
-  const rows=b.tools.map((t,ix)=>
-    `<tr><td class="center">${ix+1}</td><td><b>${esc(itemDesc(t))||'-'}</b></td><td class="center">${esc(t.no)||'-'}</td><td>${esc(t.sn)||'-'}</td><td>${esc(t._from)||'<span class="muted">—</span>'}</td></tr>`
-  ).join('');
+  const sites=[...new Set([...(S.lookups.projects||[]),'ออฟฟิต'])];
+  const rows=b.tools.map((t,ix)=>{
+    const cur=t._fromManual||'', auto=t._fromAuto||'';
+    const ph=auto?('— ตามประวัติ: '+esc(auto)+' —'):'— ไม่ทราบ (เลือกไซต์) —';
+    const opts=`<option value="">${ph}</option>`+sites.map(p=>`<option ${cur===p?'selected':''}>${esc(p)}</option>`).join('');
+    const warn=(!cur&&!auto)?'border-color:#f59e0b;background:#fffbeb;':'';
+    return `<tr><td class="center">${ix+1}</td><td><b>${esc(itemDesc(t))||'-'}</b></td><td class="center">${esc(t.no)||'-'}</td><td>${esc(t.sn)||'-'}</td><td><select onchange="setMoveFrom(${i},${ix},this.value)" style="padding:3px 5px;min-width:160px;${warn}">${opts}</select>${cur?'<div class="muted" style="font-size:11px">✏️ กรอกเอง</div>':''}</td></tr>`;
+  }).join('');
   const kv=(k,v)=>`<div><span class="muted">${k}:</span> <b>${v}</b></div>`;
   openModal(`<h3>🔀 ใบย้ายไซต์ ${b.no!=null?'#'+String(b.no).padStart(3,'0'):'<span class="muted" style="font-size:13px;font-weight:400">(ยังไม่ออกเลขที่ — ออกให้ตอนกดพิมพ์)</span>'} ${coBadge(b.company)}</h3>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px;margin:10px 0;padding:11px 14px;background:var(--bg);border-radius:9px">
@@ -2042,8 +2048,18 @@ function moveSlipDetail(i){
       ${kv('วันที่ย้าย',esc(fmtDateTH(b.date))||'-')}
       ${kv('จำนวน',b.tools.length+' เครื่อง')}
     </div>
-    <div class="listbox" style="max-height:44vh"><table class="locktbl"><thead><tr><th>ลำดับ</th><th>รายการ</th><th class="center">NO</th><th>S/N</th><th>จากไซต์</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="muted" style="font-size:12px;margin:-2px 0 8px">ช่อง "จากไซต์" ระบบดึงจากประวัติเครื่องให้ · เครื่องที่เพิ่งเข้าระบบครั้งแรกจะว่าง (กรอบเองได้) · แก้แล้วขึ้นในใบที่พิมพ์ด้วย</p>
+    <div class="listbox" style="max-height:44vh"><table class="locktbl"><thead><tr><th>ลำดับ</th><th>รายการ</th><th class="center">NO</th><th>S/N</th><th>จากไซต์ (แก้ได้)</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="flexrow" style="margin-top:14px"><button class="btn primary" onclick="printMove(${i})">🖨️ พิมพ์ใบ</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+}
+async function setMoveFrom(i,ix,val){
+  const b=(window._mb||[])[i]; if(!b){toast('ไม่พบใบย้าย');return;}
+  const mid=b.movIds[ix]; if(!mid){toast('ไม่พบรายการ');return;}
+  const r=await sb.from('movements').update({from_project:(val||null)}).eq('id',mid);
+  if(r.error){toast('บันทึกไม่ได้: '+r.error.message);return;}
+  if(val)await ensureLookup('projects',val);
+  toast(val?('บันทึกแล้ว — มาจาก '+val):'กลับไปใช้ค่าที่ระบบคำนวณให้');
+  await loadAll(); if(histTab==='moves'&&$('#hbody'))histMoves(); moveSlipDetail(i);
 }
 async function printMove(i){
   const b=(window._mb||[])[i]; if(!b){toast('ไม่พบใบย้าย');return;}
