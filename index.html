@@ -1993,23 +1993,15 @@ function moveBatches(){
       if(ty==='เบิก'||ty==='ย้ายไซต์')return a[j].project||'';
       if(ty==='คืน'||ty==='รับคืนจากซ่อม')return 'ออฟฟิต';}
     return '';};
-  const confirmOf=(m)=>{const a=byTool[m.tool_id]||[],i=a.findIndex(x=>x.id===m.id);
-    for(let j=i+1;j<a.length;j++){const ty=a[j].type;
-      if(ty==='ยืนยันรับ')return a[j];
-      if(ty==='เบิก'||ty==='คืน'||ty==='ย้ายไซต์')return null;}
-    return null;};
   const groups={};
   S.movements.forEach(m=>{
     if(m.type!=='ย้ายไซต์'||m.isDraft)return;
     const co=m.company,date=m.date,proj=m.project||'',who=m.actor||m.recordedBy||'';
     const key=(m.moveNo!=null)?(co+'#'+m.moveNo):(co+'|'+date+'|'+proj+'|'+who);
-    const g=groups[key]=groups[key]||{date,project:proj,who,company:co,no:(m.moveNo!=null?m.moveNo:null),tools:[],movIds:[],confirmed:0};
+    const g=groups[key]=groups[key]||{date,project:proj,who,company:co,no:(m.moveNo!=null?m.moveNo:null),tools:[],movIds:[]};
     const t=S.tools.find(x=>x.id===m.tool_id);
     const info=t?Object.assign({},t):{name:m.label||m.code||'',cat:'',no:'',code:m.code||'',company:co,brand:'',model:'',sn:''};
     info._from=fromSite(m);
-    const cf=confirmOf(m);
-    info._confirmBy=cf?(cf.actor||''):''; info._confirmOn=cf?(cf.date||''):'';
-    if(cf)g.confirmed++;
     g.tools.push(info); g.movIds.push(m.id);
   });
   return Object.values(groups).filter(g=>!FILTER||g.company===FILTER)
@@ -2025,12 +2017,11 @@ function histMoves(){
   const draw=()=>{const q=$('#hmq').value.trim().toLowerCase();
     const list=batches.map((b,i)=>({b,i})).filter(o=>!q||((o.b.no!=null?String(o.b.no).padStart(3,'0'):'')+' '+(o.b.project||'')+' '+(o.b.who||'')+' '+(o.b.company||'')+' '+(o.b.date||'')+' '+o.b.tools.map(t=>t._from||'').join(' ')).toLowerCase().includes(q));
     const pg=pgSlice('moves',list);
-    $('#hmtbl').innerHTML=`<table class="locktbl"><thead><tr><th>เลขที่</th><th>วันที่</th><th>จากไซต์</th><th>ไปไซต์</th><th>บ.</th><th>ผู้ย้าย</th><th class="center">จำนวน</th><th>ยืนยันรับที่ไซต์</th><th></th></tr></thead><tbody>${
+    $('#hmtbl').innerHTML=`<table class="locktbl"><thead><tr><th>เลขที่</th><th>วันที่</th><th>จากไซต์</th><th>ไปไซต์</th><th>บ.</th><th>ผู้ย้าย</th><th class="center">จำนวน</th><th></th></tr></thead><tbody>${
       pg.rows.map(({b,i})=>{
         const froms=[...new Set(b.tools.map(t=>t._from).filter(Boolean))];
         const fTxt=froms.length?esc(froms.slice(0,2).join(', '))+(froms.length>2?` +${froms.length-2}`:''):'<span class="muted">—</span>';
-        const st=b.confirmed>=b.tools.length?`<span class="chip" style="background:#dcfce7;color:#15803d">✅ รับครบ</span>`:(b.confirmed?`<span class="chip" style="background:#fef3c7;color:#92400e">⏳ รับแล้ว ${b.confirmed}/${b.tools.length}</span>`:`<span class="chip" style="background:#f1f5f9;color:#475569">— ยังไม่ยืนยัน</span>`);
-        return `<tr style="cursor:pointer" onclick="moveSlipDetail(${i})"><td><b>${b.no!=null?String(b.no).padStart(3,'0'):'<span class="muted" style="font-weight:400">ยังไม่ออก</span>'}</b></td><td>${esc(fmtDateTH(b.date))||'-'}</td><td>${fTxt}</td><td><b>${esc(b.project)||'-'}</b></td><td>${coBadge(b.company)}</td><td>${esc(b.who)||'-'}</td><td class="center">${b.tools.length}</td><td>${st}</td><td class="right" style="white-space:nowrap"><button class="btn" style="background:var(--blue);color:#fff;padding:5px 11px" onclick="event.stopPropagation();printMove(${i})">🖨️ พิมพ์</button></td></tr>`;}).join('')||`<tr><td colspan=9 class="empty">${q?'ไม่พบรายการที่ค้นหา':'ยังไม่มีการย้ายไซต์'}</td></tr>`
+        return `<tr style="cursor:pointer" onclick="moveSlipDetail(${i})"><td><b>${b.no!=null?String(b.no).padStart(3,'0'):'<span class="muted" style="font-weight:400">ยังไม่ออก</span>'}</b></td><td>${esc(fmtDateTH(b.date))||'-'}</td><td>${fTxt}</td><td><b>${esc(b.project)||'-'}</b></td><td>${coBadge(b.company)}</td><td>${esc(b.who)||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="background:var(--blue);color:#fff;padding:5px 11px" onclick="event.stopPropagation();printMove(${i})">🖨️ พิมพ์</button></td></tr>`;}).join('')||`<tr><td colspan=8 class="empty">${q?'ไม่พบรายการที่ค้นหา':'ยังไม่มีการย้ายไซต์'}</td></tr>`
     }</tbody></table>${pg.html}`;};
   PG_REDRAW['moves']=draw;
   $('#hmq').oninput=()=>{pgReset('moves');draw();};
@@ -2039,12 +2030,9 @@ function histMoves(){
 function moveSlipDetail(i){
   const b=(window._mb||[])[i]; if(!b){toast('ไม่พบใบย้าย');return;}
   const froms=[...new Set(b.tools.map(t=>t._from).filter(Boolean))].map(esc).join(', ');
-  const rows=b.tools.map((t,ix)=>{
-    const s=t._confirmBy
-      ?`<span style="color:#16a34a">✅ รับแล้ว${t._confirmOn?' · '+esc(fmtDateTH(t._confirmOn)):''}</span><div class="muted" style="font-size:11.5px">📍 ${esc(t._confirmBy)}</div>`
-      :`<span class="muted">— ยังไม่ยืนยันรับ</span>`;
-    return `<tr><td class="center">${ix+1}</td><td><b>${esc(itemDesc(t))||'-'}</b></td><td class="center">${esc(t.no)||'-'}</td><td>${esc(t._from)||'<span class="muted">—</span>'}</td><td>${s}</td></tr>`;
-  }).join('');
+  const rows=b.tools.map((t,ix)=>
+    `<tr><td class="center">${ix+1}</td><td><b>${esc(itemDesc(t))||'-'}</b></td><td class="center">${esc(t.no)||'-'}</td><td>${esc(t.sn)||'-'}</td><td>${esc(t._from)||'<span class="muted">—</span>'}</td></tr>`
+  ).join('');
   const kv=(k,v)=>`<div><span class="muted">${k}:</span> <b>${v}</b></div>`;
   openModal(`<h3>🔀 ใบย้ายไซต์ ${b.no!=null?'#'+String(b.no).padStart(3,'0'):'<span class="muted" style="font-size:13px;font-weight:400">(ยังไม่ออกเลขที่ — ออกให้ตอนกดพิมพ์)</span>'} ${coBadge(b.company)}</h3>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px;margin:10px 0;padding:11px 14px;background:var(--bg);border-radius:9px">
@@ -2053,9 +2041,8 @@ function moveSlipDetail(i){
       ${kv('ผู้ย้าย',esc(b.who)||'-')}
       ${kv('วันที่ย้าย',esc(fmtDateTH(b.date))||'-')}
       ${kv('จำนวน',b.tools.length+' เครื่อง')}
-      ${kv('ยืนยันรับที่ไซต์',b.confirmed+' / '+b.tools.length)}
     </div>
-    <div class="listbox" style="max-height:44vh"><table class="locktbl"><thead><tr><th>ลำดับ</th><th>รายการ</th><th class="center">NO</th><th>จากไซต์</th><th>สถานะรับที่ไซต์ใหม่</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="listbox" style="max-height:44vh"><table class="locktbl"><thead><tr><th>ลำดับ</th><th>รายการ</th><th class="center">NO</th><th>S/N</th><th>จากไซต์</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="flexrow" style="margin-top:14px"><button class="btn primary" onclick="printMove(${i})">🖨️ พิมพ์ใบ</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
 }
 async function printMove(i){
