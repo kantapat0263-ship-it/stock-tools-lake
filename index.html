@@ -1559,7 +1559,7 @@ function drawBorrow(){
     <div class="flexrow"><div class="field"><label>บริษัทที่ออกใบ (หัวกระดาษ) *</label><select id="b_co">${['PAC','LOTUS'].map(c=>`<option value="${c}" ${dCo===c?'selected':''}>${c==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)'}</option>`).join('')}</select></div><div class="field"><label>วันที่ *</label><input id="b_date" type="date" value="${borDraft?esc(borDraft.date):today()}"></div><div class="field"><label>ผู้เบิก *</label><input id="b_who" list="dl_p3" value="${borDraft?esc(borDraft.who):''}"></div><div class="field"><label>โครงการ/ไซต์ *</label><div style="display:flex;gap:6px"><select id="b_proj" style="flex:1"><option value="">— เลือกไซต์ —</option>${S.lookups.projects.map(p=>`<option ${borDraft&&borDraft.project===p?'selected':''}>${esc(p)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addSiteInline()" title="เพิ่มไซต์ใหม่">➕</button></div></div></div>`;
     btn='👁️ ดูใบส่งไซต์ (ยังไม่บันทึก)'; title='เลือกเครื่อง "ว่าง" ที่จะเบิกออกไซต์';
   } else if(mode==='move'){
-    form=`<div class="flexrow"><div class="field"><label>วันที่ *</label><input id="b_date" type="date" value="${today()}"></div><div class="field"><label>ผู้ที่เอาไป</label><input id="b_who" list="dl_p3"></div><div class="field"><label>จากไซต์ (ต้นทาง)</label><select id="b_from"><option value="">— ตามที่ระบบรู้ (ที่เครื่องอยู่ตอนนี้) —</option>${S.lookups.projects.map(p=>`<option>${esc(p)}</option>`).join('')}<option>ออฟฟิต</option></select></div><div class="field"><label>ไปไซต์ (ปลายทาง) *</label><div style="display:flex;gap:6px"><select id="b_proj" style="flex:1"><option value="">— เลือกไซต์ —</option>${S.lookups.projects.map(p=>`<option>${esc(p)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addSiteInline()" title="เพิ่มไซต์ใหม่">➕</button></div></div></div>`;
+    form=`<div class="flexrow"><div class="field"><label>วันที่ *</label><input id="b_date" type="date" value="${today()}"></div><div class="field"><label>ผู้ที่เอาไป</label><input id="b_who" list="dl_p3"></div><div class="field"><label>จากไซต์ (ต้นทาง · ถ้าเลือก ใช้กับทุกเครื่องที่ติ๊ก)</label><select id="b_from"><option value="">— ตามที่ระบบรู้ (ที่เครื่องอยู่ตอนนี้) —</option>${S.lookups.projects.map(p=>`<option>${esc(p)}</option>`).join('')}<option>ออฟฟิต</option></select></div><div class="field"><label>ไปไซต์ (ปลายทาง) *</label><div style="display:flex;gap:6px"><select id="b_proj" style="flex:1"><option value="">— เลือกไซต์ —</option>${S.lookups.projects.map(p=>`<option>${esc(p)}</option>`).join('')}</select><button type="button" class="btn" style="padding:0 12px" onclick="addSiteInline()" title="เพิ่มไซต์ใหม่">➕</button></div></div></div>`;
     btn='🔀 บันทึกย้ายไซต์'; title='เลือกเครื่องที่ "ถูกยืม" อยู่ → ย้ายไปไซต์ใหม่ (ไม่ต้องคืนก่อน)';
   } else {
     form=`<div class="field"><label>วันที่คืน *</label><input id="b_date" type="date" value="${today()}"></div>`;
@@ -1766,32 +1766,45 @@ async function saveDraft(){
 async function doMove(withPrint){
   if(!selBor.size)return;
   const date=$('#b_date').value, who=$('#b_who').value.trim(), proj=$('#b_proj').value.trim();
+  if(!date){toast('กรุณากรอก วันที่');return;}
   if(!proj){toast('กรุณากรอก ไซต์ใหม่');return;}
-  const sel=[...selBor].map(ix=>S.tools[ix]);
+  const curSite=t=>((t.loc||'').split(' / ')[0]||'').trim();
+  const all=[...selBor].map(ix=>S.tools[ix]);
+  const sel=all.filter(t=>curSite(t)!==proj);
+  if(sel.length<all.length)toast(`ข้าม ${all.length-sel.length} เครื่องที่อยู่ ${proj} อยู่แล้ว`);
+  if(!sel.length)return;
   const fromSel=($('#b_from')?$('#b_from').value.trim():'');
+  const actor=who||(ME&&ME.fullName)||'';
   const items=[],ids=[];
   for(const t of sel){
-    const from=fromSel||((t.loc||'').split(' / ')[0]||'').trim();
     await sb.from('tools').update({location:proj+(who?' / '+who:''),receipt_pending:true,pending_dest:proj,dispatched_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',t.id);
-    const {data:ins,error}=await sb.from('movements').insert({company:COMPANY,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'ย้ายไซต์',project:proj,actor:who,from_project:(from||null)}).select('id').maybeSingle();
-    if(error){toast('❌ บันทึกย้ายไม่สำเร็จ ('+esc(t.no||t.code)+'): '+error.message);return;}
-    items.push(Object.assign({},t,{_from:from})); if(ins&&ins.id)ids.push(ins.id);
+    // from_project เก็บเฉพาะที่ผู้ใช้เลือกเอง — ปล่อย null ให้ระบบคำนวณจากประวัติ (fromSite)
+    const {data:ins,error}=await sb.from('movements').insert({company:t.company,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date,type:'ย้ายไซต์',project:proj,actor,from_project:(fromSel||null)}).select('id').maybeSingle();
+    if(error){toast('❌ บันทึกย้ายไม่สำเร็จ ('+(t.no||t.code)+'): '+error.message);await loadAll();renderBorrow();return;}
+    items.push(Object.assign({},t,{_from:fromSel||curSite(t)})); ids.push(ins?ins.id:null);
   }
   await ensureLookup('projects',proj); if(who)await ensureLookup('people',who);
   if(withPrint){
-    const {data:mn,error:mnErr}=await sb.rpc('next_move_no',{p_company:COMPANY});
-    if(mnErr)toast('ออกเลขใบไม่ได้: '+mnErr.message);
-    else{
-      for(const id of ids)await sb.from('movements').update({move_no:mn}).eq('id',id);
-      await logAudit('ออกเลขใบย้ายไซต์',COMPANY,'ใบย้ายไซต์ #'+String(mn).padStart(3,'0'),items.length+' เครื่อง → '+proj);
-      $('#printArea').innerHTML=moveDocHtml({no:mn,company:COMPANY,date,project:proj,who:who||(ME&&ME.fullName)||'',tools:items});printNow(true);
+    // ใบย้ายออกเลขตามบริษัทเจ้าของเครื่อง — เลือกปนหลายบริษัท = แยกใบ
+    $('#printArea').innerHTML='';
+    const cos=[...new Set(items.map(t=>t.company))]; let printed=0;
+    for(const co of cos){
+      const its=items.filter(t=>t.company===co), cids=ids.filter((id,k)=>id&&items[k].company===co);
+      const {data:mn,error:mnErr}=await sb.rpc('next_move_no',{p_company:co});
+      if(mnErr){toast('ออกเลขใบ '+co+' ไม่ได้: '+mnErr.message);continue;}
+      let bad=0;
+      for(const id of cids){const r=await sb.from('movements').update({move_no:mn}).eq('id',id);if(r.error)bad++;}
+      if(bad)toast('⚠️ บันทึกเลขใบไม่ครบ '+bad+' เครื่อง — เปิดใบจากประวัติแล้วกดพิมพ์ใหม่');
+      await logAudit('ออกเลขใบย้ายไซต์',co,'ใบย้ายไซต์ #'+String(mn).padStart(3,'0'),its.length+' เครื่อง → '+proj);
+      $('#printArea').innerHTML+=moveDocHtml({no:mn,company:co,date,project:proj,who:actor,tools:its}); printed++;
     }
+    if(printed)printNow(true);
   }
   toast(`ย้าย ${sel.length} เครื่องไป ${proj} แล้ว`);await loadAll();renderBorrow();
 }
 
 /* ============ cross-company borrow helpers ============ */
-function lastBorrowMov(toolId){const c=S.movements.filter(m=>m.tool_id===toolId&&(m.type==='เบิก'||m.type==='ย้ายไซต์'));return c.sort((a,b)=>String(a.createdAt||a.date).localeCompare(String(b.createdAt||b.date))).pop();}
+function lastBorrowMov(toolId){const c=S.movements.filter(m=>m.tool_id===toolId&&m.type==='เบิก');return c.sort((a,b)=>String(a.createdAt||a.date).localeCompare(String(b.createdAt||b.date))).pop();}
 function dormantTools(){
   const cut=ymd(new Date(Date.now()-365*86400000));
   const lastBy={};
@@ -2033,6 +2046,7 @@ function moveSlipDetail(i){
   const b=(window._mb||[])[i]; if(!b){toast('ไม่พบใบย้าย');return;}
   const froms=[...new Set(b.tools.map(t=>t._from).filter(Boolean))].map(esc).join(', ');
   const sites=[...new Set([...(S.lookups.projects||[]),'ออฟฟิต'])];
+  b.tools.forEach(t=>{if(t._fromManual&&!sites.includes(t._fromManual))sites.push(t._fromManual);});
   const rows=b.tools.map((t,ix)=>{
     const cur=t._fromManual||'', auto=t._fromAuto||'';
     const ph=auto?('— ตามประวัติ: '+esc(auto)+' —'):'— ไม่ทราบ (เลือกไซต์) —';
@@ -2060,7 +2074,10 @@ async function setMoveFrom(i,ix,val){
   if(r.error){toast('บันทึกไม่ได้: '+r.error.message);return;}
   if(val)await ensureLookup('projects',val);
   toast(val?('บันทึกแล้ว — มาจาก '+val):'กลับไปใช้ค่าที่ระบบคำนวณให้');
-  await loadAll(); if(histTab==='moves'&&$('#hbody'))histMoves(); moveSlipDetail(i);
+  await loadAll();
+  if(histTab==='moves'&&$('#hbody')){histMoves();
+    const ni=(window._mb||[]).findIndex(x=>x.company===b.company&&x.no===b.no&&x.date===b.date&&x.project===b.project&&x.who===b.who);
+    moveSlipDetail(ni>=0?ni:i);}
 }
 async function printMove(i){
   const b=(window._mb||[])[i]; if(!b){toast('ไม่พบใบย้าย');return;}
@@ -2074,7 +2091,12 @@ async function printMove(i){
     await logAudit('ออกเลขใบย้ายไซต์',b.company,'ใบย้ายไซต์ #'+String(mn).padStart(3,'0'),b.tools.length+' เครื่อง → '+(b.project||'-'));
   }
   $('#printArea').innerHTML=moveDocHtml(b);printNow(true);
-  await loadAll(); if(histTab==='moves'&&$('#hbody'))histMoves();
+  const wasOpen=$('#scrim').classList.contains('on');
+  await loadAll();
+  if(histTab==='moves'&&$('#hbody')){histMoves();
+    const ni=(window._mb||[]).findIndex(x=>x.company===b.company&&x.no===b.no);
+    if(wasOpen){if(ni>=0)moveSlipDetail(ni);else closeModal();}}
+  else if(wasOpen)closeModal();
 }
 function moveDocHtml(b){
   const CO=b.company||COMPANY;
@@ -2143,7 +2165,8 @@ async function issueDraft(i){
   if(!confirm(`ออกใบส่งไซต์ ${b.company} ของ "${b.project}" (${b.tools.length} เครื่อง)?\nระบบจะออกเลขที่ + พิมพ์ใบ`))return;
   const {data:bn,error:bnErr}=await sb.rpc('next_borrow_no',{p_company:b.company});
   if(bnErr){toast('ออกเลขใบไม่ได้: '+bnErr.message);return;}
-  for(const mid of b.movIds){if(mid)await sb.from('movements').update({borrow_no:bn,is_draft:false}).eq('id',mid);}
+  for(const mid of b.movIds){if(!mid)continue;const r=await sb.from('movements').update({borrow_no:bn,is_draft:false}).eq('id',mid);
+    if(r.error){toast('❌ ออกใบไม่สำเร็จ: '+r.error.message+' — ตรวจที่ ประวัติ → ใบร่าง');await loadAll();go('history');return;}}
   borDraft=null;
   $('#printArea').innerHTML=borrowDocHtml(b.tools,b.who,b.project,b.date,bn,b.company);printNow(true);
   toast(`ออกใบส่งไซต์ ${b.company} #${String(bn).padStart(3,'0')} แล้ว`);await loadAll();go('history');
@@ -3037,6 +3060,15 @@ async function delUser(id,email){
 /* ============ modal ============ */
 function fitDocPrev(){const w=document.getElementById('docprevwrap'),p=document.getElementById('docprevpaper');if(!w||!p)return;p.style.zoom='1';const avail=w.clientWidth-16,pw=p.offsetWidth;if(pw>0)p.style.zoom=String(Math.min(1,avail/pw));}
 function docBox(doc){return `<div id="docprevwrap" style="overflow:auto;background:#eef2f7;border-radius:8px;padding:8px;max-height:64vh"><div id="docprevpaper" style="width:297mm;margin:0 auto;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.18)">${doc}</div></div>`;}
+/* ===== กันกดปุ่มบันทึกซ้ำ (ดับเบิลคลิก/กดรัว → เคยได้ร่างเบิกซ้ำ 2 แถว) — ล็อกเป็นรายฟังก์ชัน ===== */
+const _busyFn={};
+['saveTool','saveNewTool','delTool','restoreTool','doDispose','undisposeTool','commitRepair','saveRepairDraft','doReceiveStock','doCancelSlip','restoreSlip','doBorrow','commitBorrow','saveDraft','doMove','markCounted','disposeLost','revertBorrowToDraft','setMoveFrom','printMove','issueDraft','cancelDraft','issueRepairDraft','cancelRepairDraft','saveRepairDraftEdit','saveBorrowBatch','revertSlipToDraft','saveSlip','saveUser','delUser','scanReceiveSite','doScanReceiveBrokenPC','scanReceiveRepair','scanReportBroken','uploadToolImg','removeToolImg'].forEach(n=>{
+  const f=window[n]; if(typeof f!=='function')return;
+  window[n]=async function(...a){
+    if(_busyFn[n]){toast('⏳ กำลังบันทึกอยู่ รอสักครู่');return;}
+    _busyFn[n]=true; try{return await f.apply(this,a);}finally{_busyFn[n]=false;}
+  };
+});
 function openModal(html,wide){$('#modal').innerHTML=html;const d=!!document.getElementById('docprevpaper');$('#modal').classList.toggle('docwide',d);$('#modal').classList.toggle('editwide',!!wide&&!d);$('#scrim').classList.add('on');if(d)requestAnimationFrame(()=>setTimeout(fitDocPrev,30));}
 function closeModal(){$('#scrim').classList.remove('on');$('#modal').classList.remove('docwide');$('#modal').classList.remove('editwide');}
 window.addEventListener('resize',function(){if(document.getElementById('docprevpaper'))fitDocPrev();});
