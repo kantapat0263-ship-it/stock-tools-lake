@@ -2838,7 +2838,27 @@ function labelCanvas(t){
   return c;
 }
 function labelCanvasFor(t){return labelCanvas(t);}
-function labelDataURL(t){return labelCanvasFor(t).toDataURL('image/png');}
+/* ฝังขนาดจริง (pHYs) ลง PNG → NIIMBOT/แอปพิมพ์ดึงเข้ามาแล้ววางเต็มป้ายตามขนาดที่กำหนด ไม่ต้องลากขยายเอง */
+const _crcTab=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}return t;})();
+function _crc32(a){let c=0xFFFFFFFF;for(let i=0;i<a.length;i++)c=_crcTab[(c^a[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+function pngWithDPI(dataURL,pxPerMeter){
+  try{
+    const bin=atob(dataURL.split(',')[1]),len=bin.length,bytes=new Uint8Array(len);
+    for(let i=0;i<len;i++)bytes[i]=bin.charCodeAt(i);
+    // ต้องเป็น PNG ที่ chunk แรก = IHDR (offset 12..15) ไม่งั้นคืนไฟล์เดิม (ยังใช้ได้ แค่ไม่มีขนาด)
+    if(!(bytes[12]===0x49&&bytes[13]===0x48&&bytes[14]===0x44&&bytes[15]===0x52))return dataURL;
+    const chunk=new Uint8Array(21),cv=new DataView(chunk.buffer);
+    cv.setUint32(0,9); chunk[4]=0x70;chunk[5]=0x48;chunk[6]=0x59;chunk[7]=0x73; // "pHYs"
+    cv.setUint32(8,pxPerMeter); cv.setUint32(12,pxPerMeter); chunk[16]=1; // x,y ppu + unit=เมตร
+    cv.setUint32(17,_crc32(chunk.subarray(4,17)));
+    const out=new Uint8Array(len+21);
+    out.set(bytes.subarray(0,33),0); out.set(chunk,33); out.set(bytes.subarray(33),54);
+    let str=''; for(let i=0;i<out.length;i++)str+=String.fromCharCode(out[i]);
+    return 'data:image/png;base64,'+btoa(str);
+  }catch(e){return dataURL;}
+}
+// 600px = 30mm → 20000 px/เมตร (ป้าย 30x20 มม.)
+function labelDataURL(t){return pngWithDPI(labelCanvasFor(t).toDataURL('image/png'),20000);}
 function downloadLabel(id){const t=(S.tools||[]).find(x=>x.id===id);if(!t){toast('ไม่พบเครื่อง');return;}
   try{const a=document.createElement('a');a.href=labelDataURL(t);a.download='label_'+String(t.no||t.code||id).replace(/[^\w\-ก-๙]+/g,'_')+'.png';document.body.appendChild(a);a.click();a.remove();toast('ดาวน์โหลดป้ายแล้ว');}catch(e){toast('สร้างป้ายไม่ได้: '+e.message);} }
 function selectFromPasteList(){
