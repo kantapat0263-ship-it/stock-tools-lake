@@ -2911,7 +2911,7 @@ function pngWithDPI(dataURL,pxPerMeter){
   }catch(e){return dataURL;}
 }
 // 600px = 30mm → 20000 px/เมตร (ป้าย 30x20 มม.)
-function labelDataURL(t){const c=labelCanvasFor(t);return pngWithDPI(c.toDataURL('image/png'),Math.round(c.width/0.030));}
+function labelDataURL(t){const c=labelCanvasFor(t);return pngWithDPI(c.toDataURL('image/png'),Math.round(c.width/0.060));}
 function downloadLabel(id){const t=(S.tools||[]).find(x=>x.id===id);if(!t){toast('ไม่พบเครื่อง');return;}
   try{const a=document.createElement('a');a.href=labelDataURL(t);a.download='label_'+String(t.no||t.code||id).replace(/[^\w\-ก-๙]+/g,'_')+'.png';document.body.appendChild(a);a.click();a.remove();toast('ดาวน์โหลดป้ายแล้ว');}catch(e){toast('สร้างป้ายไม่ได้: '+e.message);} }
 function selectFromPasteList(){
