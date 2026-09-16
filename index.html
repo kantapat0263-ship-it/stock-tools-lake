@@ -1388,13 +1388,13 @@ async function saveRepairDraft(){
   const sel=[...selRepair].map(ix=>S.tools[ix]);
   // เข้าร่าง = ยังไม่ได้ส่งจริง → "รอส่งซ่อม" อยู่ออฟฟิต (จะเป็น "ส่งซ่อม" ตอนออกใบจริง)
   for(const t of sel){await sb.from('tools').update({status:'รอส่งซ่อม',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',t.id);}
-  await sb.from('movements').insert(sel.map(t=>({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'ส่งซ่อม',actor:sender,counterparty:vendor,reason:(rRsn[t.i]||'').trim(),symptom:(rSg[t.i]||'')||null,project:(rPj[t.i]||'').trim()||null,is_draft:true})));
+  await sb.from('movements').insert(sel.map(t=>({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'ส่งซ่อม',actor:sender,counterparty:vendor,reason:(rRsn[t.i]||'').trim(),symptom:(rSg[t.i]||'')||null,project:(rPj[t.i]||'').trim()||null,slip_no:(rDraft&&rDraft.parkNo!=null?rDraft.parkNo:null),is_draft:true})));
   await ensureLookup('vendors',vendor);await ensureLookup('people',sender);
-  rDraft={company:co,vendor,sender,date};
+  rDraft={company:co,vendor,sender,date,parkNo:(rDraft&&rDraft.parkNo!=null?rDraft.parkNo:null)};
   toast(`เก็บเข้าใบร่างซ่อมแล้ว ${sel.length} เครื่อง · ออกใบจริงได้ที่ ประวัติ → ใบร่าง`);await loadAll();renderRepair();
 }
 let pendingRepair=null,rDraft=null;
-function repairDocHtml(slip,date,vendor,sender,items,issueCo,cancelled){
+function repairDocHtml(slip,date,vendor,sender,items,issueCo,cancelled,reissued){
   const CO=issueCo||COMPANY;
   const co=CO==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)';
   const PER=13, pages=Math.max(1,Math.ceil(items.length/PER));
@@ -1433,7 +1433,7 @@ function repairDocHtml(slip,date,vendor,sender,items,issueCo,cancelled){
     out+=`<div class="doc land rsdoc rspage" style="position:relative">
       ${cancelled?`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:9"><div style="transform:rotate(-16deg);border:7px solid #dc2626;color:#dc2626;font-size:78px;font-weight:900;padding:8px 48px;border-radius:14px;letter-spacing:10px;opacity:.78;font-family:Tahoma,sans-serif">ยกเลิก</div></div>`:''}
       <div class="rshd">
-        <div class="rshd-l"><div class="rsno-lbl">เลขที่</div><div class="rsno-big">${esc(slip)}</div>${pages>1?`<div class="rspg">หน้า ${p+1}/${pages}</div>`:''}</div>
+        <div class="rshd-l"><div class="rsno-lbl">เลขที่</div><div class="rsno-big">${esc(slip)}</div>${reissued?`<div style="font-size:10px;color:#1e40af;font-weight:700">· ออกใหม่ ·</div>`:''}${pages>1?`<div class="rspg">หน้า ${p+1}/${pages}</div>`:''}</div>
         <div class="rshd-c"><div class="rsttl">ใบบันทึกการส่งซ่อมเครื่องมือ</div><div class="rssub">บริษัท ${co}</div></div>
         <div class="rshd-r"><div class="rsorig">ORIGINAL</div>
           <div class="rsrecv">เซ็นชื่อผู้รับเครื่องมือซ่อม ...........................<br>วันที่รับเครื่องมือซ่อม ......./......./.........</div>
@@ -1456,7 +1456,7 @@ let selRecv=new Set();
 function renderReceive(){
   selRecv=new Set();
   const out=S.tools.filter(t=>t.status==='ส่งซ่อม'&&inView(t));
-  const pend=S.slips.filter(s=>s.status!=='รับคืนครบ'&&s.status!=='ยกเลิก'&&(!FILTER||s.company===FILTER));
+  const pend=S.slips.filter(s=>s.status!=='รับคืนครบ'&&s.status!=='ยกเลิก'&&s.status!=='พักไว้'&&(!FILTER||s.company===FILTER));
   $('#view').innerHTML=`
    <div class="panel" id="rvform" style="display:none;position:sticky;top:10px;z-index:5;box-shadow:0 6px 16px rgba(0,0,0,.10)">
      <div class="flexrow">
@@ -1684,10 +1684,10 @@ function printNow(landscape){
   const imgs=[...document.querySelectorAll('#printArea img')];
   Promise.all(imgs.map(im=>(im&&im.decode)?im.decode().catch(()=>{}):Promise.resolve())).then(()=>{setTimeout(()=>window.print(),30);});
 }
-function borrowDocHtml(items,who,proj,date,no,issueCo){
+function borrowDocHtml(items,who,proj,date,no,issueCo,reissued){
   const CO=issueCo||COMPANY;
   const co=CO==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)';
-  const noTxt=(no!=null&&no!=='')?String(no).padStart(3,'0'):'..........';
+  const noTxt=((no!=null&&no!=='')?String(no).padStart(3,'0'):'..........')+(reissued?`<br><span style="color:#1e40af;font-size:10px;font-weight:700">· ออกใหม่ ·</span>`:'');
   const PER=13, pages=Math.max(1,Math.ceil(items.length/PER));
   function copy(p,stamp){
     let rows='';
@@ -1757,11 +1757,11 @@ async function saveDraft(){
   for(const t of items){
     const u=await sb.from('tools').update({status:'ถูกยืม',location:(proj||'')+(who?' / '+who:''),receipt_pending:true,pending_dest:proj,dispatched_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',t.id);
     if(u.error){toast('❌ เก็บร่างไม่สำเร็จ (อัปเดตเครื่อง '+esc(t.no||t.code)+'): '+u.error.message);return;}
-    const ins=await sb.from('movements').insert({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'เบิก',project:proj,actor:who,pr_no:t.pr||null,note:t.note||null,is_draft:true});
+    const ins=await sb.from('movements').insert({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date||null,type:'เบิก',project:proj,actor:who,pr_no:t.pr||null,note:t.note||null,borrow_no:(borDraft&&borDraft.no!=null?borDraft.no:null),is_draft:true});
     if(ins.error){toast('❌ เก็บร่างไม่สำเร็จ (บันทึกรายการ '+esc(t.no||t.code)+'): '+ins.error.message);return;}
   }
   await ensureLookup('people',who);await ensureLookup('projects',proj);
-  borDraft={company:co,who,project:proj,date};
+  borDraft={company:co,who,project:proj,date,no:(borDraft&&borDraft.no!=null?borDraft.no:null)};
   toast(`เก็บเข้าใบร่างแล้ว ${items.length} เครื่อง · ออกใบจริงได้ที่เมนู ประวัติ → ใบร่าง`);await loadAll();renderBorrow();
 }
 async function doMove(withPrint){
@@ -1902,8 +1902,9 @@ function borrowBatches(draftsOnly){
       const mv=S.movements.filter(m=>m.tool_id===t.id&&m.type==='เบิก').sort((a,b)=>String((a.date||'')+(a.createdAt||'')).localeCompare(String((b.date||'')+(b.createdAt||'')))).pop();
       if(!mv||!mv.isDraft)return;
       const issCo=mv.company,date=mv.date,proj=mv.project,who=mv.actor;
-      const key=issCo+'|'+date+'|'+proj+'|'+who;
-      const g=groups[key]=groups[key]||{date,project:proj,who,company:issCo,no:null,draft:true,tools:[],movIds:[]};
+      const pno=(mv.borrowNo!=null?mv.borrowNo:null);
+      const key=(pno!=null)?(issCo+'#'+pno):(issCo+'|'+date+'|'+proj+'|'+who);
+      const g=groups[key]=groups[key]||{date,project:proj,who,company:issCo,no:pno,draft:true,tools:[],movIds:[]};
       g.tools.push(Object.assign({},t,{pr:mv.prNo,note:mv.note||''})); g.movIds.push(mv.id);
     });
     return Object.values(groups).filter(g=>!FILTER||g.company===FILTER).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
@@ -1984,7 +1985,7 @@ function borrowSlipDetail(i){
       ${kv('คืนแล้ว',(b.tools.length-(b.out||0))+' / '+b.tools.length)}
     </div>
     <div class="listbox" style="max-height:44vh"><table class="locktbl"><thead><tr><th>ลำดับ</th><th>รายการ</th><th class="center">NO</th><th>PR</th><th>สถานะคืน</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="flexrow" style="margin-top:14px"><button class="btn primary" onclick="reprintBorrow(${i})">🖨️ พิมพ์ใบ</button><button class="btn" onclick="editBorrowBatchForm(${i})">✏️ แก้ไข</button>${(b.no!=null&&!b.draft&&(b.out||0)===b.tools.length)?`<button class="btn" style="background:#fef3c7;color:#92400e" onclick="revertBorrowToDraft(${i})" title="ออกใบแล้วแต่ของยังไม่ได้ส่งออกไปจริง — ถอยทั้งใบกลับเข้าใบร่าง">↩️ ถอยกลับเป็นร่าง (ยังไม่ได้ส่งจริง)</button>`:''}<button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+    <div class="flexrow" style="margin-top:14px"><button class="btn primary" onclick="reprintBorrow(${i})">🖨️ พิมพ์ใบ</button><button class="btn" onclick="editBorrowBatchForm(${i})">✏️ แก้ไข</button>${(b.no!=null&&!b.draft&&(b.out||0)===b.tools.length)?`<button class="btn" style="background:#dbeafe;color:#1e40af" onclick="parkBorrowSlip(${i})" title="ปริ้นใบแล้วแต่รถยังไม่ว่างเอาไปส่ง — พักใบไว้ เก็บเลขเดิม เติม/แก้ของได้ วันหลังออกใบใหม่เลขเดิม">⏸️ พักใบ (เก็บเลข)</button><button class="btn" style="background:#fef3c7;color:#92400e" onclick="revertBorrowToDraft(${i})" title="ใบผิด ไม่เอาแล้ว — ถอยกลับเป็นร่าง เลขนี้ทิ้ง ออกใหม่ได้เลขใหม่">↩️ ยกเลิกใบ (ทิ้งเลข)</button>`:''}<button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
 }
 async function revertBorrowToDraft(i){
   const b=(window._bb||[])[i]; if(!b){toast('ไม่พบใบเบิก');return;}
@@ -1996,6 +1997,17 @@ async function revertBorrowToDraft(i){
     if(r.error){toast('ถอยไม่ได้: '+r.error.message);return;}}
   await logAudit('ถอยใบเป็นร่าง',b.company,'ใบส่งไซต์ #'+String(b.no).padStart(3,'0'),b.tools.length+' เครื่องกลับเข้าใบร่าง (ยังไม่ได้ส่งจริง)');
   closeModal();toast(`↩️ ถอยใบ #${String(b.no).padStart(3,'0')} เป็นร่างแล้ว (${b.tools.length} เครื่อง) — ดูที่ ประวัติ → ใบร่าง`);
+  await loadAll();go('history');
+}
+async function parkBorrowSlip(i){
+  const b=(window._bb||[])[i]; if(!b){toast('ไม่พบใบเบิก');return;}
+  if(b.no==null||b.draft){toast('ใบนี้เป็นร่างอยู่แล้ว');return;}
+  if((b.out||0)!==b.tools.length){toast('ใบนี้มีเครื่องคืนแล้วบางส่วน — พักใบไม่ได้');return;}
+  if(!confirm(`พักใบส่งไซต์ #${String(b.no).padStart(3,'0')} ${b.company} ไว้ก่อน (คนขับรถยังไม่ว่างเอาไปส่ง)?\n\n• เลข #${String(b.no).padStart(3,'0')} เก็บไว้ใช้ต่อ (ไม่ยกเลิก)\n• เครื่อง ${b.tools.length} ตัวกลับเข้า "ใบร่าง" — เติม/แก้เครื่องได้\n• วันไหนรถว่าง ไปที่ ประวัติ → ใบร่าง กด "ออกใบ" ใช้เลขเดิม พิมพ์ใหม่`))return;
+  for(const mid of b.movIds){if(!mid)continue;const r=await sb.from('movements').update({is_draft:true}).eq('id',mid);
+    if(r.error){toast('พักใบไม่ได้: '+r.error.message);return;}}
+  await logAudit('พักใบ',b.company,'ใบส่งไซต์ #'+String(b.no).padStart(3,'0'),b.tools.length+' เครื่องกลับเข้าใบร่าง (เก็บเลขเดิม)');
+  closeModal();toast(`⏸️ พักใบ #${String(b.no).padStart(3,'0')} แล้ว (${b.tools.length} เครื่อง) · ไปออกใบใหม่ที่ ประวัติ → ใบร่าง เลขเดิมพร้อมใช้`);
   await loadAll();go('history');
 }
 /* ============ ใบย้ายไซต์ (รวมอัตโนมัติ วัน+ไซต์ปลายทาง+ผู้ย้าย · ออกเลขใบตอนพิมพ์) ============ */
@@ -2146,30 +2158,33 @@ function histDrafts(){
    <div class="panel">
     <h3>📝 ใบร่างเบิก / ส่งไซต์ <span class="muted" style="font-weight:400">— เครื่องในร่างถือว่า "ถูกยืม" แล้ว · กด "ออกใบ" เพื่อออกเลขที่ + พิมพ์</span></h3>
     <div id="hdtbl" style="max-height:40vh;overflow:auto"><table class="locktbl"><thead><tr><th>บ.</th><th>โครงการ / ไซต์</th><th>ผู้เบิก</th><th>วันที่</th><th class="center">จำนวน</th><th></th></tr></thead><tbody>${
-      bb.map((b,i)=>`<tr><td>${coBadge(b.company)}</td><td><b>${esc(b.project)||'-'}</b></td><td>${esc(b.who)||'-'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 10px" onclick="addToDraft(${i})">➕ เพิ่มเครื่อง</button> <button class="btn" style="padding:5px 10px" onclick="editBorrowBatchForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:#16a34a;color:#fff;padding:5px 11px" onclick="issueDraft(${i})">🖨️ ออกใบ</button> <button class="btn" style="background:#fee2e2;color:#b91c1c;padding:5px 10px" onclick="cancelDraft(${i})">🗑️ ยกเลิก</button></td></tr>`).join('')||`<tr><td colspan=6 class="empty">ยังไม่มีใบร่างเบิก — สร้างที่เมนู เบิก/คืน → เลือกเครื่อง → "เก็บเข้าร่าง"</td></tr>`
+      bb.map((b,i)=>`<tr><td>${coBadge(b.company)}</td><td><b>${esc(b.project)||'-'}</b>${b.no!=null?` <span class="chip" style="background:#dbeafe;color:#1e40af;font-size:11px">⏸️ พักไว้ · เลข #${String(b.no).padStart(3,'0')}</span>`:''}</td><td>${esc(b.who)||'-'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 10px" onclick="addToDraft(${i})">➕ เพิ่มเครื่อง</button> <button class="btn" style="padding:5px 10px" onclick="editBorrowBatchForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:#16a34a;color:#fff;padding:5px 11px" onclick="issueDraft(${i})">🖨️ ออกใบ</button> <button class="btn" style="background:#fee2e2;color:#b91c1c;padding:5px 10px" onclick="cancelDraft(${i})">🗑️ ยกเลิก</button></td></tr>`).join('')||`<tr><td colspan=6 class="empty">ยังไม่มีใบร่างเบิก — สร้างที่เมนู เบิก/คืน → เลือกเครื่อง → "เก็บเข้าร่าง"</td></tr>`
     }</tbody></table></div></div>
    <div class="panel">
     <h3>🔧 ใบร่างส่งซ่อม <span class="muted" style="font-weight:400">— เครื่องในร่างถือว่า "ส่งซ่อม" แล้ว · กด "ออกใบ" เพื่อออกเลขที่ + พิมพ์</span></h3>
     <div id="hrdtbl" style="max-height:40vh;overflow:auto"><table class="locktbl"><thead><tr><th>บ.</th><th>ร้าน/ช่างซ่อม</th><th>ผู้ส่ง</th><th>วันที่</th><th class="center">จำนวน</th><th></th></tr></thead><tbody>${
-      rr.map((b,i)=>`<tr><td>${coBadge(b.company)}</td><td><b>${esc(b.vendor)||'-'}</b></td><td>${esc(b.sender)||'-'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 10px" onclick="addToRepairDraft(${i})">➕ เพิ่มเครื่อง</button> <button class="btn" style="padding:5px 10px" onclick="editRepairDraftForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:#16a34a;color:#fff;padding:5px 11px" onclick="issueRepairDraft(${i})">🖨️ ออกใบ</button> <button class="btn" style="background:#fee2e2;color:#b91c1c;padding:5px 10px" onclick="cancelRepairDraft(${i})">🗑️ ยกเลิก</button></td></tr>`).join('')||`<tr><td colspan=6 class="empty">ยังไม่มีใบร่างซ่อม — สร้างที่เมนู ส่งซ่อม → เลือกเครื่อง → "เก็บเข้าร่าง"</td></tr>`
+      rr.map((b,i)=>`<tr><td>${coBadge(b.company)}</td><td><b>${esc(b.vendor)||'-'}</b>${b.parkNo!=null?` <span class="chip" style="background:#dbeafe;color:#1e40af;font-size:11px">⏸️ พักไว้ · เลข #${String(b.parkNo).padStart(3,'0')}</span>`:''}</td><td>${esc(b.sender)||'-'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 10px" onclick="addToRepairDraft(${i})">➕ เพิ่มเครื่อง</button> <button class="btn" style="padding:5px 10px" onclick="editRepairDraftForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:#16a34a;color:#fff;padding:5px 11px" onclick="issueRepairDraft(${i})">🖨️ ออกใบ</button> <button class="btn" style="background:#fee2e2;color:#b91c1c;padding:5px 10px" onclick="cancelRepairDraft(${i})">🗑️ ยกเลิก</button></td></tr>`).join('')||`<tr><td colspan=6 class="empty">ยังไม่มีใบร่างซ่อม — สร้างที่เมนู ส่งซ่อม → เลือกเครื่อง → "เก็บเข้าร่าง"</td></tr>`
     }</tbody></table></div></div>`;
 }
 function addToDraft(i){
   const b=(window._bb||[])[i]; if(!b){toast('ไม่พบใบร่าง');return;}
-  const d={company:b.company,who:b.who,project:b.project,date:b.date};
+  const d={company:b.company,who:b.who,project:b.project,date:b.date,no:(b.no!=null?b.no:null)};
   borrowTab='out'; go('borrow');
   borDraft=d; renderBorrow();
   toast('เลือกเครื่องที่จะเพิ่ม แล้วกด "เพิ่มเข้าใบร่างนี้"');
 }
 async function issueDraft(i){
   const b=(window._bb||[])[i]; if(!b){toast('ไม่พบใบร่าง');return;}
-  if(!confirm(`ออกใบส่งไซต์ ${b.company} ของ "${b.project}" (${b.tools.length} เครื่อง)?\nระบบจะออกเลขที่ + พิมพ์ใบ`))return;
-  const {data:bn,error:bnErr}=await sb.rpc('next_borrow_no',{p_company:b.company});
-  if(bnErr){toast('ออกเลขใบไม่ได้: '+bnErr.message);return;}
+  const reissue=(b.no!=null);
+  if(!confirm(reissue?`ออกใบส่งไซต์ ${b.company} เลขเดิม #${String(b.no).padStart(3,'0')} ของ "${b.project}" (${b.tools.length} เครื่อง)?\nใช้เลขเดิม + พิมพ์ใบใหม่ (ใบเก่าที่ปริ้นไว้ทิ้ง)`:`ออกใบส่งไซต์ ${b.company} ของ "${b.project}" (${b.tools.length} เครื่อง)?\nระบบจะออกเลขที่ + พิมพ์ใบ`))return;
+  let bn=b.no;
+  if(!reissue){const {data,error:bnErr}=await sb.rpc('next_borrow_no',{p_company:b.company});
+    if(bnErr){toast('ออกเลขใบไม่ได้: '+bnErr.message);return;} bn=data;}
   for(const mid of b.movIds){if(!mid)continue;const r=await sb.from('movements').update({borrow_no:bn,is_draft:false}).eq('id',mid);
     if(r.error){toast('❌ ออกใบไม่สำเร็จ: '+r.error.message+' — ตรวจที่ ประวัติ → ใบร่าง');await loadAll();go('history');return;}}
   borDraft=null;
-  $('#printArea').innerHTML=borrowDocHtml(b.tools,b.who,b.project,b.date,bn,b.company);printNow(true);
+  if(reissue)await logAudit('ออกใบจากใบพัก',b.company,'ใบส่งไซต์ #'+String(bn).padStart(3,'0'),b.tools.length+' เครื่อง (ใช้เลขเดิม)');
+  $('#printArea').innerHTML=borrowDocHtml(b.tools,b.who,b.project,b.date,bn,b.company,reissue);printNow(true);
   toast(`ออกใบส่งไซต์ ${b.company} #${String(bn).padStart(3,'0')} แล้ว`);await loadAll();go('history');
 }
 async function cancelDraft(i){
@@ -2191,31 +2206,40 @@ function repairDrafts(){
     const mv=S.movements.filter(m=>m.tool_id===t.id&&m.type==='ส่งซ่อม').sort((a,b)=>String((a.date||'')+(a.createdAt||'')).localeCompare(String((b.date||'')+(b.createdAt||'')))).pop();
     if(!mv||!mv.isDraft)return;
     const co=mv.company,date=mv.date,vendor=mv.vendor,sender=mv.actor;
-    const key=co+'|'+date+'|'+vendor+'|'+sender;
-    const g=groups[key]=groups[key]||{company:co,date,vendor,sender,tools:[],movIds:[]};
+    const pno=(mv.slipNo!=null?mv.slipNo:null);
+    const key=(pno!=null)?(co+'#'+pno):(co+'|'+date+'|'+vendor+'|'+sender);
+    const g=groups[key]=groups[key]||{company:co,date,vendor,sender,parkNo:pno,tools:[],movIds:[]};
     g.tools.push(Object.assign({},t,{reason:mv.reason||'',project:mv.project||''})); g.movIds.push(mv.id);
   });
   return Object.values(groups).filter(g=>!FILTER||g.company===FILTER).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
 }
 function addToRepairDraft(i){
   const b=(window._rd||[])[i]; if(!b){toast('ไม่พบใบร่าง');return;}
-  const d={company:b.company,vendor:b.vendor,sender:b.sender,date:b.date};
+  const d={company:b.company,vendor:b.vendor,sender:b.sender,date:b.date,parkNo:(b.parkNo!=null?b.parkNo:null)};
   go('repair'); rDraft=d; renderRepair();
   toast('เลือกเครื่องเพิ่ม แล้วกด "เพิ่มเข้าใบร่างนี้"');
 }
 async function issueRepairDraft(i){
   const b=(window._rd||[])[i]; if(!b){toast('ไม่พบใบร่าง');return;}
-  if(!confirm(`ออกใบส่งซ่อม ${b.company} ร้าน ${b.vendor||'-'} (${b.tools.length} เครื่อง)?\nระบบจะออกเลขที่ + พิมพ์ใบ`))return;
-  const {data:slipN,error:snErr}=await sb.rpc('next_repair_no',{p_company:b.company});
-  if(snErr||!slipN){toast('ออกเลขใบไม่ได้: '+((snErr&&snErr.message)||'ไม่ทราบสาเหตุ'));return;}
-  const sres=await sb.from('repair_slips').insert({company:b.company,slip_no:slipN,sent_date:b.date||null,vendor:b.vendor,project:'',sender:b.sender,status:'ส่งแล้ว'});
-  if(sres.error){toast('ออกใบไม่ได้: '+sres.error.message);return;}
+  const reissue=(b.parkNo!=null);
+  if(!confirm(reissue?`ออกใบส่งซ่อม ${b.company} เลขเดิม #${String(b.parkNo).padStart(3,'0')} ร้าน ${b.vendor||'-'} (${b.tools.length} เครื่อง)?\nใช้เลขเดิม + พิมพ์ใบใหม่ (ใบเก่าที่ปริ้นไว้ทิ้ง)`:`ออกใบส่งซ่อม ${b.company} ร้าน ${b.vendor||'-'} (${b.tools.length} เครื่อง)?\nระบบจะออกเลขที่ + พิมพ์ใบ`))return;
+  let slipN=b.parkNo;
+  if(reissue){
+    const up=await sb.from('repair_slips').update({status:'ส่งแล้ว',sent_date:b.date||null,vendor:b.vendor,sender:b.sender}).eq('company',b.company).eq('slip_no',slipN);
+    if(up.error){toast('ออกใบไม่ได้: '+up.error.message);return;}
+  }else{
+    const {data,error:snErr}=await sb.rpc('next_repair_no',{p_company:b.company});
+    if(snErr||!data){toast('ออกเลขใบไม่ได้: '+((snErr&&snErr.message)||'ไม่ทราบสาเหตุ'));return;} slipN=data;
+    const sres=await sb.from('repair_slips').insert({company:b.company,slip_no:slipN,sent_date:b.date||null,vendor:b.vendor,project:'',sender:b.sender,status:'ส่งแล้ว'});
+    if(sres.error){toast('ออกใบไม่ได้: '+sres.error.message);return;}
+  }
   for(const mid of b.movIds){if(mid)await sb.from('movements').update({slip_no:slipN,is_draft:false}).eq('id',mid);}
   // ออกใบจริงแล้ว → เครื่องออกไปร้านซ่อมจริง
   for(const t of b.tools)await sb.from('tools').update({status:'ส่งซ่อม',location:b.vendor||'ร้านซ่อม',updated_at:new Date().toISOString()}).eq('id',t.id);
   rDraft=null;
+  if(reissue)await logAudit('ออกใบจากใบพัก',b.company,'ใบซ่อม #'+String(slipN).padStart(3,'0'),b.tools.length+' เครื่อง (ใช้เลขเดิม)');
   const items=b.tools.map(t=>({t,reason:t.reason||'',project:t.project||''}));
-  $('#printArea').innerHTML=repairDocHtml(String(slipN).padStart(3,'0'),b.date,b.vendor,b.sender,items,b.company);printNow(true);
+  $('#printArea').innerHTML=repairDocHtml(String(slipN).padStart(3,'0'),b.date,b.vendor,b.sender,items,b.company,false,reissue);printNow(true);
   toast(`ออกใบส่งซ่อม ${b.company} #${String(slipN).padStart(3,'0')} แล้ว`);await loadAll();go('history');
 }
 async function cancelRepairDraft(i){
@@ -2224,6 +2248,7 @@ async function cancelRepairDraft(i){
   for(let j=0;j<b.tools.length;j++){const t=b.tools[j],mid=b.movIds[j];
     if(mid)await sb.from('movements').update({deleted:true}).eq('id',mid);
     if(t.status==='ส่งซ่อม'||t.status==='รอส่งซ่อม')await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',t.id);}
+  if(b.parkNo!=null)await sb.from('repair_slips').update({status:'ยกเลิก',note:'🚫 ยกเลิก (จากใบพัก) '+fmtDateTH(today())+' — '+b.tools.length+' เครื่องกลับเป็นว่าง'}).eq('company',b.company).eq('slip_no',b.parkNo);
   toast(`ยกเลิกใบร่างซ่อมแล้ว — ${b.tools.length} เครื่องกลับเป็นว่าง`);await loadAll();go('history');
 }
 function editRepairDraftForm(i){
@@ -2349,7 +2374,7 @@ function histRecent(){
 }
 function histRepair(){
   const cntOf=(slipNo,co)=>S.movements.filter(m=>m.slipNo===slipNo&&m.company===co&&m.type==='ส่งซ่อม').length;
-  const pend=S.slips.filter(s=>s.status!=='รับคืนครบ'&&s.status!=='ยกเลิก'&&(!FILTER||s.company===FILTER)).map(s=>({s,days:dDiff(s.sent,today())})).sort((a,b)=>(b.days||0)-(a.days||0));
+  const pend=S.slips.filter(s=>s.status!=='รับคืนครบ'&&s.status!=='ยกเลิก'&&s.status!=='พักไว้'&&(!FILTER||s.company===FILTER)).map(s=>({s,days:dDiff(s.sent,today())})).sort((a,b)=>(b.days||0)-(a.days||0));
   const done=S.slips.filter(s=>s.status==='รับคืนครบ'&&s.received&&(!FILTER||s.company===FILTER)).map(s=>({s,days:dDiff(s.sent,s.received)})).sort((a,b)=>String(b.s.received).localeCompare(String(a.s.received))).slice(0,30);
   $('#hbody').innerHTML=`
     <div class="panel"><h3>🔧 กำลังซ่อม / ค้างอยู่ (${pend.length}) <span class="muted" style="font-weight:400">— เรียงตามค้างนานสุด</span></h3>
@@ -2414,9 +2439,9 @@ function histSlips(){
     list=[...list].sort((a,b)=>String(b.sent||'').localeCompare(String(a.sent||''))||(b.slip_no-a.slip_no));
     const pg=pgSlice('slips',list);
     $('#stbl').innerHTML=`<table class="locktbl"><thead><tr><th>ใบ</th><th>บ.</th><th>วันส่ง</th><th>ช่าง</th><th>ผู้ส่ง</th><th class="center">จำนวน</th><th>สถานะ</th><th></th></tr></thead><tbody>${
-      pg.rows.map(s=>{const cx=s.status==='ยกเลิก';
-        const stCell=cx?`<span class="chip" style="background:#f1f5f9;color:#64748b;text-decoration:line-through">🚫 ยกเลิก</span>`:chip(s.status==='รับคืนครบ'?'ว่าง':s.status==='ส่งแล้ว'?'ส่งซ่อม':'รอส่งซ่อม');
-        return `<tr style="cursor:pointer${cx?';opacity:.6':''}" onclick="slipDetail(${s.slip_no},'${esc(s.company)}')"><td><b style="${cx?'text-decoration:line-through':''}">${esc(s.no)}</b></td><td>${coBadge(s.company)}</td><td>${esc(s.sent)||'-'}</td><td>${esc(s.vendor)||'-'}</td><td>${esc(s.sender)||'-'}</td><td class="center">${cx?'—':slipCount(s.slip_no,s.company)}</td><td>${stCell}</td><td class="right" style="white-space:nowrap">${cx?'':`<button class="btn" style="padding:5px 11px" onclick="event.stopPropagation();editSlipForm(${s.slip_no},'${esc(s.company)}')">✏️ แก้ไข</button> `}<button class="btn" style="background:var(--blue);color:#fff;padding:5px 11px" onclick="event.stopPropagation();reprintSlip(${s.slip_no},'${esc(s.company)}')">🖨️ พิมพ์${cx?'ใบยกเลิก':''}</button></td></tr>`;}).join('')||'<tr><td colspan=8 class="empty">ไม่มีใบส่งซ่อม</td></tr>'
+      pg.rows.map(s=>{const cx=s.status==='ยกเลิก',pk=s.status==='พักไว้',dim=cx||pk;
+        const stCell=cx?`<span class="chip" style="background:#f1f5f9;color:#64748b;text-decoration:line-through">🚫 ยกเลิก</span>`:pk?`<span class="chip" style="background:#dbeafe;color:#1e40af">⏸️ พักไว้ (ในใบร่าง)</span>`:chip(s.status==='รับคืนครบ'?'ว่าง':s.status==='ส่งแล้ว'?'ส่งซ่อม':'รอส่งซ่อม');
+        return `<tr style="cursor:pointer${dim?';opacity:.6':''}" onclick="slipDetail(${s.slip_no},'${esc(s.company)}')"><td><b style="${cx?'text-decoration:line-through':''}">${esc(s.no)}</b></td><td>${coBadge(s.company)}</td><td>${esc(s.sent)||'-'}</td><td>${esc(s.vendor)||'-'}</td><td>${esc(s.sender)||'-'}</td><td class="center">${cx?'—':slipCount(s.slip_no,s.company)}</td><td>${stCell}</td><td class="right" style="white-space:nowrap">${pk?'<span class="muted" style="font-size:12px">อยู่ในใบร่าง</span>':`${cx?'':`<button class="btn" style="padding:5px 11px" onclick="event.stopPropagation();editSlipForm(${s.slip_no},'${esc(s.company)}')">✏️ แก้ไข</button> `}<button class="btn" style="background:var(--blue);color:#fff;padding:5px 11px" onclick="event.stopPropagation();reprintSlip(${s.slip_no},'${esc(s.company)}')">🖨️ พิมพ์${cx?'ใบยกเลิก':''}</button>`}</td></tr>`;}).join('')||'<tr><td colspan=8 class="empty">ไม่มีใบส่งซ่อม</td></tr>'
     }</tbody></table>${pg.html}`;
   };
   PG_REDRAW['slips']=draw;
@@ -2436,8 +2461,9 @@ function slipDetail(slipNo,co){
     return `<tr><td class="center">${i+1}</td><td><b>${esc(m.code)||esc(m.label)||'-'}</b></td><td class="center">${esc(m.no)||'-'}</td><td>${esc(m.project)||'-'}</td><td>${esc(m.reason)||'-'}</td><td>${back}</td></tr>`;
   }).join('');
   const kv=(k,v)=>`<div><span class="muted">${k}:</span> <b>${v}</b></div>`;
-  const cx=s.status==='ยกเลิก';
-  openModal(`<h3>📑 ใบส่งซ่อม #${esc(s.no)} ${coBadge(s.company)}${cx?' <span style="color:#dc2626;font-size:14px">🚫 ยกเลิก</span>':''}</h3>
+  const cx=s.status==='ยกเลิก',pk=s.status==='พักไว้';
+  openModal(`<h3>📑 ใบส่งซ่อม #${esc(s.no)} ${coBadge(s.company)}${cx?' <span style="color:#dc2626;font-size:14px">🚫 ยกเลิก</span>':pk?' <span style="color:#1e40af;font-size:14px">⏸️ พักไว้</span>':''}</h3>
+    ${pk?`<div style="background:#eff6ff;border-left:4px solid #2563eb;padding:11px 13px;border-radius:8px;margin:8px 0;font-size:13px">⏸️ <b>ใบนี้พักไว้</b> — เครื่องกลับเข้า "ใบร่าง" แล้ว (เลข #${esc(s.no)} จองไว้ให้) · ไปที่ <b>ประวัติ → ใบร่าง</b> เพื่อเติม/แก้ของ แล้วกด "ออกใบ" จะใช้เลขเดิม #${esc(s.no)} + พิมพ์ใบใหม่</div>`:''}
     ${cx?`<div style="background:#fef2f2;border-left:4px solid #dc2626;padding:11px 13px;border-radius:8px;margin:8px 0;font-size:13px">🚫 <b>ใบนี้ถูกยกเลิก</b> (ถอยกลับเป็นร่างแล้วออกใบใหม่แทน) · เลขที่ #${esc(s.no)} ไม่ถูกนำกลับมาใช้ · ปริ้นใบยกเลิกนี้ให้โรงซ่อมได้เพื่อให้เลขในแฟ้มเรียงต่อกัน${s.note?`<div class="muted" style="margin-top:5px">${esc(s.note)}</div>`:''}</div>`:''}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:13px;margin:10px 0;padding:11px 14px;background:var(--bg);border-radius:9px">
       ${kv('วันที่ส่งซ่อม',esc(s.sent)||'-')}
@@ -2451,7 +2477,7 @@ function slipDetail(slipNo,co){
       ${s.note?`<div style="grid-column:1/3"><span class="muted">หมายเหตุ:</span> ${esc(s.note)}</div>`:''}
     </div>
     <div style="max-height:42vh;overflow:auto"><table><thead><tr><th>#</th><th>รายการ / รหัส</th><th>NO</th><th>โครงการ</th><th>อาการ/สาเหตุ</th><th>รับคืน</th></tr></thead><tbody>${rows||'<tr><td colspan=6 class="empty">ไม่มีรายการ</td></tr>'}</tbody></table></div>
-    <div class="flexrow" style="margin-top:12px">${cx?`<button class="btn" style="background:var(--blue);color:#fff" onclick="reprintSlip(${slipNo},'${esc(co)}')">🖨️ พิมพ์ใบยกเลิก (ให้โรงซ่อม)</button>`:`<button class="btn primary" onclick="editSlipForm(${slipNo},'${esc(co)}')">✏️ แก้ไขใบ</button>${s.status==='ส่งแล้ว'?`<button class="btn" style="background:#fef3c7;color:#92400e" onclick="revertSlipToDraft(${slipNo},'${esc(co)}')" title="ออกใบแล้วแต่ยังไม่ได้เอาไปส่งจริง — ถอยทั้งใบกลับเข้าใบร่าง (เครื่อง+อาการครบ) รอส่งวันหลัง">↩️ ถอยกลับเป็นร่าง (ยังไม่ได้ส่งจริง)</button>`:''}`}<button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+    <div class="flexrow" style="margin-top:12px">${cx?`<button class="btn" style="background:var(--blue);color:#fff" onclick="reprintSlip(${slipNo},'${esc(co)}')">🖨️ พิมพ์ใบยกเลิก (ให้โรงซ่อม)</button>`:pk?'':`<button class="btn primary" onclick="editSlipForm(${slipNo},'${esc(co)}')">✏️ แก้ไขใบ</button>${s.status==='ส่งแล้ว'?`<button class="btn" style="background:#dbeafe;color:#1e40af" onclick="parkRepairSlip(${slipNo},'${esc(co)}')" title="ปริ้นใบแล้วแต่รถยังไม่ว่างเอาไปส่ง — พักใบไว้ เก็บเลขเดิม เติม/แก้ของได้ วันหลังออกใบใหม่เลขเดิม">⏸️ พักใบ (เก็บเลข)</button><button class="btn" style="background:#fef3c7;color:#92400e" onclick="revertSlipToDraft(${slipNo},'${esc(co)}')" title="ใบผิด ไม่เอาแล้ว — ถอยกลับเป็นร่าง เลขนี้ยกเลิก ออกใหม่ได้เลขใหม่">↩️ ยกเลิกใบ (ทิ้งเลข)</button>`:''}`}<button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
 }
 async function revertSlipToDraft(slipNo,co){
   const s=S.slips.find(x=>x.slip_no===slipNo&&x.company===co); if(!s){toast('ไม่พบใบ');return;}
@@ -2471,6 +2497,23 @@ async function revertSlipToDraft(slipNo,co){
   await sb.from('repair_slips').update({status:'ยกเลิก',note:cancelNote}).eq('company',co).eq('slip_no',slipNo);
   await logAudit('ถอยใบเป็นร่าง',co,'ใบซ่อม #'+String(slipNo).padStart(3,'0'),ms.length+' เครื่องกลับเข้าใบร่าง · ใบ #'+String(slipNo).padStart(3,'0')+' เก็บเป็น "ยกเลิก"');
   closeModal();toast(`↩️ ถอยใบ #${String(slipNo).padStart(3,'0')} เป็นร่างแล้ว (${ms.length} เครื่อง) · ใบเดิมขึ้นสถานะ "ยกเลิก" ปริ้นให้โรงซ่อมได้`);
+  await loadAll();go('history');
+}
+async function parkRepairSlip(slipNo,co){
+  const s=S.slips.find(x=>x.slip_no===slipNo&&x.company===co); if(!s){toast('ไม่พบใบ');return;}
+  const ms=S.movements.filter(m=>m.slipNo===slipNo&&m.company===co&&m.type==='ส่งซ่อม');
+  if(!ms.length){toast('ใบนี้ไม่มีรายการเครื่อง');return;}
+  const hasBack=S.movements.some(m=>m.slipNo===slipNo&&m.company===co&&m.type==='รับคืนจากซ่อม');
+  if(hasBack){toast('ใบนี้มีการรับคืนแล้ว — พักใบไม่ได้');return;}
+  if(!confirm(`พักใบส่งซ่อม #${String(slipNo).padStart(3,'0')} ${co} ไว้ก่อน (คนขับรถยังไม่ว่างเอาไปส่ง)?\n\n• เลข #${String(slipNo).padStart(3,'0')} เก็บไว้ใช้ต่อ (ไม่ยกเลิก)\n• เครื่อง ${ms.length} ตัวกลับเข้า "ใบร่าง" ที่ออฟฟิต — เติม/แก้เครื่องได้\n• วันไหนรถว่าง ไปที่ ประวัติ → ใบร่าง กด "ออกใบ" ใช้เลขเดิม พิมพ์ใหม่`))return;
+  const r1=await sb.from('movements').update({is_draft:true}).eq('company',co).eq('slip_no',slipNo).eq('type','ส่งซ่อม').eq('deleted',false);
+  if(r1.error){toast('พักใบไม่ได้: '+r1.error.message);return;}
+  for(const m of ms){if(!m.tool_id)continue;const t=S.tools.find(x=>x.id===m.tool_id);
+    if(t&&t.status==='ส่งซ่อม')await sb.from('tools').update({status:'รอส่งซ่อม',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',m.tool_id);}
+  const r2=await sb.from('repair_slips').update({status:'พักไว้'}).eq('company',co).eq('slip_no',slipNo);
+  if(r2.error){toast('พักใบไม่ได้: '+r2.error.message);return;}
+  await logAudit('พักใบ',co,'ใบซ่อม #'+String(slipNo).padStart(3,'0'),ms.length+' เครื่องกลับเข้าใบร่าง (เก็บเลขเดิม)');
+  closeModal();toast(`⏸️ พักใบ #${String(slipNo).padStart(3,'0')} แล้ว (${ms.length} เครื่อง) · ไปออกใบใหม่ที่ ประวัติ → ใบร่าง เลขเดิมพร้อมใช้`);
   await loadAll();go('history');
 }
 function editSlipForm(slipNo,co){
@@ -3063,7 +3106,7 @@ function fitDocPrev(){const w=document.getElementById('docprevwrap'),p=document.
 function docBox(doc){return `<div id="docprevwrap" style="overflow:auto;background:#eef2f7;border-radius:8px;padding:8px;max-height:64vh"><div id="docprevpaper" style="width:297mm;margin:0 auto;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.18)">${doc}</div></div>`;}
 /* ===== กันกดปุ่มบันทึกซ้ำ (ดับเบิลคลิก/กดรัว → เคยได้ร่างเบิกซ้ำ 2 แถว) — ล็อกเป็นรายฟังก์ชัน ===== */
 const _busyFn={};
-['saveTool','saveNewTool','delTool','restoreTool','doDispose','undisposeTool','commitRepair','saveRepairDraft','doReceiveStock','doCancelSlip','restoreSlip','doBorrow','commitBorrow','saveDraft','doMove','markCounted','disposeLost','revertBorrowToDraft','setMoveFrom','printMove','issueDraft','cancelDraft','issueRepairDraft','cancelRepairDraft','saveRepairDraftEdit','saveBorrowBatch','revertSlipToDraft','saveSlip','saveUser','delUser','scanReceiveSite','doScanReceiveBrokenPC','scanReceiveRepair','scanReportBroken','uploadToolImg','removeToolImg'].forEach(n=>{
+['saveTool','saveNewTool','delTool','restoreTool','doDispose','undisposeTool','commitRepair','saveRepairDraft','doReceiveStock','doCancelSlip','restoreSlip','doBorrow','commitBorrow','saveDraft','doMove','markCounted','disposeLost','revertBorrowToDraft','parkBorrowSlip','parkRepairSlip','setMoveFrom','printMove','issueDraft','cancelDraft','issueRepairDraft','cancelRepairDraft','saveRepairDraftEdit','saveBorrowBatch','revertSlipToDraft','saveSlip','saveUser','delUser','scanReceiveSite','doScanReceiveBrokenPC','scanReceiveRepair','scanReportBroken','uploadToolImg','removeToolImg'].forEach(n=>{
   const f=window[n]; if(typeof f!=='function')return;
   window[n]=async function(...a){
     if(_busyFn[n]){toast('⏳ กำลังบันทึกอยู่ รอสักครู่');return;}
