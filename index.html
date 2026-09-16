@@ -2271,6 +2271,7 @@ function editRepairDraftForm(i){
 async function saveRepairDraftEdit(i){
   const b=(window._rd||[])[i]; if(!b)return;
   const date=$('#er_date').value,vendor=$('#er_vendor').value.trim(),sender=$('#er_sender').value.trim();
+  let kept=0;
   for(let j=0;j<b.tools.length;j++){
     const t=b.tools[j],mid=b.movIds[j];
     const rm=document.querySelector(`[data-rrm="${j}"]`);
@@ -2278,11 +2279,13 @@ async function saveRepairDraftEdit(i){
       if(mid)await sb.from('movements').update({deleted:true}).eq('id',mid);
       if(t.status==='ส่งซ่อม'||t.status==='รอส่งซ่อม')await sb.from('tools').update({status:'ว่าง',location:'ออฟฟิต',updated_at:new Date().toISOString()}).eq('id',t.id);
       continue;}
+    kept++;
     const rs=document.querySelector(`[data-rrs="${j}"]`),rp=document.querySelector(`[data-rrp="${j}"]`);
     if(mid)await sb.from('movements').update({occurred_on:date||null,counterparty:vendor,actor:sender,reason:(rs?rs.value.trim():'')||'',project:(rp?rp.value.trim():'')||null}).eq('id',mid);
     if(t.status==='ส่งซ่อม')await sb.from('tools').update({location:vendor||'ร้านซ่อม',updated_at:new Date().toISOString()}).eq('id',t.id);
   }
-  closeModal();toast('แก้ไขใบร่างซ่อมแล้ว');await loadAll();go('history');
+  if(b.parkNo!=null&&kept===0)await sb.from('repair_slips').update({status:'ยกเลิก',note:'🚫 ยกเลิก (จากใบพัก) '+fmtDateTH(today())+' — เอาเครื่องออกหมดจากหน้าแก้ไข'}).eq('company',b.company).eq('slip_no',b.parkNo);
+  closeModal();toast(b.parkNo!=null&&kept===0?'เอาเครื่องออกหมด — ใบพัก #'+String(b.parkNo).padStart(3,'0')+' เปลี่ยนเป็นยกเลิก':'แก้ไขใบร่างซ่อมแล้ว');await loadAll();go('history');
 }
 function _togglePick(boxId){const b=$('#'+boxId);b.style.display=(b.style.display==='none'?'block':'none');}
 function _filterPick(listId,inputId){const q=$('#'+inputId).value.trim().toLowerCase();$('#'+listId).querySelectorAll('[data-pickrow]').forEach(el=>{el.style.display=(!q||el.textContent.toLowerCase().includes(q))?'':'none';});}
