@@ -333,19 +333,31 @@ async function fetchAllMov(){
   }
   return all;
 }
+/* ดึงทุกแถวแบบแบ่งหน้า — Supabase ตัดที่ 1,000 แถวต่อครั้ง (เครื่องมือเกิน 1,000 แล้ว เคยทำเครื่องหายจากหน้าเว็บ) · คืน {data,error} รูปแบบเดียวกับ query ปกติ */
+async function fetchAllRows(mk){
+  const all=[];const PAGE=1000;let from=0;
+  for(;;){
+    const {data,error}=await mk().order('id').range(from,from+PAGE-1);
+    if(error)return {data:all,error};
+    all.push(...(data||[]));
+    if(!data||data.length<PAGE)break;
+    from+=PAGE;
+  }
+  return {data:all,error:null};
+}
 async function loadAll(){
   _rtReloadAt=Date.now();   // กันแบนเนอร์ realtime เด้งใส่ตัวเอง — ครอบทุก write path ที่เรียก loadAll (ไม่ใช่แค่ reload)
   const mvP=fetchAllMov();
   const [t,s,c,p,pe,v,rcv,au,tr,st,di]=await Promise.all([
-    sb.from('tools').select('*').eq('deleted',false).eq('disposed',false),
+    fetchAllRows(()=>sb.from('tools').select('*').eq('deleted',false).eq('disposed',false)),
     sb.from('repair_slips').select('*').eq('deleted',false).order('slip_no'),
     sb.from('categories').select('name'),sb.from('projects').select('name'),
     sb.from('people').select('name'),sb.from('vendors').select('name'),
     sb.from('receivers').select('name'),
     sb.from('audit_log').select('*').order('occurred_at',{ascending:false}).limit(1000),
-    sb.from('tools').select('*').eq('deleted',true),
+    fetchAllRows(()=>sb.from('tools').select('*').eq('deleted',true)),
     sb.from('repair_slips').select('*').eq('deleted',true).order('slip_no'),
-    sb.from('tools').select('*').eq('disposed',true).eq('deleted',false)]);
+    fetchAllRows(()=>sb.from('tools').select('*').eq('disposed',true).eq('deleted',false))]);
   const mv={data:await mvP};
   if(t.error){toast('โหลดข้อมูลไม่ได้: '+t.error.message);}
   const byId={};
