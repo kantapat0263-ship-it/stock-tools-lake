@@ -908,8 +908,10 @@ async function reassignPersonRefs(oldN,newN){
   await sb.from('repair_slips').update({sender:newN}).eq('sender',oldN);
   await sb.from('repair_slips').update({receiver:newN}).eq('receiver',oldN);
 }
-async function reassignVendorRefs(oldN,newN){
+async function reassignVendorRefs(oldN,newN){ // ต้องแก้ครบ 3 ที่ — เดิมแก้แค่ใบซ่อม ทำให้ประวัติ/ที่อยู่เครื่องยังเป็นชื่อเก่า และร่างซ่อมแยกใบกัน
   await sb.from('repair_slips').update({vendor:newN}).eq('vendor',oldN);
+  await sb.from('movements').update({counterparty:newN}).eq('counterparty',oldN);
+  await sb.from('tools').update({location:newN}).eq('location',oldN);
 }
 async function renamePerson(i){
   const oldN=_peopleList[i];const newN=(prompt('เปลี่ยนชื่อ "'+oldN+'" เป็น:',oldN)||'').trim();
