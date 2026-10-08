@@ -1176,7 +1176,7 @@ function toolDetail(i){
   const hist=S.movements.filter(m=>m.tool_id===t.id).slice(-6).reverse();
   const audits=(S.audit||[]).filter(a=>a.tool_code===t.code&&a.company===t.company).slice(0,8);
   const histHtml=`<h3 style="font-size:14px;margin-top:16px">ประวัติการใช้งานล่าสุด</h3>
-    <ul class="tl">${hist.map(m=>`<li><div class="ti">${({'เบิก':'📤','คืน':'📥','ส่งซ่อม':'⚙️','รับคืนจากซ่อม':'✅','ย้ายไซต์':'🔀'}[m.type]||'•')}</div><div><b>${esc(m.type)}</b> ${m.slip?'ใบ'+esc(m.slip):''}<div class="sub muted">${esc(m.date)} ${m.project?'· '+esc(m.project):''} ${m.actor?'· '+esc(m.actor):''}</div></div></li>`).join('')||'<li class="muted">ยังไม่มีประวัติ</li>'}</ul>
+    <ul class="tl">${hist.map(m=>`<li><div class="ti">${({'เบิก':'📤','คืน':'📥','ส่งซ่อม':'⚙️','รับคืนจากซ่อม':'✅','ย้ายไซต์':'🔀'}[m.type]||'•')}</div><div><b>${m.isDraft?'ร่าง':''}${esc(m.type)}</b> ${m.isDraft?'<span class="muted" style="font-size:12px">(ยังไม่ออกใบ'+(m.type==='ส่งซ่อม'?' · ยังอยู่ออฟฟิศ':'')+')</span> ':''}${m.slip?'ใบ'+esc(m.slip):''}<div class="sub muted">${esc(m.date)} ${m.project?'· '+esc(m.project):''} ${m.actor?'· '+esc(m.actor):''}</div></div></li>`).join('')||'<li class="muted">ยังไม่มีประวัติ</li>'}</ul>
     <h3 style="font-size:14px;margin-top:14px">📝 ประวัติแก้ไขทะเบียน</h3>
     <ul class="tl">${audits.map(a=>`<li><div class="ti">📝</div><div><b>${esc(a.action)}</b> ${esc(a.detail||'')}<div class="sub muted">${esc(fmtDTH(a.occurred_at))} · ${esc(a.user_email||'')}</div></div></li>`).join('')||'<li class="muted">ยังไม่มีการแก้ไข</li>'}</ul>`;
   if(editable){
@@ -1319,6 +1319,9 @@ function renderRepair(){
   selRepair=new Set();rRsn={};rPj={};rSg={};
   const dCo=rDraft?rDraft.company:COMPANY;
   const eligible=S.tools.filter(t=>['ว่าง','ชำรุด','รอส่งซ่อม'].includes(t.status)&&inView(t)&&!inRepairDraft(t));
+  const inDraftT=S.tools.filter(t=>['รอส่งซ่อม','ส่งซ่อม'].includes(t.status)&&inView(t)&&inRepairDraft(t)); // ไม่ให้เลือกซ้ำ แต่ค้นแล้วต้องเห็นว่าอยู่ใบร่างไหน
+  const tdr=rDraft?null:todayRepairDraft(dCo);
+  const defVendor=rDraft?rDraft.vendor:(tdr?tdr.vendor:lastRepairVendor(dCo)), defSender=rDraft?rDraft.sender:(tdr?tdr.sender:'');
   $('#view').innerHTML=`
    <div class="panel" id="rform" style="display:none;position:sticky;top:10px;z-index:5;box-shadow:0 6px 16px rgba(0,0,0,.10)">
     ${rDraft?`<div class="note" style="margin:0 0 8px;background:#fef9c3;border:1px solid #fde047;padding:7px 11px;border-radius:8px;font-size:13px">📝 กำลังเพิ่มเครื่องเข้า<b>ใบร่างซ่อม</b>: ${coBadge(rDraft.company)} ร้าน ${esc(rDraft.vendor)||'-'} · กด "เพิ่มเข้าใบร่างนี้" &nbsp;<button type="button" class="btn" style="padding:1px 9px" onclick="rDraft=null;renderRepair()">ออกจากโหมดร่าง</button></div>`:''}
@@ -1326,8 +1329,8 @@ function renderRepair(){
     <div class="flexrow">
       <div class="field"><label>บริษัทที่ออกใบ (หัวกระดาษ) *</label><select id="r_co" onchange="rcoChanged()">${['PAC','LOTUS'].map(c=>`<option value="${c}" ${dCo===c?'selected':''}>${c==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)'}</option>`).join('')}</select></div>
       <div class="field"><label>วันที่ส่ง</label><input id="r_date" type="date" value="${rDraft?esc(rDraft.date):today()}"></div>
-      <div class="field"><label>ร้าน/ช่างซ่อม</label><input id="r_vendor" list="dl_v" placeholder="เช่น สุเทพ" value="${rDraft?esc(rDraft.vendor):'ช่างสุเทพ'}"></div>
-      <div class="field"><label>ผู้ส่ง</label><input id="r_sender" list="dl_p" value="${rDraft?esc(rDraft.sender):''}"></div>
+      <div class="field"><label>ร้าน/ช่างซ่อม</label><input id="r_vendor" list="dl_v" placeholder="เช่น สุเทพ" value="${esc(defVendor||'')}"></div>
+      <div class="field"><label>ผู้ส่ง</label><input id="r_sender" list="dl_p" value="${esc(defSender||'')}"></div>
     </div>
     <div class="muted" style="font-size:12px;margin:-2px 0 6px">เลขที่จะออกอัตโนมัติ <b style="color:var(--blue)" id="rnohint">#${String((S.nextSlipByCo&&S.nextSlipByCo[dCo])||1).padStart(3,'0')}</b></div>
     <div id="rsel" style="max-height:32vh;overflow:auto"></div>
@@ -1346,10 +1349,12 @@ function renderRepair(){
   const draw=()=>{
     const q=$('#rq').value.trim().toLowerCase();
     const rows=eligible.filter(t=>!q||(t.name+t.no+t.code+(t.model||'')+(t.sn||'')).toLowerCase().includes(q));
+    const dr=q?inDraftT.filter(t=>(t.name+t.no+t.code+(t.model||'')+(t.sn||'')).toLowerCase().includes(q)).map(t=>{const d=repairDraftMov(t);
+      return `<tr style="opacity:.6" title="อยู่ในใบร่างซ่อมแล้ว — แก้/ออกใบที่ ประวัติ → ใบร่าง"><td style="text-align:center">📝</td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td><span class="chip" style="background:#fef3c7;color:#92400e">อยู่ในใบร่างแล้ว · ร้าน ${esc((d&&d.vendor)||'ยังไม่ระบุ')}</span></td></tr>`;}).join(''):'';
     const pg=pgSlice('repair',rows);
     $('#rtbl').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th></th><th>บริษัท</th><th>ชื่อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th></tr></thead><tbody>${
-      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selRepair.has(t.i)?'checked':''} onchange="togRepair(${t.i},this.checked)"></td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td></tr>`).join('')||'<tr><td colspan=8 class="empty">ไม่พบ</td></tr>'
-    }</tbody></table></div>${pg.html}`;
+      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selRepair.has(t.i)?'checked':''} onchange="togRepair(${t.i},this.checked)"></td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td></tr>`).join('')+dr||'<tr><td colspan=8 class="empty">ไม่พบ</td></tr>'
+    }</tbody></table></div>${pg.html}${!q&&inDraftT.length?`<div class="muted" style="font-size:12px;margin-top:8px">📝 มีอีก ${inDraftT.length} เครื่องอยู่ในใบร่างซ่อมแล้ว (ไม่แสดงให้เลือกซ้ำ) — พิมพ์ค้นหาเพื่อดูว่าอยู่ใบไหน หรือไปที่ ประวัติ → ใบร่าง</div>`:''}`;
   };
   PG_REDRAW['repair']=draw;
   $('#rq').oninput=()=>{pgReset('repair');draw();};draw();
@@ -2211,6 +2216,17 @@ function inRepairDraft(t){ // เครื่องกำลังอยู่�
   const mv=S.movements.filter(m=>m.tool_id===t.id&&m.type==='ส่งซ่อม').sort((a,b)=>String((a.date||'')+(a.createdAt||'')).localeCompare(String((b.date||'')+(b.createdAt||'')))).pop();
   return !!(mv&&mv.isDraft);
 }
+function repairDraftMov(t){ // movement ร่างซ่อมล่าสุดของเครื่อง (ถ้ายังเป็นร่าง) — ใช้บอกว่าอยู่ใบร่างร้านไหน
+  const mv=S.movements.filter(m=>m.tool_id===t.id&&m.type==='ส่งซ่อม').sort((a,b)=>String((a.date||'')+(a.createdAt||'')).localeCompare(String((b.date||'')+(b.createdAt||'')))).pop();
+  return (mv&&mv.isDraft)?mv:null;
+}
+function lastRepairVendor(co){ // ร้านซ่อมที่ใช้ล่าสุด (บริษัทนี้ก่อน ไม่มีค่อยดูทุกบริษัท) — แทนค่าเริ่มต้นตายตัว
+  const ms=S.movements.filter(m=>m.type==='ส่งซ่อม'&&m.vendor).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  const m=ms.find(x=>x.company===co)||ms[0]; return m?m.vendor:'';
+}
+function todayRepairDraft(co){ // ใบร่างซ่อม "วันนี้" ของบริษัทนี้ที่มีร้านแล้ว (ไม่นับใบพัก) — คัดลอกร้าน+ผู้ส่งให้รวมใบเดียวกันได้
+  return repairDrafts().find(g=>g.company===co&&g.date===today()&&g.vendor&&g.parkNo==null)||null;
+}
 function repairDrafts(){
   const groups={};
   S.tools.forEach(t=>{
@@ -2812,11 +2828,14 @@ async function scanReceiveSite(){ const t=scanTool; if(!t)return;
   await scanWrite(t,{status:'ว่าง',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null},{type:'คืน',project:'ออฟฟิต',actor:(ME&&ME.email)||''},'📥 รับคืน '+t.code+' เข้าออฟฟิตแล้ว');
 }
 function scanReceiveBrokenPC(){ const t=scanTool; if(!t)return;
+  const co=(ME&&ME.role==='admin')?t.company:COMPANY, tdr=todayRepairDraft(co), dv=tdr?tdr.vendor:lastRepairVendor(co);
   openModal(`<h3>🔧 รับคืนเครื่องเสีย → เข้าร่างใบซ่อม</h3>
     <p class="muted" style="font-size:13px">${esc(t.code)} · ${esc((t.name||'').slice(0,40))} · จาก ${esc(t.loc)||'-'}</p>
     <div style="background:#f0fdf4;border-left:3px solid #16a34a;padding:8px 11px;border-radius:8px;font-size:12.5px;margin:8px 0">ระบบจะบันทึก <b>"คืนจากไซต์"</b> ตามวันที่เลือก (ใบเบิกติ๊กคืน — เคลียร์ว่าไซต์คืนแล้ว) แล้วเก็บเครื่องเข้า<b>ร่างใบซ่อม</b>ต่อทันที</div>
     <div class="flexrow"><div class="field"><label>วันที่คืนจริงจากไซต์ (ย้อนหลังได้)</label><input type="date" id="sbk_date" value="${today()}"></div></div>
     <div class="flexrow"><div class="field"><label>กลุ่มอาการ</label><select id="sbk_sym"><option value="">— เลือก —</option>${SYMPTOMS.map(s=>`<option>${s}</option>`).join('')}</select></div><div class="field"><label>รายละเอียดเพิ่ม (ไม่บังคับ)</label><input id="sbk_reason" placeholder="เช่น สายขาด"></div></div>
+    <div class="flexrow"><div class="field"><label>ร้าน/ช่างซ่อม</label><input id="sbk_vendor" list="dl_sbkv" value="${esc(dv||'')}" placeholder="เช่น สุเทพการช่าง"><datalist id="dl_sbkv">${S.lookups.vendors.map(v=>`<option>${esc(v)}</option>`).join('')}</datalist></div></div>
+    ${tdr?`<div class="muted" style="font-size:12px;margin-top:4px">📝 วันนี้มีใบร่างซ่อมร้าน <b>${esc(tdr.vendor)}</b> อยู่แล้ว ${tdr.tools.length} เครื่อง — ใช้ร้านเดิมจะรวมเป็นใบเดียวกัน</div>`:''}
     <div class="flexrow" style="margin-top:14px"><button class="btn primary" onclick="doScanReceiveBrokenPC()">💾 บันทึก คืน + เข้าร่างซ่อม</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
 }
 async function doScanReceiveBrokenPC(){ const t=scanTool; if(!t)return;
@@ -2824,10 +2843,12 @@ async function doScanReceiveBrokenPC(){ const t=scanTool; if(!t)return;
   const site=((t.loc||'').split('/')[0]||'').trim();
   const co=(ME&&ME.role==='admin')?t.company:COMPANY;
   // 1) หลักฐานคืนจากไซต์ (ปิดรายการในใบเบิก — ไซต์ไม่ค้างแล้ว)
-  await sb.from('movements').insert({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:rdate,type:'คืน',project:'ออฟฟิต',actor:(ME&&ME.email)||'',note:'คืนจากไซต์ (เครื่องเสีย)'+(site?' — '+site:'')});
+  await sb.from('movements').insert({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:rdate,type:'คืน',project:'ออฟฟิต',actor:(ME&&(ME.fullName||ME.email))||'',note:'คืนจากไซต์ (เครื่องเสีย)'+(site?' — '+site:'')});
   // 2) เก็บเข้าร่างใบซ่อม — ยังไม่ส่งจริง → "รอส่งซ่อม" อยู่ออฟฟิต
   await sb.from('tools').update({status:'รอส่งซ่อม',location:'ออฟฟิต',receipt_pending:false,pending_dest:null,dispatched_at:null,updated_at:new Date().toISOString()}).eq('id',t.id);
-  await sb.from('movements').insert({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:today(),type:'ส่งซ่อม',actor:'',counterparty:'',reason,symptom:sym,project:(site&&site!=='ออฟฟิต')?site:null,is_draft:true});
+  const vendor=($('#sbk_vendor')?$('#sbk_vendor').value.trim():''), tdr=todayRepairDraft(co), sender=(tdr&&tdr.vendor===vendor)?(tdr.sender||''):'';
+  await sb.from('movements').insert({company:co,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:today(),type:'ส่งซ่อม',actor:sender,counterparty:vendor,reason,symptom:sym,project:(site&&site!=='ออฟฟิต')?site:null,is_draft:true});
+  if(vendor)await ensureLookup('vendors',vendor);
   closeModal(); toast('🔧 '+t.code+' บันทึกคืน ('+fmtDateTH(rdate)+') + เข้าร่างใบซ่อมแล้ว');
   await loadAll(); scanDone(t,'คืนจากไซต์ + เข้าร่างใบซ่อมแล้ว');
 }
