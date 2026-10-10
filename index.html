@@ -276,9 +276,11 @@ input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<!-- ล็อกเวอร์ชัน + SRI (integrity): ถ้า CDN ถูกแก้ไฟล์ เบราว์เซอร์จะไม่รัน · อัปเวอร์ชันต้องคำนวณ hash ใหม่ด้วย
+     ใช้ไฟล์ต้นฉบับในแพ็กเกจเท่านั้น — ห้ามใช้ .min.js ที่ jsDelivr ย่อเอง (สร้างใหม่ได้ทุกเมื่อ → hash ไม่ตรง → แอปพังทั้งระบบ) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" integrity="sha384-BWcjm9OdFth9TbhCxZPdm+gAOUMAzQy9nmTs12ioXdCcbVnJaPMn+fMUoQCLt60R" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js" integrity="sha384-8FWZA6BGMXhsfO+BLtrJK0We6gg5o1JyO8xQm6peWDEUs17ACA5ziE/NIAkl9z2k" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js" integrity="sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+" crossorigin="anonymous"></script>
 <script>
 /* ============ state ============ */
 const SB_URL='https://iadnauodmoydxaajtory.supabase.co';
@@ -2766,7 +2768,7 @@ function bossReportRender(found,miss){
 async function bossReportPNG(){
   const el=document.getElementById('bossrep'); if(!el){toast('ไม่พบรายงาน');return;}
   toast('กำลังสร้างรูป…');
-  if(!window.html2canvas){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);}).catch(()=>{});}
+  if(!window.html2canvas){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';s.integrity='sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H';s.crossOrigin='anonymous';s.onload=res;s.onerror=rej;document.head.appendChild(s);}).catch(()=>{});}
   if(!window.html2canvas){toast('โหลดตัวแปลงรูปไม่ได้ — ลองใช้ปุ่มพิมพ์แทน');return;}
   try{
     const canvas=await html2canvas(el,{scale:2,backgroundColor:'#ffffff'});
