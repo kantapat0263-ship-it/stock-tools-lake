@@ -1570,7 +1570,7 @@ function renderBorrow(){
 }
 function setBT(t){borrowTab=t;selBor=new Set();renderBorrow();}
 function drawBorrow(){
-  const mode=borrowTab; const out=mode==='out';
+  const mode=borrowTab; const out=mode==='out'; const withPR=mode!=='in'; // เบิก + ย้ายไซต์ ใส่ PR/หมายเหตุรายเครื่องได้
   const list=S.tools.filter(t=>t.status===(out?'ว่าง':'ถูกยืม')&&inView(t));
   let form,btn,title;
   if(mode==='out'){
@@ -1600,8 +1600,8 @@ function drawBorrow(){
   const draw=()=>{const q=$('#bq').value.trim().toLowerCase();const rows=list.filter(t=>!q||(t.name+t.no+t.code+(t.model||'')+(t.sn||'')).toLowerCase().includes(q));
     if(out&&borView==='card'){$('#btbl').innerHTML=borCardsHtml(rows);return;}
     const pg=pgSlice('borrow',rows);
-    $('#btbl').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th></th><th>บริษัท</th><th>ชื่อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th>${out?'<th>เลขที่ PR</th><th>หมายเหตุ</th>':''}</tr></thead><tbody>${
-      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selBor.has(t.i)?'checked':''} onchange="togBor(${t.i},this.checked)"></td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td>${out?`<td><input value="${esc(borPR[t.i]||'')}" oninput="borPR[${t.i}]=this.value" placeholder="PR..." style="width:100%;min-width:90px;padding:3px 5px"></td><td><input value="${esc(borNote[t.i]||'')}" oninput="borNote[${t.i}]=this.value" placeholder="หมายเหตุ" style="width:100%;min-width:100px;padding:3px 5px"></td>`:''}</tr>`).join('')||`<tr><td colspan=${out?10:8} class="empty">ไม่มี</td></tr>`
+    $('#btbl').innerHTML=`<div class="listbox"><table class="locktbl"><thead><tr><th></th><th>บริษัท</th><th>ชื่อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>S/N</th><th>สถานะ</th>${withPR?'<th>เลขที่ PR</th><th>หมายเหตุ</th>':''}</tr></thead><tbody>${
+      pg.rows.map(t=>`<tr><td><input type="checkbox" ${selBor.has(t.i)?'checked':''} onchange="togBor(${t.i},this.checked)"></td><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td>${esc(t.sn)||'-'}</td><td>${chip(t.status)}</td>${withPR?`<td><input value="${esc(borPR[t.i]||'')}" oninput="borPR[${t.i}]=this.value" placeholder="PR..." style="width:100%;min-width:90px;padding:3px 5px"></td><td><input value="${esc(borNote[t.i]||'')}" oninput="borNote[${t.i}]=this.value" placeholder="หมายเหตุ" style="width:100%;min-width:100px;padding:3px 5px"></td>`:''}</tr>`).join('')||`<tr><td colspan=${withPR?10:8} class="empty">ไม่มี</td></tr>`
     }</tbody></table></div>${pg.html}`;};
   PG_REDRAW['borrow']=draw;
   $('#bq').oninput=()=>{pgReset('borrow');draw();};draw();
@@ -1797,11 +1797,12 @@ async function doMove(withPrint){
   const actor=who||(ME&&ME.fullName)||'';
   const items=[],ids=[];
   for(const t of sel){
+    const pr=(borPR[t.i]||'').trim(), note=(borNote[t.i]||'').trim();
     await sb.from('tools').update({location:proj+(who?' / '+who:''),receipt_pending:true,pending_dest:proj,dispatched_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',t.id);
     // from_project เก็บเฉพาะที่ผู้ใช้เลือกเอง — ปล่อย null ให้ระบบคำนวณจากประวัติ (fromSite)
-    const {data:ins,error}=await sb.from('movements').insert({company:t.company,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date,type:'ย้ายไซต์',project:proj,actor,from_project:(fromSel||null)}).select('id').maybeSingle();
+    const {data:ins,error}=await sb.from('movements').insert({company:t.company,owner_company:t.company,recorded_by:(ME&&ME.email)||'',tool_id:t.id,occurred_on:date,type:'ย้ายไซต์',project:proj,actor,from_project:(fromSel||null),pr_no:pr||null,note:note||null}).select('id').maybeSingle();
     if(error){toast('❌ บันทึกย้ายไม่สำเร็จ ('+(t.no||t.code)+'): '+error.message);await loadAll();renderBorrow();return;}
-    items.push(Object.assign({},t,{_from:fromSel||curSite(t)})); ids.push(ins?ins.id:null);
+    items.push(Object.assign({},t,{_from:fromSel||curSite(t),pr,note})); ids.push(ins?ins.id:null);
   }
   await ensureLookup('projects',proj); if(who)await ensureLookup('people',who);
   if(withPrint){
@@ -2049,6 +2050,7 @@ function moveBatches(){
     const info=t?Object.assign({},t):{name:m.label||m.code||'',cat:'',no:'',code:m.code||'',company:co,brand:'',model:'',sn:''};
     const autoFrom=fromSite(m);
     info._fromAuto=autoFrom; info._fromManual=(m.fromProject||''); info._from=info._fromManual||autoFrom;
+    info.pr=m.prNo||''; info.note=m.note||'';
     g.tools.push(info); g.movIds.push(m.id);
   });
   return Object.values(groups).filter(g=>!FILTER||g.company===FILTER)
@@ -2084,7 +2086,7 @@ function moveSlipDetail(i){
     const ph=auto?('— ตามประวัติ: '+esc(auto)+' —'):'— ไม่ทราบ (เลือกไซต์) —';
     const opts=`<option value="">${ph}</option>`+sites.map(p=>`<option ${cur===p?'selected':''}>${esc(p)}</option>`).join('');
     const warn=(!cur&&!auto)?'border-color:#f59e0b;background:#fffbeb;':'';
-    return `<tr><td class="center">${ix+1}</td><td><b>${esc(itemDesc(t))||'-'}</b></td><td class="center">${esc(t.no)||'-'}</td><td>${esc(t.sn)||'-'}</td><td><select onchange="setMoveFrom(${i},${ix},this.value)" style="padding:3px 5px;min-width:160px;${warn}">${opts}</select>${cur?'<div class="muted" style="font-size:11px">✏️ กรอกเอง</div>':''}</td></tr>`;
+    return `<tr><td class="center">${ix+1}</td><td><b>${esc(itemDesc(t))||'-'}</b></td><td class="center">${esc(t.no)||'-'}</td><td>${esc(t.sn)||'-'}</td><td><select onchange="setMoveFrom(${i},${ix},this.value)" style="padding:3px 5px;min-width:160px;${warn}">${opts}</select>${cur?'<div class="muted" style="font-size:11px">✏️ กรอกเอง</div>':''}</td><td><input value="${esc(t.pr||'')}" onchange="setMoveInfo(${i},${ix},'pr_no',this.value)" placeholder="เลขที่ PR" style="width:100%;min-width:90px;padding:3px 5px"></td><td><input value="${esc(t.note||'')}" onchange="setMoveInfo(${i},${ix},'note',this.value)" placeholder="หมายเหตุ" style="width:100%;min-width:100px;padding:3px 5px"></td></tr>`;
   }).join('');
   const kv=(k,v)=>`<div><span class="muted">${k}:</span> <b>${v}</b></div>`;
   openModal(`<h3>🔀 ใบย้ายไซต์ ${b.no!=null?'#'+String(b.no).padStart(3,'0'):'<span class="muted" style="font-size:13px;font-weight:400">(ยังไม่ออกเลขที่ — ออกให้ตอนกดพิมพ์)</span>'} ${coBadge(b.company)}</h3>
@@ -2095,8 +2097,8 @@ function moveSlipDetail(i){
       ${kv('วันที่ย้าย',esc(fmtDateTH(b.date))||'-')}
       ${kv('จำนวน',b.tools.length+' เครื่อง')}
     </div>
-    <p class="muted" style="font-size:12px;margin:-2px 0 8px">ช่อง "จากไซต์" ระบบดึงจากประวัติเครื่องให้ · เครื่องที่เพิ่งเข้าระบบครั้งแรกจะว่าง (กรอบเองได้) · แก้แล้วขึ้นในใบที่พิมพ์ด้วย</p>
-    <div class="listbox" style="max-height:44vh"><table class="locktbl"><thead><tr><th>ลำดับ</th><th>รายการ</th><th class="center">NO</th><th>S/N</th><th>จากไซต์ (แก้ได้)</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="muted" style="font-size:12px;margin:-2px 0 8px">ช่อง "จากไซต์" ระบบดึงจากประวัติเครื่องให้ · เครื่องที่เพิ่งเข้าระบบครั้งแรกจะว่าง (กรอบเองได้) · เลขที่ PR / หมายเหตุ พิมพ์แล้วบันทึกเอง · แก้แล้วขึ้นในใบที่พิมพ์ด้วย</p>
+    <div class="listbox" style="max-height:44vh"><table class="locktbl"><thead><tr><th>ลำดับ</th><th>รายการ</th><th class="center">NO</th><th>S/N</th><th>จากไซต์ (แก้ได้)</th><th>เลขที่ PR</th><th>หมายเหตุ</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="flexrow" style="margin-top:14px"><button class="btn primary" onclick="printMove(${i})">🖨️ พิมพ์ใบ</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
 }
 async function setMoveFrom(i,ix,val){
@@ -2110,6 +2112,20 @@ async function setMoveFrom(i,ix,val){
   if(histTab==='moves'&&$('#hbody')){histMoves();
     const ni=(window._mb||[]).findIndex(x=>x.company===b.company&&x.no===b.no&&x.date===b.date&&x.project===b.project&&x.who===b.who);
     moveSlipDetail(ni>=0?ni:i);}
+}
+// เลขที่ PR / หมายเหตุ รายเครื่องในใบย้าย — อัปเดตตรงจุด ไม่ re-render (ช่องที่กำลังพิมพ์ไม่หลุด)
+// ไม่ใส่ใน _busyFn ตั้งใจ: เป็น UPDATE ซ้ำได้ไม่เสียหาย และล็อกรายฟังก์ชันจะทิ้งการแก้แถวถัดไปที่พิมพ์ต่อกันเร็ว ๆ
+async function setMoveInfo(i,ix,col,val){
+  const b=(window._mb||[])[i]; if(!b){toast('ไม่พบใบย้าย');return;}
+  const mid=b.movIds[ix],t=b.tools[ix]; if(!mid||!t){toast('ไม่พบรายการ');return;}
+  const key=col==='pr_no'?'pr':'note', v=(val||'').trim(), old=t[key];
+  t[key]=v; // ตั้งค่าก่อน await — กดพิมพ์ทันทีหลังพิมพ์ช่องนี้ ใบจะได้ค่าใหม่
+  _rtReloadAt=Date.now(); // ไม่ได้เรียก loadAll → กันแบนเนอร์ realtime เด้งใส่การแก้ของตัวเอง
+  const r=await sb.from('movements').update({[col]:(v||null)}).eq('id',mid);
+  _rtReloadAt=Date.now();
+  if(r.error){t[key]=old;toast('บันทึกไม่ได้: '+r.error.message);return;}
+  const m=S.movements.find(x=>x.id===mid); if(m){if(col==='pr_no')m.prNo=v;else m.note=v;}
+  toast(col==='pr_no'?'บันทึกเลขที่ PR แล้ว':'บันทึกหมายเหตุแล้ว');
 }
 async function printMove(i){
   const b=(window._mb||[])[i]; if(!b){toast('ไม่พบใบย้าย');return;}
@@ -2139,7 +2155,7 @@ function moveDocHtml(b){
   function copy(p,stamp){
     let rows='';
     for(let r=0;r<PER;r++){const gi=p*PER+r,it=items[gi];
-      rows+=`<tr><td class="c">${gi+1}</td><td>${it?esc(slipName(it)):''}</td><td>${it?esc(it.brand||''):''}</td><td>${it?esc(it.model||''):''}</td><td class="c">${it?esc(it.sn||''):''}</td><td class="c">${it?esc(it.no||''):''}</td><td class="c">${it?esc(it._from||''):''}</td><td></td></tr>`;}
+      rows+=`<tr><td class="c">${gi+1}</td><td>${it?esc(slipName(it)):''}</td><td>${it?esc(it.brand||''):''}</td><td>${it?esc(it.model||''):''}</td><td class="c">${it?esc(it.sn||''):''}</td><td class="c">${it?esc(it.no||''):''}</td><td class="c">${it?esc(it._from||''):''}</td><td class="c">${it?esc(it.pr||''):''}</td><td>${it?esc(it.note||''):''}</td></tr>`;}
     return `<div class="bcopy">
       <div class="bhd">
         <div class="blogo">${LOGO[CO]?`<img src="${LOGO[CO]}" alt="${esc(CO)}">`:esc(CO)}</div>
@@ -2151,8 +2167,8 @@ function moveDocHtml(b){
         <div class="r"><span>ย้ายไปไซต์: <b>${esc(b.project)||'.................'}</b></span><span>วันที่ย้าย: <b>${esc(fmtDateTH(b.date))||'..../..../....'}</b></span></div>
         <div>ผู้ย้าย / ผู้นำส่ง: <b>${esc(b.who)||'.................'}</b></div>
       </div>
-      <table class="btbl"><colgroup><col style="width:5%"><col style="width:20%"><col style="width:10%"><col style="width:11%"><col style="width:13%"><col style="width:13%"><col style="width:15%"><col style="width:13%"></colgroup>
-        <thead><tr><th>ลำดับ</th><th>รายการ</th><th>ยี่ห้อ</th><th>รุ่น</th><th>S/N</th><th>รหัส</th><th>จากไซต์เดิม</th><th>หมายเหตุ</th></tr></thead>
+      <table class="btbl"><colgroup><col style="width:5%"><col style="width:17%"><col style="width:9%"><col style="width:10%"><col style="width:12%"><col style="width:11%"><col style="width:13%"><col style="width:11%"><col style="width:12%"></colgroup>
+        <thead><tr><th>ลำดับ</th><th>รายการ</th><th>ยี่ห้อ</th><th>รุ่น</th><th>S/N</th><th>รหัส</th><th>จากไซต์เดิม</th><th>เลขที่ PR</th><th>หมายเหตุ</th></tr></thead>
         <tbody>${rows}</tbody></table>
       <div class="bsign">
         <div>ผู้ส่งจากไซต์เดิม<br><br><span class="bsline"></span><br>(.................)
