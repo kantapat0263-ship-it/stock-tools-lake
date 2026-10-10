@@ -2070,7 +2070,9 @@ function histMoves(){
       pg.rows.map(({b,i})=>{
         const froms=[...new Set(b.tools.map(t=>t._from).filter(Boolean))];
         const fTxt=froms.length?esc(froms.slice(0,2).join(', '))+(froms.length>2?` +${froms.length-2}`:''):'<span class="muted">—</span>';
-        return `<tr style="cursor:pointer" onclick="moveSlipDetail(${i})"><td><b>${b.no!=null?String(b.no).padStart(3,'0'):'<span class="muted" style="font-weight:400">ยังไม่ออก</span>'}</b></td><td>${esc(fmtDateTH(b.date))||'-'}</td><td>${fTxt}</td><td><b>${esc(b.project)||'-'}</b></td><td>${coBadge(b.company)}</td><td>${esc(b.who)||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="background:var(--blue);color:#fff;padding:5px 11px" onclick="event.stopPropagation();printMove(${i})">🖨️ พิมพ์</button></td></tr>`;}).join('')||`<tr><td colspan=8 class="empty">${q?'ไม่พบรายการที่ค้นหา':'ยังไม่มีการย้ายไซต์'}</td></tr>`
+        return `<tr style="cursor:pointer" onclick="moveSlipDetail(${i})"><td><b>${b.no!=null?String(b.no).padStart(3,'0'):'<span class="muted" style="font-weight:400">ยังไม่ออก</span>'}</b></td><td>${esc(fmtDateTH(b.date))||'-'}</td><td>${fTxt}</td><td><b>${esc(b.project)||'-'}</b></td><td>${coBadge(b.company)}</td><td>${esc(b.who)||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap">${b.no!=null
+          ?`<button class="btn" style="background:var(--blue);color:#fff;padding:5px 11px" onclick="event.stopPropagation();printMove(${i})">🖨️ พิมพ์</button>`
+          :`<button class="btn" style="padding:5px 11px" onclick="event.stopPropagation();movePreview(${i})">👁️ ดูตัวอย่าง</button>`}</td></tr>`;}).join('')||`<tr><td colspan=8 class="empty">${q?'ไม่พบรายการที่ค้นหา':'ยังไม่มีการย้ายไซต์'}</td></tr>`
     }</tbody></table>${pg.html}`;};
   PG_REDRAW['moves']=draw;
   $('#hmq').oninput=()=>{pgReset('moves');draw();};
@@ -2099,7 +2101,16 @@ function moveSlipDetail(i){
     </div>
     <p class="muted" style="font-size:12px;margin:-2px 0 8px">ช่อง "จากไซต์" ระบบดึงจากประวัติเครื่องให้ · เครื่องที่เพิ่งเข้าระบบครั้งแรกจะว่าง (กรอบเองได้) · เลขที่ PR / หมายเหตุ พิมพ์แล้วบันทึกเอง · แก้แล้วขึ้นในใบที่พิมพ์ด้วย</p>
     <div class="listbox" style="max-height:44vh"><table class="locktbl"><thead><tr><th>ลำดับ</th><th>รายการ</th><th class="center">NO</th><th>S/N</th><th>จากไซต์ (แก้ได้)</th><th>เลขที่ PR</th><th>หมายเหตุ</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="flexrow" style="margin-top:14px"><button class="btn primary" onclick="printMove(${i})">🖨️ พิมพ์ใบ</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+    <div class="flexrow" style="margin-top:14px"><button class="btn" onclick="movePreview(${i})">👁️ ดูตัวอย่างใบเต็ม</button><button class="btn primary" onclick="printMove(${i})">${b.no!=null?'🖨️ พิมพ์ใบ':'🖨️ ออกเลขที่ + พิมพ์'}</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+}
+// ดูใบเต็มก่อน — ไม่ออกเลข ไม่บันทึกอะไร (เลขออกเฉพาะตอนกด printMove)
+function movePreview(i){
+  const b=(window._mb||[])[i]; if(!b){toast('ไม่พบใบย้าย');return;}
+  const issued=b.no!=null;
+  openModal(`<h3>👁️ ตัวอย่างใบย้ายไซต์ ${issued?'#'+String(b.no).padStart(3,'0'):''} ${coBadge(b.company)}</h3>
+    <p class="muted">${issued?'ใบนี้ออกเลขที่แล้ว':'ดูก่อน — <b>ยังไม่ออกเลขที่</b> · เลขจะออกตอนกด "ออกเลขที่ + พิมพ์" เท่านั้น'}</p>
+    ${docBox(moveDocHtml(b))}
+    <div class="flexrow"><button class="btn primary" onclick="printMove(${i})">${issued?'🖨️ พิมพ์ใบ':'🖨️ ออกเลขที่ + พิมพ์'}</button><button class="btn" onclick="moveSlipDetail(${i})">← กลับไปแก้ (จากไซต์ / PR / หมายเหตุ)</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
 }
 async function setMoveFrom(i,ix,val){
   const b=(window._mb||[])[i]; if(!b){toast('ไม่พบใบย้าย');return;}
