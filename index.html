@@ -2222,11 +2222,11 @@ function draftPreview(kind,i){
   const pno=rep?b.parkNo:b.no, sub=(pno!=null)?'พักไว้ · เลข #'+String(pno).padStart(3,'0'):'ยังไม่ออกเลขที่';
   const doc=rep
     ?`<div style="padding:8mm">${repairDocHtml('ร่าง',b.date,b.vendor,b.sender,b.tools.map(t=>({t,reason:t.reason||'',project:t.project||''})),b.company,false,false,sub)}</div>` // ขอบเท่าระยะขอบกระดาษตอนพิมพ์
-    :borrowDocHtml(b.tools,b.who,b.project,b.date,pno,b.company,false,sub);
+    :`<div style="padding:5mm 0">${borrowDocHtml(b.tools,b.who,b.project,b.date,pno,b.company,false,sub)}</div>`;
   window._dpv={scale:rep?2:3,name:['ใบร่าง'+(rep?'ส่งซ่อม':'ส่งไซต์'),b.company,rep?b.vendor:b.project,b.date].filter(Boolean).join('_')};
   openModal(`<h3>👁️ ตัวอย่างใบร่าง${rep?'ส่งซ่อม':'เบิก / ส่งไซต์'} ${coBadge(b.company)}</h3>
     <p class="muted">ดูก่อน — <b>ยังไม่ออกเลขที่ ไม่บันทึกอะไร</b> · คัดลอกรูปไปวางในแชท หรือบันทึก PNG ส่งให้หัวหน้าดูได้</p>
-    ${docBox(doc,rep?'297mm':'150mm')}
+    ${docBox(doc,rep?'297mm':'139mm')}
     <div class="flexrow"><button class="btn primary" onclick="draftCopyImg()">📋 คัดลอกรูป</button><button class="btn" onclick="draftSavePng()">💾 บันทึก PNG</button><button class="btn" style="background:#16a34a;color:#fff" onclick="closeModal();${rep?'issueRepairDraft':'issueDraft'}(${i})">🖨️ ออกใบ</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
 }
 async function draftImgBlob(){ // รูปของใบในกล่องตัวอย่าง (#docprevpaper) — ปลดซูม/ความสูงจำกัดในสำเนา ให้ได้ใบเต็มขนาดจริง
@@ -2238,14 +2238,15 @@ async function draftImgBlob(){ // รูปของใบในกล่อง�
 async function draftCopyImg(){
   if(!(navigator.clipboard&&navigator.clipboard.write&&window.ClipboardItem)){toast('เบราว์เซอร์นี้คัดลอกรูปไม่ได้ — ใช้ปุ่ม "บันทึก PNG" แทน');return;}
   toast('กำลังสร้างรูป…');
-  try{await navigator.clipboard.write([new ClipboardItem({'image/png':draftImgBlob()})]);toast('✅ คัดลอกรูปแล้ว — ไปวาง (Ctrl+V) ในแชทได้เลย');}
+  const img=draftImgBlob(); img.catch(()=>{}); // กัน unhandled rejection ถ้า write() ล้มก่อนรูปเสร็จ
+  try{await navigator.clipboard.write([new ClipboardItem({'image/png':img})]);toast('✅ คัดลอกรูปแล้ว — ไปวาง (Ctrl+V) ในแชทได้เลย');}
   catch(e){toast('คัดลอกไม่ได้: '+e.message+' — ใช้ปุ่ม "บันทึก PNG" แทน');}
 }
 async function draftSavePng(){
   toast('กำลังสร้างรูป…');
   try{const bl=await draftImgBlob(),a=document.createElement('a');a.href=URL.createObjectURL(bl);
     a.download=String((window._dpv&&window._dpv.name)||'ใบร่าง').replace(/[\\/:*?"<>|]+/g,'-')+'.png';
-    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast('✅ บันทึกรูปแล้ว');}
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),60000);toast('✅ บันทึกรูปแล้ว');}
   catch(e){toast('สร้างรูปไม่ได้: '+e.message);}
 }
 function addToDraft(i){
