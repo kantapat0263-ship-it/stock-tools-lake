@@ -1415,7 +1415,7 @@ async function saveRepairDraft(){
   toast(`เก็บเข้าใบร่างซ่อมแล้ว ${sel.length} เครื่อง · ออกใบจริงได้ที่ ประวัติ → ใบร่าง`);await loadAll();renderRepair();
 }
 let pendingRepair=null,rDraft=null;
-function repairDocHtml(slip,date,vendor,sender,items,issueCo,cancelled,reissued){
+function repairDocHtml(slip,date,vendor,sender,items,issueCo,cancelled,reissued,draft){ // draft = ข้อความใต้คำว่า "ร่าง" (ดูก่อนออกใบ)
   const CO=issueCo||COMPANY;
   const co=CO==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)';
   const PER=13, pages=Math.max(1,Math.ceil(items.length/PER));
@@ -1454,9 +1454,9 @@ function repairDocHtml(slip,date,vendor,sender,items,issueCo,cancelled,reissued)
     out+=`<div class="doc land rsdoc rspage" style="position:relative">
       ${cancelled?`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:9"><div style="transform:rotate(-16deg);border:7px solid #dc2626;color:#dc2626;font-size:78px;font-weight:900;padding:8px 48px;border-radius:14px;letter-spacing:10px;opacity:.78;font-family:Tahoma,sans-serif">ยกเลิก</div></div>`:''}
       <div class="rshd">
-        <div class="rshd-l"><div class="rsno-lbl">เลขที่</div><div class="rsno-big">${esc(slip)}</div>${reissued?`<div style="font-size:10px;color:#1e40af;font-weight:700">· ออกใหม่ ·</div>`:''}${pages>1?`<div class="rspg">หน้า ${p+1}/${pages}</div>`:''}</div>
+        <div class="rshd-l"><div class="rsno-lbl">เลขที่</div><div class="rsno-big"${draft?' style="color:#b91c1c"':''}>${esc(slip)}</div>${draft?`<div style="font-size:11px;color:#b91c1c;font-weight:700">${esc(draft)}</div>`:''}${reissued?`<div style="font-size:10px;color:#1e40af;font-weight:700">· ออกใหม่ ·</div>`:''}${pages>1?`<div class="rspg">หน้า ${p+1}/${pages}</div>`:''}</div>
         <div class="rshd-c"><div class="rsttl">ใบบันทึกการส่งซ่อมเครื่องมือ</div><div class="rssub">บริษัท ${co}</div></div>
-        <div class="rshd-r"><div class="rsorig">ORIGINAL</div>
+        <div class="rshd-r"><div class="rsorig">${draft?'ร่าง':'ORIGINAL'}</div>
           <div class="rsrecv">เซ็นชื่อผู้รับเครื่องมือซ่อม ...........................<br>วันที่รับเครื่องมือซ่อม ......./......./.........</div>
         </div>
       </div>
@@ -1705,10 +1705,11 @@ function printNow(landscape){
   const imgs=[...document.querySelectorAll('#printArea img')];
   Promise.all(imgs.map(im=>(im&&im.decode)?im.decode().catch(()=>{}):Promise.resolve())).then(()=>{setTimeout(()=>window.print(),30);});
 }
-function borrowDocHtml(items,who,proj,date,no,issueCo,reissued){
+function borrowDocHtml(items,who,proj,date,no,issueCo,reissued,draft){ // draft = ข้อความใต้คำว่า "ร่าง" → พิมพ์ซีกเดียว ไว้ทำรูปดูก่อนออกใบ
   const CO=issueCo||COMPANY;
   const co=CO==='LOTUS'?'LOTUS':'P-ADVANCED (PAC)';
-  const noTxt=((no!=null&&no!=='')?String(no).padStart(3,'0'):'..........')+(reissued?`<br><span style="color:#1e40af;font-size:10px;font-weight:700">· ออกใหม่ ·</span>`:'');
+  const noTxt=draft?`<span style="color:#b91c1c">ร่าง</span><br><span style="color:#b91c1c;font-size:9px">${esc(draft)}</span>`
+    :((no!=null&&no!=='')?String(no).padStart(3,'0'):'..........')+(reissued?`<br><span style="color:#1e40af;font-size:10px;font-weight:700">· ออกใหม่ ·</span>`:'');
   const PER=13, pages=Math.max(1,Math.ceil(items.length/PER));
   function copy(p,stamp){
     let rows='';
@@ -1738,7 +1739,8 @@ function borrowDocHtml(items,who,proj,date,no,issueCo,reissued){
   }
   let out='';
   for(let p=0;p<pages;p++){
-    out+=`<div class="doc land rspage"><div class="bpair">${copy(p,'ORIGINAL')}<div class="bcut"></div>${copy(p,'COPY')}</div></div>`;
+    out+=draft?`<div class="doc rspage"${p?' style="border-top:2px dashed #999;margin-top:5mm;padding-top:5mm"':''}><div class="bpair">${copy(p,'ร่าง')}</div></div>`
+      :`<div class="doc land rspage"><div class="bpair">${copy(p,'ORIGINAL')}<div class="bcut"></div>${copy(p,'COPY')}</div></div>`;
   }
   return out;
 }
@@ -2206,13 +2208,45 @@ function histDrafts(){
    <div class="panel">
     <h3>📝 ใบร่างเบิก / ส่งไซต์ <span class="muted" style="font-weight:400">— เครื่องในร่างถือว่า "ถูกยืม" แล้ว · กด "ออกใบ" เพื่อออกเลขที่ + พิมพ์</span></h3>
     <div id="hdtbl" style="max-height:40vh;overflow:auto"><table class="locktbl"><thead><tr><th>บ.</th><th>โครงการ / ไซต์</th><th>ผู้เบิก</th><th>วันที่</th><th class="center">จำนวน</th><th></th></tr></thead><tbody>${
-      bb.map((b,i)=>`<tr><td>${coBadge(b.company)}</td><td><b>${esc(b.project)||'-'}</b>${b.no!=null?` <span class="chip" style="background:#dbeafe;color:#1e40af;font-size:11px">⏸️ พักไว้ · เลข #${String(b.no).padStart(3,'0')}</span>`:''}</td><td>${esc(b.who)||'-'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 10px" onclick="addToDraft(${i})">➕ เพิ่มเครื่อง</button> <button class="btn" style="padding:5px 10px" onclick="editBorrowBatchForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:#16a34a;color:#fff;padding:5px 11px" onclick="issueDraft(${i})">🖨️ ออกใบ</button> <button class="btn" style="background:#fee2e2;color:#b91c1c;padding:5px 10px" onclick="cancelDraft(${i})">🗑️ ยกเลิก</button></td></tr>`).join('')||`<tr><td colspan=6 class="empty">ยังไม่มีใบร่างเบิก — สร้างที่เมนู เบิก/คืน → เลือกเครื่อง → "เก็บเข้าร่าง"</td></tr>`
+      bb.map((b,i)=>`<tr><td>${coBadge(b.company)}</td><td><b>${esc(b.project)||'-'}</b>${b.no!=null?` <span class="chip" style="background:#dbeafe;color:#1e40af;font-size:11px">⏸️ พักไว้ · เลข #${String(b.no).padStart(3,'0')}</span>`:''}</td><td>${esc(b.who)||'-'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 10px" onclick="draftPreview('borrow',${i})">👁️ ดูตัวอย่าง</button> <button class="btn" style="padding:5px 10px" onclick="addToDraft(${i})">➕ เพิ่มเครื่อง</button> <button class="btn" style="padding:5px 10px" onclick="editBorrowBatchForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:#16a34a;color:#fff;padding:5px 11px" onclick="issueDraft(${i})">🖨️ ออกใบ</button> <button class="btn" style="background:#fee2e2;color:#b91c1c;padding:5px 10px" onclick="cancelDraft(${i})">🗑️ ยกเลิก</button></td></tr>`).join('')||`<tr><td colspan=6 class="empty">ยังไม่มีใบร่างเบิก — สร้างที่เมนู เบิก/คืน → เลือกเครื่อง → "เก็บเข้าร่าง"</td></tr>`
     }</tbody></table></div></div>
    <div class="panel">
     <h3>🔧 ใบร่างส่งซ่อม <span class="muted" style="font-weight:400">— เครื่องในร่างถือว่า "ส่งซ่อม" แล้ว · กด "ออกใบ" เพื่อออกเลขที่ + พิมพ์</span></h3>
     <div id="hrdtbl" style="max-height:40vh;overflow:auto"><table class="locktbl"><thead><tr><th>บ.</th><th>ร้าน/ช่างซ่อม</th><th>ผู้ส่ง</th><th>วันที่</th><th class="center">จำนวน</th><th></th></tr></thead><tbody>${
-      rr.map((b,i)=>`<tr><td>${coBadge(b.company)}</td><td><b>${esc(b.vendor)||'-'}</b>${b.parkNo!=null?` <span class="chip" style="background:#dbeafe;color:#1e40af;font-size:11px">⏸️ พักไว้ · เลข #${String(b.parkNo).padStart(3,'0')}</span>`:''}</td><td>${esc(b.sender)||'-'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 10px" onclick="addToRepairDraft(${i})">➕ เพิ่มเครื่อง</button> <button class="btn" style="padding:5px 10px" onclick="editRepairDraftForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:#16a34a;color:#fff;padding:5px 11px" onclick="issueRepairDraft(${i})">🖨️ ออกใบ</button> <button class="btn" style="background:#fee2e2;color:#b91c1c;padding:5px 10px" onclick="cancelRepairDraft(${i})">🗑️ ยกเลิก</button></td></tr>`).join('')||`<tr><td colspan=6 class="empty">ยังไม่มีใบร่างซ่อม — สร้างที่เมนู ส่งซ่อม → เลือกเครื่อง → "เก็บเข้าร่าง"</td></tr>`
+      rr.map((b,i)=>`<tr><td>${coBadge(b.company)}</td><td><b>${esc(b.vendor)||'-'}</b>${b.parkNo!=null?` <span class="chip" style="background:#dbeafe;color:#1e40af;font-size:11px">⏸️ พักไว้ · เลข #${String(b.parkNo).padStart(3,'0')}</span>`:''}</td><td>${esc(b.sender)||'-'}</td><td>${esc(fmtDateTH(b.date))||'-'}</td><td class="center">${b.tools.length}</td><td class="right" style="white-space:nowrap"><button class="btn" style="padding:5px 10px" onclick="draftPreview('repair',${i})">👁️ ดูตัวอย่าง</button> <button class="btn" style="padding:5px 10px" onclick="addToRepairDraft(${i})">➕ เพิ่มเครื่อง</button> <button class="btn" style="padding:5px 10px" onclick="editRepairDraftForm(${i})">✏️ แก้ไข</button> <button class="btn" style="background:#16a34a;color:#fff;padding:5px 11px" onclick="issueRepairDraft(${i})">🖨️ ออกใบ</button> <button class="btn" style="background:#fee2e2;color:#b91c1c;padding:5px 10px" onclick="cancelRepairDraft(${i})">🗑️ ยกเลิก</button></td></tr>`).join('')||`<tr><td colspan=6 class="empty">ยังไม่มีใบร่างซ่อม — สร้างที่เมนู ส่งซ่อม → เลือกเครื่อง → "เก็บเข้าร่าง"</td></tr>`
     }</tbody></table></div></div>`;
+}
+// ดูใบร่างเป็นหน้าตาใบจริง — ไม่ออกเลข ไม่บันทึกอะไร · คัดลอก/บันทึกเป็นรูปส่งให้หัวหน้าดูก่อนออกใบได้
+function draftPreview(kind,i){
+  const rep=kind==='repair', b=((rep?window._rd:window._bb)||[])[i]; if(!b){toast('ไม่พบใบร่าง');return;}
+  const pno=rep?b.parkNo:b.no, sub=(pno!=null)?'พักไว้ · เลข #'+String(pno).padStart(3,'0'):'ยังไม่ออกเลขที่';
+  const doc=rep
+    ?`<div style="padding:8mm">${repairDocHtml('ร่าง',b.date,b.vendor,b.sender,b.tools.map(t=>({t,reason:t.reason||'',project:t.project||''})),b.company,false,false,sub)}</div>` // ขอบเท่าระยะขอบกระดาษตอนพิมพ์
+    :borrowDocHtml(b.tools,b.who,b.project,b.date,pno,b.company,false,sub);
+  window._dpv={scale:rep?2:3,name:['ใบร่าง'+(rep?'ส่งซ่อม':'ส่งไซต์'),b.company,rep?b.vendor:b.project,b.date].filter(Boolean).join('_')};
+  openModal(`<h3>👁️ ตัวอย่างใบร่าง${rep?'ส่งซ่อม':'เบิก / ส่งไซต์'} ${coBadge(b.company)}</h3>
+    <p class="muted">ดูก่อน — <b>ยังไม่ออกเลขที่ ไม่บันทึกอะไร</b> · คัดลอกรูปไปวางในแชท หรือบันทึก PNG ส่งให้หัวหน้าดูได้</p>
+    ${docBox(doc,rep?'297mm':'150mm')}
+    <div class="flexrow"><button class="btn primary" onclick="draftCopyImg()">📋 คัดลอกรูป</button><button class="btn" onclick="draftSavePng()">💾 บันทึก PNG</button><button class="btn" style="background:#16a34a;color:#fff" onclick="closeModal();${rep?'issueRepairDraft':'issueDraft'}(${i})">🖨️ ออกใบ</button><button class="btn ghost" onclick="closeModal()">ปิด</button></div>`);
+}
+async function draftImgBlob(){ // รูปของใบในกล่องตัวอย่าง (#docprevpaper) — ปลดซูม/ความสูงจำกัดในสำเนา ให้ได้ใบเต็มขนาดจริง
+  if(!await ensureH2C())throw new Error('โหลดตัวแปลงรูปไม่ได้');
+  const canvas=await html2canvas(document.getElementById('docprevpaper'),{scale:(window._dpv&&window._dpv.scale)||2,backgroundColor:'#ffffff',
+    onclone:d=>{const w=d.getElementById('docprevwrap'),p=d.getElementById('docprevpaper');if(w){w.style.maxHeight='none';w.style.overflow='visible';}if(p){p.style.zoom='1';p.style.boxShadow='none';}}});
+  return await new Promise((res,rej)=>canvas.toBlob(bl=>bl?res(bl):rej(new Error('สร้างรูปไม่ได้')),'image/png'));
+}
+async function draftCopyImg(){
+  if(!(navigator.clipboard&&navigator.clipboard.write&&window.ClipboardItem)){toast('เบราว์เซอร์นี้คัดลอกรูปไม่ได้ — ใช้ปุ่ม "บันทึก PNG" แทน');return;}
+  toast('กำลังสร้างรูป…');
+  try{await navigator.clipboard.write([new ClipboardItem({'image/png':draftImgBlob()})]);toast('✅ คัดลอกรูปแล้ว — ไปวาง (Ctrl+V) ในแชทได้เลย');}
+  catch(e){toast('คัดลอกไม่ได้: '+e.message+' — ใช้ปุ่ม "บันทึก PNG" แทน');}
+}
+async function draftSavePng(){
+  toast('กำลังสร้างรูป…');
+  try{const bl=await draftImgBlob(),a=document.createElement('a');a.href=URL.createObjectURL(bl);
+    a.download=String((window._dpv&&window._dpv.name)||'ใบร่าง').replace(/[\\/:*?"<>|]+/g,'-')+'.png';
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast('✅ บันทึกรูปแล้ว');}
+  catch(e){toast('สร้างรูปไม่ได้: '+e.message);}
 }
 function addToDraft(i){
   const b=(window._bb||[])[i]; if(!b){toast('ไม่พบใบร่าง');return;}
@@ -2765,11 +2799,14 @@ function bossReportRender(found,miss){
       <button class="btn" onclick="(function(){$('#printArea').innerHTML=document.getElementById('bossrep').outerHTML;printNow(true);})()">🖨️ พิมพ์</button>
       <button class="btn ghost" onclick="closeModal()">ปิด</button></div>`,true);
 }
+async function ensureH2C(){ // โหลด html2canvas ตอนใช้ครั้งแรก (รายงานติดตาม + รูปใบร่าง)
+  if(!window.html2canvas){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';s.integrity='sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H';s.crossOrigin='anonymous';s.onload=res;s.onerror=rej;document.head.appendChild(s);}).catch(()=>{});}
+  return !!window.html2canvas;
+}
 async function bossReportPNG(){
   const el=document.getElementById('bossrep'); if(!el){toast('ไม่พบรายงาน');return;}
   toast('กำลังสร้างรูป…');
-  if(!window.html2canvas){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';s.integrity='sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H';s.crossOrigin='anonymous';s.onload=res;s.onerror=rej;document.head.appendChild(s);}).catch(()=>{});}
-  if(!window.html2canvas){toast('โหลดตัวแปลงรูปไม่ได้ — ลองใช้ปุ่มพิมพ์แทน');return;}
+  if(!await ensureH2C()){toast('โหลดตัวแปลงรูปไม่ได้ — ลองใช้ปุ่มพิมพ์แทน');return;}
   try{
     const canvas=await html2canvas(el,{scale:2,backgroundColor:'#ffffff'});
     const a=document.createElement('a');a.href=canvas.toDataURL('image/png');
@@ -3170,7 +3207,7 @@ async function delUser(id,email){
 
 /* ============ modal ============ */
 function fitDocPrev(){const w=document.getElementById('docprevwrap'),p=document.getElementById('docprevpaper');if(!w||!p)return;p.style.zoom='1';const avail=w.clientWidth-16,pw=p.offsetWidth;if(pw>0)p.style.zoom=String(Math.min(1,avail/pw));}
-function docBox(doc){return `<div id="docprevwrap" style="overflow:auto;background:#eef2f7;border-radius:8px;padding:8px;max-height:64vh"><div id="docprevpaper" style="width:297mm;margin:0 auto;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.18)">${doc}</div></div>`;}
+function docBox(doc,w){return `<div id="docprevwrap" style="overflow:auto;background:#eef2f7;border-radius:8px;padding:8px;max-height:64vh"><div id="docprevpaper" style="width:${w||'297mm'};margin:0 auto;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.18)">${doc}</div></div>`;}
 /* ===== กันกดปุ่มบันทึกซ้ำ (ดับเบิลคลิก/กดรัว → เคยได้ร่างเบิกซ้ำ 2 แถว) — ล็อกเป็นรายฟังก์ชัน ===== */
 const _busyFn={};
 ['saveTool','saveNewTool','delTool','restoreTool','doDispose','undisposeTool','commitRepair','saveRepairDraft','doReceiveStock','doCancelSlip','restoreSlip','doBorrow','commitBorrow','saveDraft','doMove','markCounted','disposeLost','revertBorrowToDraft','parkBorrowSlip','parkRepairSlip','setMoveFrom','printMove','issueDraft','cancelDraft','issueRepairDraft','cancelRepairDraft','saveRepairDraftEdit','saveBorrowBatch','revertSlipToDraft','saveSlip','saveUser','delUser','scanReceiveSite','doScanReceiveBrokenPC','scanReceiveRepair','scanReportBroken','uploadToolImg','removeToolImg'].forEach(n=>{
