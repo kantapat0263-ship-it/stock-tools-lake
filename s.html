@@ -352,7 +352,7 @@ function screenLogin(){
     <div style="margin:6px 0 18px;max-width:280px">ต้องเข้าสู่ระบบเพื่อดูรายละเอียดและบันทึกรายการ</div>
     <div style="width:100%;max-width:300px;text-align:left">
       <input class="inp" id="le" type="email" placeholder="อีเมล" autocomplete="username">
-      <input class="inp" id="lp" type="password" placeholder="รหัสผ่าน" autocomplete="current-password">
+      <div style="position:relative"><input class="inp" id="lp" type="password" placeholder="รหัสผ่าน" autocomplete="current-password" style="padding-right:46px"><button type="button" aria-label="แสดงรหัสผ่าน" onclick="const i=document.getElementById('lp'),s=i.type==='password';i.type=s?'text':'password';this.textContent=s?'🙈':'👁️';this.setAttribute('aria-label',s?'ซ่อนรหัสผ่าน':'แสดงรหัสผ่าน')" style="position:absolute;right:4px;top:0;bottom:9px;display:flex;align-items:center;background:none;border:0;cursor:pointer;font-size:19px;padding:0 10px;line-height:1">👁️</button></div>
       <button class="btn primary" style="background:var(--blue)" onclick="doLogin()">เข้าสู่ระบบ</button>
       <div id="lmsg" class="muted" style="font-size:13px;margin-top:10px;text-align:center"></div>
     </div></div>`;
