@@ -1277,7 +1277,7 @@ function disposeTool(i){const t=S.tools[i];
     <p class="muted">${esc(t.code)} · ${coBadge(t.company)} · ${esc(t.name)}</p>
     <div style="background:#fef3c7;color:#92400e;padding:9px 12px;border-radius:8px;font-size:13px;margin:8px 0">เครื่องจะถูก<b>ตัดออกจากทะเบียนใช้งาน</b> (เบิก/ไซต์/รายงาน จะไม่เห็น) แต่ยังเก็บบันทึกไว้ในหน้า "ตัดจำหน่าย/ขายซาก" · กู้คืนได้ถ้าตัดผิด</div>
     <div class="flexrow"><div class="field"><label>วันที่ตัดจำหน่าย</label><input type="date" id="dp_date" value="${today()}"></div></div>
-    <div class="flexrow"><div class="field"><label>ประเภท</label><select id="dp_reason"><option>ขายซาก</option><option>สูญหาย</option><option>ชำแหละอะไหล่</option><option>เสื่อมสภาพ/เก่า</option><option value="">อื่นๆ (ระบุเอง)</option></select></div></div>
+    <div class="flexrow"><div class="field"><label>ประเภท</label><select id="dp_reason"><option>ขายซาก</option><option>โจรขโมย</option><option>สูญหาย (ไม่ทราบสาเหตุ)</option><option>ชำแหละอะไหล่</option><option>เสื่อมสภาพ/เก่า</option><option value="">อื่นๆ (ระบุเอง)</option></select></div></div>
     <div class="field"><label>รายละเอียดเพิ่มเติม (ไม่บังคับ)</label><input id="dp_note" placeholder="เช่น หายที่ไซต์ A / ขายให้ร้าน..."></div>
     <div class="flexrow" style="margin-top:16px"><button class="btn" style="background:#f59e0b;color:#fff" onclick="doDispose(${i})">🗄️ ยืนยันตัดจำหน่าย</button><button class="btn ghost" onclick="closeModal()">ยกเลิก</button></div>`);
 }
@@ -3139,18 +3139,31 @@ function renderTrash(){
 }
 
 /* ============ ตัดจำหน่าย / ขายซาก ============ */
+// ประเภทอ่านจากคำแรกของ disposal_note (doDispose เอาประเภทจาก dropdown นำหน้า · ตัดสูญหายจากลิสต์นิ่ง = "สูญหาย (นิ่งเกิน 1 ปี)")
+const DISPOSE_RSN=[{k:'โจรขโมย',ic:'🚨',bg:'#fee2e2',fg:'#b91c1c',main:1},{k:'สูญหาย',ic:'❓',bg:'#fef3c7',fg:'#92400e',main:1},{k:'ขายซาก',ic:'🔧',bg:'#e0e7ff',fg:'#3730a3',main:1},{k:'ชำแหละอะไหล่',ic:'🔩',bg:'#e0e7ff',fg:'#3730a3'},{k:'เสื่อมสภาพ/เก่า',ic:'🕰️',bg:'#e0e7ff',fg:'#3730a3'},{k:'อื่นๆ',ic:'📝',bg:'#f1f5f9',fg:'#475569'}];
+function disposeRsn(note){const n=(note||'').trim();const r=DISPOSE_RSN.find(x=>x.k!=='อื่นๆ'&&n.startsWith(x.k));return r?r.k:'อื่นๆ';}
+let _dpRsn='';
 function renderDisposed(){
+  _dpRsn='';
   const items=(S.disposed||[]).filter(inView);
   const totalPrice=items.reduce((s,x)=>s+(x.price?Number(x.price)||0:0),0);
   $('#view').innerHTML=`<div class="panel">
     <div class="toolbar"><input class="search" id="dpq" placeholder="🔎 ค้นหา: รหัส / ชื่อ / NO / เหตุผล…"><div class="spacer"></div><button class="btn" onclick="exportDisposed()">⬇️ ดาวน์โหลด CSV (บัญชี)</button></div>
     <h3>🗄️ เครื่องที่ตัดจำหน่าย / ขายซาก (${items.length}) <span class="muted" style="font-weight:400">— ตัดออกจากทรัพย์สินแล้ว · มูลค่าซื้อรวม ${totalPrice.toLocaleString('th-TH')} บาท · กู้คืนได้ถ้าตัดผิด</span></h3>
+    <div id="dprsn" style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px"></div>
     <div id="dptbl"></div>
   </div>`;
   const draw=()=>{const q=$('#dpq').value.trim().toLowerCase();
-    let a=items; if(q)a=items.filter(t=>((t.code||'')+' '+(t.name||'')+' '+(t.no||'')+' '+(t.disposalNote||'')).toLowerCase().includes(q));
+    const cnt={};items.forEach(t=>{const k=disposeRsn(t.disposalNote);const c=cnt[k]||(cnt[k]={n:0,v:0});c.n++;c.v+=Number(t.price)||0;});
+    $('#dprsn').innerHTML=DISPOSE_RSN.filter(r=>r.main||cnt[r.k]).map(r=>{const c=cnt[r.k]||{n:0,v:0};const on=_dpRsn===r.k;
+      return `<button class="chip" style="cursor:pointer;font-size:13px;padding:6px 12px;background:${r.bg};color:${r.fg};border:2px solid ${on?r.fg:'transparent'}" title="กดเพื่อกรอง / กดซ้ำเพื่อดูทั้งหมด" onclick="_dpRsn=_dpRsn==='${r.k}'?'':'${r.k}';pgReset('disposed');PG_REDRAW['disposed']()">${r.ic} ${r.k} <b>${c.n}</b> เครื่อง${c.v?' · ฿'+c.v.toLocaleString('th-TH'):''}</button>`;}).join('');
+    let a=items; if(_dpRsn)a=a.filter(t=>disposeRsn(t.disposalNote)===_dpRsn);
+    if(q)a=a.filter(t=>((t.code||'')+' '+(t.name||'')+' '+(t.no||'')+' '+(t.disposalNote||'')+' '+(t.loc||'')).toLowerCase().includes(q));
+    let bySite='';
+    if(_dpRsn&&a.length){const g={};a.forEach(t=>{const k=t.loc||'(ไม่ระบุ)';g[k]=(g[k]||0)+1;});
+      bySite=`<p class="muted" style="font-size:13px;margin:0 0 8px">แยกตามที่อยู่ล่าสุดก่อนตัด: ${Object.entries(g).sort((x,y)=>y[1]-x[1]).map(([k,n])=>`<b>${esc(k)}</b> ${n}`).join(' · ')}</p>`;}
     const pg=pgSlice('disposed',a);
-    $('#dptbl').innerHTML=pg.rows.length?`<div class="listbox"><table class="locktbl"><thead><tr><th>บริษัท</th><th>ชื่อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>วันที่ตัด</th><th>เหตุผล</th><th>ราคาซื้อ</th><th></th></tr></thead><tbody>${pg.rows.map(t=>{const di=(S.disposed||[]).indexOf(t);return `<tr><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td class="muted" style="white-space:nowrap">${esc(t.disposedAt)||'-'}</td><td style="font-size:12px">${esc(t.disposalNote)||'-'}</td><td>${esc(t.price)||'-'}</td><td class="right">${canEditCo(t.company)?`<button class="btn" style="background:#dcfce7;color:#15803d;padding:6px 14px" onclick="undisposeTool(${di})">♻️ กู้คืน</button>`:'<span class="muted" style="font-size:12px">—</span>'}</td></tr>`;}).join('')}</tbody></table></div>${pg.html}`:'<div class="empty">ยังไม่มีเครื่องที่ตัดจำหน่าย</div>';};
+    $('#dptbl').innerHTML=bySite+(pg.rows.length?`<div class="listbox"><table class="locktbl"><thead><tr><th>บริษัท</th><th>ชื่อ</th><th>รุ่น</th><th>หมวด</th><th>NO</th><th>วันที่ตัด</th><th>เหตุผล</th><th>ที่อยู่ล่าสุด</th><th>ราคาซื้อ</th><th></th></tr></thead><tbody>${pg.rows.map(t=>{const di=(S.disposed||[]).indexOf(t);return `<tr><td>${coBadge(t.company)}</td><td>${esc(t.name)}</td><td>${esc(t.model)||'-'}</td><td>${esc(t.cat)}</td><td>${esc(t.no)}</td><td class="muted" style="white-space:nowrap">${esc(t.disposedAt)||'-'}</td><td style="font-size:12px">${esc(t.disposalNote)||'-'}</td><td style="font-size:12px">${esc(t.loc)||'-'}</td><td>${esc(t.price)||'-'}</td><td class="right">${canEditCo(t.company)?`<button class="btn" style="background:#dcfce7;color:#15803d;padding:6px 14px" onclick="undisposeTool(${di})">♻️ กู้คืน</button>`:'<span class="muted" style="font-size:12px">—</span>'}</td></tr>`;}).join('')}</tbody></table></div>${pg.html}`:`<div class="empty">${_dpRsn?'ยังไม่มีเครื่องประเภท '+esc(_dpRsn):'ยังไม่มีเครื่องที่ตัดจำหน่าย'}</div>`);};
   PG_REDRAW['disposed']=draw;
   $('#dpq').oninput=()=>{pgReset('disposed');draw();};draw();
 }
