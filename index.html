@@ -1212,6 +1212,14 @@ async function saveTool(i){const t=S.tools[i];
   const nv={company,cat,no,name:$('#ed_name').value.trim(),brand:$('#ed_brand').value.trim(),model:$('#ed_model').value.trim(),sn:$('#ed_sn').value.trim(),status:$('#ed_st').value,loc:(_ss&&_ss!=='ออฟฟิต')?(_ss+(_pp?(' / '+_pp):'')):'ออฟฟิต',note:$('#ed_note').value.trim(),purchaseDate:$('#ed_pdate').value,price:$('#ed_price').value,warranty:$('#ed_warranty').value.trim()};
   const L={company:'บริษัท',cat:'หมวด',no:'NO',name:'ชื่อ',brand:'ยี่ห้อ',model:'รุ่น',sn:'S/N',status:'สถานะ',loc:'อยู่ที่',note:'หมายเหตุ',purchaseDate:'วันที่ซื้อ',price:'ราคา',warranty:'ประกัน'};
   const ch=Object.keys(L).filter(k=>String(t[k]||'')!==String(nv[k]||'')).map(k=>`${L[k]}: ${t[k]||'-'}→${nv[k]||'-'}`);
+  // กันแก้ทับเป็นคนละเครื่อง (เคส L-JS-003 27 ก.ค. 2026: แก้จิ๊กซอว์ทับเป็นตู้เชื่อม → เครื่องเดิมหายจากระบบ แต่ป้ายยังติดอยู่)
+  // นับเฉพาะช่องที่เดิมมีค่า (เติมช่องว่าง = ปกติ) · เทียบแบบตัดเครื่องหมายคำพูด/ช่องว่าง ("MAKITA"→MAKITA ไม่นับ)
+  const _idn=s=>String(s||'').toLowerCase().replace(/["'“”‘’\s\-_.]/g,'');
+  const _idc=['cat','brand','model','sn'].filter(k=>_idn(t[k])&&_idn(t[k])!==_idn(nv[k]));
+  if(_idc.length>=2){
+    if(!confirm(`⚠️ กำลังเปลี่ยน ${_idc.map(k=>L[k]).join(' + ')} ของ ${t.code} พร้อมกัน — ดูเหมือนเป็น "คนละเครื่อง"\n\n${_idc.map(k=>'• '+L[k]+': '+(t[k]||'-')+' → '+(nv[k]||'-')).join('\n')}\n\nถ้าเป็นเครื่องอีกตัว ให้กด "ยกเลิก" แล้วใช้ ➕ เพิ่มเครื่องมือ แทน\n(ถ้าแก้ทับ เครื่องเดิมจะหายจากระบบ แต่ป้ายเดิมยังติดอยู่ที่ตัวเครื่อง)\n\nกด "ตกลง" เฉพาะเมื่อตั้งใจแก้ข้อมูลเครื่องเดิมที่กรอกผิด`))return;
+    ch.unshift('⚠️ ยืนยันเปลี่ยนตัวตนเครื่อง');
+  }
   const _np=parsePrice(nv.price), _op=(t.price===''||t.price==null)?null:+t.price;
   let _pe;
   if(_np===null)_pe=false;                          // ล้างราคา
